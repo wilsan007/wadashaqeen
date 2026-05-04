@@ -100,7 +100,7 @@ export const TaskRow = ({
         }}
         onDoubleClick={e => {
           e.stopPropagation();
-          onRowDoubleClick(task);
+          onEdit(task.id);
         }}
       >
         {/* Titre de la tâche avec actions */}

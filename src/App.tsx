@@ -55,6 +55,7 @@ const OperationsPage = lazy(() =>
 const PerformanceMonitor = lazy(() => import('./components/dev/PerformanceMonitor'));
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
 const TermsOfUse = lazy(() => import('./pages/TermsOfUse'));
+const UpdatePassword = lazy(() => import('./pages/UpdatePassword'));
 
 import { useInactivityTimer } from '@/hooks/useInactivityTimer';
 import { useSessionManager } from './hooks/useSessionManager';
@@ -79,17 +80,18 @@ const PageLoader = () => (
 const MemoizedRoutes = memo(() => (
   <Suspense fallback={<PageLoader />}>
     <Routes>
+      {/* Route publique racine (Landing Page) */}
+      <Route path="/" element={<LandingPage />} />
+
+      {/* Route dashboard protégée */}
       <Route
-        path="/"
+        path="/dashboard"
         element={
           <ProtectedRoute requiredAccess="canAccessTasks">
             <Index />
           </ProtectedRoute>
         }
       />
-
-      {/* Route dashboard - redirige vers la page d'accueil */}
-      <Route path="/dashboard" element={<Navigate to="/" replace />} />
 
       {/* Routes protégées avec système de permissions réactivé */}
       <Route
@@ -255,6 +257,10 @@ const MemoizedRoutes = memo(() => (
       <Route path="/invite/:inviteId" element={<InvitePage />} />
       <Route path="/privacy-policy" element={<PrivacyPolicy />} />
       <Route path="/terms-of-use" element={<TermsOfUse />} />
+      <Route path="/update-password" element={<UpdatePassword />} />
+
+      {/* Redirect /login to /dashboard if authenticated */}
+      <Route path="/login" element={<Navigate to="/dashboard" replace />} />
 
       {/* Catch-all route */}
       <Route path="*" element={<NotFound />} />
@@ -417,6 +423,7 @@ function App() {
               <Route path="/auth/callback" element={<AuthCallback />} />
               <Route path="/setup-account" element={<SetupAccount />} />
               <Route path="/invite" element={<InvitePage />} />
+              <Route path="/update-password" element={<UpdatePassword />} />
               <Route path="*" element={<Auth onAuthStateChange={handleAuthStateChange} />} />
             </Routes>
           </BrowserRouter>
@@ -438,6 +445,8 @@ function App() {
                     <BrowserRouter>
                       <InvitationHandler />
                       <AppLayoutWithSidebar {...headerProps}>
+                        {/* Redirection automatique pour les utilisateurs connectés sur la racine */}
+                        {window.location.pathname === '/' && <Navigate to="/dashboard" replace />}
                         <MemoizedRoutes />
                       </AppLayoutWithSidebar>
                     </BrowserRouter>

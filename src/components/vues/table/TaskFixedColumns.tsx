@@ -57,8 +57,6 @@ export const TaskFixedColumns = ({
   scrollRef,
   onScroll,
 }: TaskFixedColumnsProps) => {
-  const dialogManager = TaskDialogManager({ tasks, onCreateSubtask });
-
   return (
     <>
       <div ref={scrollRef} className="h-[600px] overflow-auto" onScroll={onScroll}>
@@ -92,7 +90,7 @@ export const TaskFixedColumns = ({
             tasks={tasks}
             selectedTaskId={selectedTaskId}
             onSelectTask={onSelectTask}
-            onRowDoubleClick={dialogManager.handleRowDoubleClick}
+            onRowDoubleClick={task => onEdit(task.id)}
             onCreateSubtask={onCreateSubtask}
             onCreateSubtaskWithActions={onCreateSubtaskWithActions}
             onDelete={onDelete}
@@ -103,8 +101,6 @@ export const TaskFixedColumns = ({
           />
         </Table>
       </div>
-
-      {dialogManager.dialogs}
     </>
   );
 };

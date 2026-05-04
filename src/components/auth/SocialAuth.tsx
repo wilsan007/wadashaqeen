@@ -28,26 +28,6 @@ export const SocialAuth = () => {
     }
   };
 
-  const handleMicrosoftLogin = async () => {
-    try {
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'azure',
-        options: {
-          scopes: 'email profile openid',
-          redirectTo: `${window.location.origin}/auth/callback`,
-        },
-      });
-
-      if (error) throw error;
-    } catch (err: any) {
-      toast({
-        title: 'Erreur',
-        description: err.message || 'Erreur lors de la connexion Microsoft',
-        variant: 'destructive',
-      });
-    }
-  };
-
   return (
     <div className="space-y-3">
       <button
@@ -73,19 +53,6 @@ export const SocialAuth = () => {
           />
         </svg>
         <span className="text-sm font-medium text-gray-700">Continuer avec Google</span>
-      </button>
-
-      <button
-        onClick={handleMicrosoftLogin}
-        className="flex w-full items-center justify-center gap-3 rounded-lg border border-gray-300 px-4 py-2 transition-colors hover:bg-gray-50"
-      >
-        <svg className="h-5 w-5" viewBox="0 0 23 23">
-          <path fill="#f35325" d="M1 1h10v10H1z" />
-          <path fill="#81bc06" d="M12 1h10v10H12z" />
-          <path fill="#05a6f0" d="M1 12h10v10H1z" />
-          <path fill="#ffba08" d="M12 12h10v10H12z" />
-        </svg>
-        <span className="text-sm font-medium text-gray-700">Continuer avec Microsoft</span>
       </button>
 
       <div className="relative my-4">

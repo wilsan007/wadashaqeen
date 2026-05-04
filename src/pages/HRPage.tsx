@@ -65,6 +65,12 @@ const PayrollManagement = lazy(() =>
 const HealthSafety = lazy(() =>
   import('@/components/hr/HealthSafety').then(m => ({ default: m.HealthSafety }))
 );
+const HierarchyConfig = lazy(() =>
+  import('@/components/hr/HierarchyConfig').then(m => ({ default: m.HierarchyConfig }))
+);
+const OrganizationChart = lazy(() =>
+  import('@/components/hr/OrganizationChart').then(m => ({ default: m.OrganizationChart }))
+);
 
 // Composant de chargement professionnel
 const LoadingFallback = () => <BrandedLoadingScreen appName="Wadashaqayn" logoSrc="/logo-w.svg" />;
@@ -147,6 +153,16 @@ const PayrollManagementWithSuspense = () => (
 const HealthSafetyWithSuspense = () => (
   <Suspense fallback={<LoadingFallback />}>
     <HealthSafety />
+  </Suspense>
+);
+const HierarchyConfigWithSuspense = () => (
+  <Suspense fallback={<LoadingFallback />}>
+    <HierarchyConfig />
+  </Suspense>
+);
+const OrganizationChartWithSuspense = () => (
+  <Suspense fallback={<LoadingFallback />}>
+    <OrganizationChart />
   </Suspense>
 );
 
@@ -272,6 +288,22 @@ const HRPage = () => {
                 <Building className="mr-1.5 h-4 w-4 sm:mr-2" />
                 Départ.
               </Button>
+              <Button
+                variant={activeSubTab.employees === 'hierarchy' ? 'default' : 'outline'}
+                onClick={() => setActiveSubTab(prev => ({ ...prev, employees: 'hierarchy' }))}
+                className="h-10 flex-1 text-xs sm:h-auto sm:text-sm"
+              >
+                <TrendingUp className="mr-1.5 h-4 w-4 sm:mr-2" />
+                Organigramme
+              </Button>
+              <Button
+                variant={activeSubTab.employees === 'config' ? 'default' : 'outline'}
+                onClick={() => setActiveSubTab(prev => ({ ...prev, employees: 'config' }))}
+                className="h-10 flex-1 text-xs sm:h-auto sm:text-sm"
+              >
+                <Shield className="mr-1.5 h-4 w-4 sm:mr-2" />
+                Config.
+              </Button>
             </div>
 
             <div className="modern-card transition-smooth hover-glow rounded-xl">
@@ -279,6 +311,8 @@ const HRPage = () => {
                 <EnhancedEmployeeManagementWithSuspense />
               )}
               {activeSubTab.employees === 'departments' && <DepartmentManagementWithSuspense />}
+              {activeSubTab.employees === 'hierarchy' && <OrganizationChartWithSuspense />}
+              {activeSubTab.employees === 'config' && <HierarchyConfigWithSuspense />}
             </div>
           </div>
         </TabsContent>

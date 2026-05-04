@@ -17,7 +17,7 @@ import { TaskFixedColumns } from './TaskFixedColumns';
 import { TaskActionColumns } from './TaskActionColumns';
 import { LoadingState } from '@/components/ui/loading-state';
 import { ErrorState } from '@/components/ui/error-state';
-import { ModernTaskEditDialog } from '@/components/tasks/ModernTaskEditDialog';
+import { TaskDetailDialog } from '@/components/tasks/TaskDetailDialog';
 import { ModernTaskCreationDialog } from '@/components/tasks/ModernTaskCreationDialog';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { ProjectTableView } from '../projects/ProjectTableView';
@@ -460,7 +460,7 @@ const DynamicTable = ({ demoTasks, isDemoMode = false }: DynamicTableProps = {})
       </CardContent>
 
       {/* Dialog de modification de tâche */}
-      <ModernTaskEditDialog
+      <TaskDetailDialog
         open={editDialogOpen}
         onOpenChange={setEditDialogOpen}
         task={taskToEdit}

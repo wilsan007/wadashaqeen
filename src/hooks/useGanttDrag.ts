@@ -167,12 +167,43 @@ export const useGanttDrag = (
           window.location.reload();
         }
       } finally {
+        // ✅ Revised Fix: Manually reset styles to original position
+        // This ensures the element stays visible and snaps back to the correct place
+        const targetId = draggedTask || resizeTask?.taskId;
+        if (targetId && dragStart) {
+          const taskElement = document.querySelector(`[data-task-id="${targetId}"]`) as HTMLElement;
+
+          if (taskElement) {
+            // Calculate original position based on original dates
+            const left =
+              ((dragStart.originalStartDate.getTime() - timelineStartDate.getTime()) /
+                (1000 * 60 * 60 * 24) /
+                config.unitDuration) *
+              config.unitWidth;
+
+            taskElement.style.left = `${left}px`;
+
+            // If it was a resize, also reset width to match original duration
+            if (resizeTask) {
+              const duration = Math.max(
+                1,
+                Math.ceil(
+                  (dragStart.originalEndDate.getTime() - dragStart.originalStartDate.getTime()) /
+                    (1000 * 60 * 60 * 24)
+                )
+              );
+              const width = (duration / config.unitDuration) * config.unitWidth;
+              taskElement.style.width = `${width}px`;
+            }
+          }
+        }
+
         setDraggedTask(null);
         setResizeTask(null);
         setDragStart(null);
       }
     },
-    [dragStart, draggedTask, resizeTask, config, updateTaskDates, onError]
+    [dragStart, draggedTask, resizeTask, config, updateTaskDates, onError, timelineStartDate]
   );
 
   return {

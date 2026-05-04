@@ -20,6 +20,8 @@ interface EditableTaskAssigneeProps {
   onChange: (value: string) => void;
   readOnly?: boolean;
   taskTenantId?: string; // 🔒 SÉCURITÉ: Filtrer par tenant de la tâche
+  initialName?: string | null;
+  initialAvatar?: string | null;
 }
 
 export const EditableTaskAssignee = ({
@@ -27,6 +29,8 @@ export const EditableTaskAssignee = ({
   onChange,
   readOnly = false,
   taskTenantId,
+  initialName,
+  initialAvatar,
 }: EditableTaskAssigneeProps) => {
   const { employees, loading } = useEmployees();
 
@@ -43,9 +47,21 @@ export const EditableTaskAssignee = ({
   const normalizedValue = value || null;
 
   // Chercher l'employé assigné par id ou user_id DANS LES EMPLOYÉS FILTRÉS
-  const assignee = normalizedValue
+  const foundEmployee = normalizedValue
     ? filteredEmployees.find(e => e.id === normalizedValue || e.user_id === normalizedValue)
     : null;
+
+  // Utiliser les données initiales si l'employé n'est pas encore chargé (évite le flash "Non assigné")
+  const assignee =
+    foundEmployee ||
+    (initialName
+      ? {
+          full_name: initialName,
+          avatar_url: initialAvatar,
+          id: normalizedValue || 'temp',
+          user_id: normalizedValue || 'temp',
+        }
+      : null);
 
   if (readOnly) {
     if (!assignee) {

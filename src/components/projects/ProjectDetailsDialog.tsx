@@ -1,15 +1,9 @@
 import { toast } from 'sonner';
-import {
-  ResponsiveModal,
-  ResponsiveModalContent,
-  ResponsiveModalHeader,
-  ResponsiveModalTitle,
-} from '@/components/ui/responsive-modal';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Calendar, Users, Target, DollarSign, Activity, Clock } from 'lucide-react';
-import { formatCurrency } from '@/components/common/CurrencySelect';
 
 interface Project {
   id: string;
@@ -24,7 +18,6 @@ interface Project {
   team_members?: string[];
   skills_required?: string[];
   budget?: number;
-  currency?: string;
   priority?: string; // Peut être n'importe quelle valeur
   created_at?: string;
   updated_at?: string;
@@ -80,139 +73,141 @@ export const ProjectDetailsDialog: React.FC<ProjectDetailsDialogProps> = ({
   const priorityBadge = getPriorityBadge(project.priority);
 
   return (
-    <ResponsiveModal open={open} onOpenChange={onOpenChange}>
-      <ResponsiveModalContent className="max-h-[90vh] w-[95vw] max-w-4xl overflow-y-auto p-4 sm:p-6">
-        <ResponsiveModalHeader>
-          <ResponsiveModalTitle className="flex items-center gap-2 text-base sm:text-lg">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="border-border/20 flex max-h-[85vh] w-[90vw] max-w-4xl flex-col overflow-hidden border p-0 shadow-lg sm:w-[88vw] sm:rounded-2xl">
+        <DialogHeader className="shrink-0 border-b px-6 py-4">
+          <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
             <Target className="h-4 w-4 sm:h-5 sm:w-5" />
             <span className="truncate">Détails du Projet: {project.name}</span>
-          </ResponsiveModalTitle>
-        </ResponsiveModalHeader>
+          </DialogTitle>
+        </DialogHeader>
 
-        <div className="space-y-4 sm:space-y-6">
-          {/* Informations générales */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Informations Générales</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex flex-wrap items-center gap-2">
-                <Badge className={statusBadge.color}>{statusBadge.label}</Badge>
-                <Badge className={priorityBadge.color}>{priorityBadge.label}</Badge>
-              </div>
-
-              {project.description && (
-                <p className="text-muted-foreground text-sm sm:text-base">{project.description}</p>
-              )}
-
-              <div className="grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2">
-                {project.start_date && project.end_date && (
-                  <div className="flex items-center gap-2">
-                    <Calendar className="text-muted-foreground h-4 w-4" />
-                    <span className="text-sm">
-                      {new Date(project.start_date).toLocaleDateString()} -{' '}
-                      {new Date(project.end_date).toLocaleDateString()}
-                    </span>
-                  </div>
-                )}
-
-                {(project.manager || project.owner_name) && (
-                  <div className="flex items-center gap-2">
-                    <Users className="text-muted-foreground h-4 w-4" />
-                    <span className="text-sm">
-                      Manager: {project.manager || project.owner_name}
-                    </span>
-                  </div>
-                )}
-
-                {project.budget && (
-                  <div className="flex items-center gap-2">
-                    <DollarSign className="text-muted-foreground h-4 w-4" />
-                    <span className="text-sm">
-                      Budget: {formatCurrency(project.budget, project.currency || 'DJF')}
-                    </span>
-                  </div>
-                )}
-
-                <div className="flex items-center gap-2">
-                  <Activity className="text-muted-foreground h-4 w-4" />
-                  <span className="text-sm">Progression: {project.progress ?? 0}%</span>
-                </div>
-              </div>
-
-              <div>
-                <Progress value={project.progress ?? 0} className="w-full" />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Équipe */}
-          {project.team_members && project.team_members.length > 0 && (
+        <div className="h-full min-h-0 w-full flex-1 overflow-y-auto">
+          <div className="space-y-4 px-6 py-6 sm:space-y-6">
+            {/* Informations générales */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Équipe du Projet</CardTitle>
+                <CardTitle className="text-lg">Informations Générales</CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="flex flex-wrap gap-2">
-                  {project.team_members.map(member => (
-                    <Badge key={member} variant="outline">
-                      {member}
-                    </Badge>
-                  ))}
+              <CardContent className="space-y-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge className={statusBadge.color}>{statusBadge.label}</Badge>
+                  <Badge className={priorityBadge.color}>{priorityBadge.label}</Badge>
                 </div>
-              </CardContent>
-            </Card>
-          )}
 
-          {/* Compétences requises */}
-          {project.skills_required && project.skills_required.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Compétences Requises</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-wrap gap-2">
-                  {project.skills_required.map(skill => (
-                    <Badge key={skill} className="bg-primary/10 text-primary">
-                      {skill}
-                    </Badge>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
+                {project.description && (
+                  <p className="text-muted-foreground text-sm sm:text-base">
+                    {project.description}
+                  </p>
+                )}
 
-          {/* Historique des modifications */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Clock className="h-5 w-5" />
-                Historique des Modifications
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                {mockHistory.map((entry, index) => (
-                  <div
-                    key={index}
-                    className="border-border/50 flex items-start gap-3 border-b pb-3 last:border-b-0"
-                  >
-                    <Badge variant="outline" className="text-xs">
-                      {entry.user}
-                    </Badge>
-                    <div className="flex-1">
-                      <p className="text-sm">{entry.action}</p>
-                      <p className="text-muted-foreground text-xs">
-                        {new Date(entry.date).toLocaleDateString()}
-                      </p>
+                <div className="grid grid-cols-1 gap-3 sm:gap-4 md:grid-cols-2">
+                  {project.start_date && project.end_date && (
+                    <div className="flex items-center gap-2">
+                      <Calendar className="text-muted-foreground h-4 w-4" />
+                      <span className="text-sm">
+                        {new Date(project.start_date).toLocaleDateString()} -{' '}
+                        {new Date(project.end_date).toLocaleDateString()}
+                      </span>
                     </div>
+                  )}
+
+                  {(project.manager || project.owner_name) && (
+                    <div className="flex items-center gap-2">
+                      <Users className="text-muted-foreground h-4 w-4" />
+                      <span className="text-sm">
+                        Manager: {project.manager || project.owner_name}
+                      </span>
+                    </div>
+                  )}
+
+                  {project.budget && (
+                    <div className="flex items-center gap-2">
+                      <DollarSign className="text-muted-foreground h-4 w-4" />
+                      <span className="text-sm">Budget: {project.budget.toLocaleString()} €</span>
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-2">
+                    <Activity className="text-muted-foreground h-4 w-4" />
+                    <span className="text-sm">Progression: {project.progress ?? 0}%</span>
                   </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+                </div>
+
+                <div>
+                  <Progress value={project.progress ?? 0} className="w-full" />
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Équipe */}
+            {project.team_members && project.team_members.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Équipe du Projet</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-wrap gap-2">
+                    {project.team_members.map(member => (
+                      <Badge key={member} variant="outline">
+                        {member}
+                      </Badge>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Compétences requises */}
+            {project.skills_required && project.skills_required.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Compétences Requises</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex flex-wrap gap-2">
+                    {project.skills_required.map(skill => (
+                      <Badge key={skill} className="bg-primary/10 text-primary">
+                        {skill}
+                      </Badge>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Historique des modifications */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Clock className="h-5 w-5" />
+                  Historique des Modifications
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  {mockHistory.map((entry, index) => (
+                    <div
+                      key={index}
+                      className="border-border/50 flex items-start gap-3 border-b pb-3 last:border-b-0"
+                    >
+                      <Badge variant="outline" className="text-xs">
+                        {entry.user}
+                      </Badge>
+                      <div className="flex-1">
+                        <p className="text-sm">{entry.action}</p>
+                        <p className="text-muted-foreground text-xs">
+                          {new Date(entry.date).toLocaleDateString()}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </div>
-      </ResponsiveModalContent>
-    </ResponsiveModal>
+      </DialogContent>
+    </Dialog>
   );
 };

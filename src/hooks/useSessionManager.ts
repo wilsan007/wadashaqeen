@@ -38,15 +38,17 @@ export const useSessionManager = () => {
     try {
       console.log('🔒 SÉCURITÉ: Déconnexion via useSessionManager...');
 
-      // 🚨 CRITIQUE: Utiliser le système de sécurité centralisé
-      await secureLogout();
-
-      // États React (déjà nettoyés mais on les reset quand même)
+      // ⚡️ OPTIMISATION: Mise à jour optimiste de l'UI
+      // On vide l'état React immédiatement pour donner un feedback instantané
       setUser(null);
       setSession(null);
+      setLoading(false);
+
+      // 🚨 CRITIQUE: Utiliser le système de sécurité centralisé
+      // Cela va rediriger l'utilisateur après le nettoyage
+      await secureLogout();
     } catch (error) {
       console.error('❌ Erreur lors de la déconnexion sécurisée:', error);
-      // En cas d'erreur, rediriger quand même vers login
       window.location.replace('/login?error=logout_failed');
     }
   }, []);

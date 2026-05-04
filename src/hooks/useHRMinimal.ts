@@ -28,6 +28,9 @@ import type {
   PaginationConfig,
 } from '@/types/hr';
 
+// Export types for consumers
+export type { Employee, HRData, HRMetrics };
+
 // Configuration options for the hook
 export interface UseHRMinimalOptions {
   enabled?: {
@@ -200,10 +203,6 @@ export const useHRMinimal = (options: UseHRMinimalOptions = {}) => {
           return; // Pas de mise à jour des métriques si c'est du cache pour éviter re-renders
         }
 
-        // // console.log('🔄 Fetching HR data for tenant:', tenantId || 'ALL_TENANTS (Super Admin)');
-        // // console.log('👑 Is Super Admin:', isSuper);
-        // // console.log(' Cache key:', cacheKey);
-
         const [
           leaveRequestsRes,
           absenceTypesRes,
@@ -212,7 +211,7 @@ export const useHRMinimal = (options: UseHRMinimalOptions = {}) => {
           leaveBalancesRes,
           departmentsRes,
         ] = await Promise.all([
-          // Leave Requests - Super Admin voit tout, autres voient leur tenant
+          // Leave Requests
           enabled.leaveRequests
             ? isSuper
               ? supabase
@@ -230,12 +229,12 @@ export const useHRMinimal = (options: UseHRMinimalOptions = {}) => {
                 : supabase.from('leave_requests').select('*').limit(0)
             : Promise.resolve({ data: [], error: null }),
 
-          // Absence Types - Toujours globaux
+          // Absence Types
           enabled.absenceTypes
             ? supabase.from('absence_types').select('*').order('name')
             : Promise.resolve({ data: [], error: null }),
 
-          // Attendances - Super Admin voit tout, autres voient leur tenant
+          // Attendances
           enabled.attendances
             ? isSuper
               ? supabase
@@ -253,7 +252,7 @@ export const useHRMinimal = (options: UseHRMinimalOptions = {}) => {
                 : supabase.from('attendances').select('*').limit(0)
             : Promise.resolve({ data: [], error: null }),
 
-          // Employees - Super Admin voit max, autres voient leur tenant
+          // Employees
           enabled.employees
             ? isSuper
               ? supabase
@@ -270,7 +269,7 @@ export const useHRMinimal = (options: UseHRMinimalOptions = {}) => {
                 : supabase.from('employees').select('*').limit(0)
             : Promise.resolve({ data: [], error: null }),
 
-          // Leave Balances - Super Admin voit tout, autres voient leur tenant
+          // Leave Balances
           enabled.leaveBalances
             ? isSuper
               ? supabase
@@ -290,7 +289,7 @@ export const useHRMinimal = (options: UseHRMinimalOptions = {}) => {
                 : supabase.from('leave_balances').select('*').limit(0)
             : Promise.resolve({ data: [], error: null }),
 
-          // Departments - Super Admin voit tout, autres voient leur tenant
+          // Departments
           enabled.departments
             ? isSuper
               ? supabase.from('departments').select('*').order('name')
@@ -300,24 +299,6 @@ export const useHRMinimal = (options: UseHRMinimalOptions = {}) => {
             : Promise.resolve({ data: [], error: null }),
         ]);
 
-        // Vérifier les erreurs
-        if (leaveRequestsRes.error) {
-          console.error('Leave requests error:', leaveRequestsRes.error);
-        }
-        if (absenceTypesRes.error) {
-          console.error('Absence types error:', absenceTypesRes.error);
-        }
-        if (attendancesRes.error) {
-          console.error('Attendances error:', attendancesRes.error);
-        }
-        if (employeesRes.error) {
-          console.error('Employees error:', employeesRes.error);
-        }
-        if (leaveBalancesRes.error) {
-          console.error('Leave balances error:', leaveBalancesRes.error);
-        }
-
-        // Construire les données (même en cas d'erreur partielle)
         const newData: HRData = {
           leaveRequests: leaveRequestsRes.data || [],
           absenceTypes: absenceTypesRes.data || [],
@@ -327,15 +308,12 @@ export const useHRMinimal = (options: UseHRMinimalOptions = {}) => {
           departments: departmentsRes.data || [],
         };
 
-        // Calculer les métriques de performance
         const endTime = performance.now();
         const fetchTime = endTime - startTime;
         const dataSize = JSON.stringify(newData).length;
 
-        // Mettre en cache les données
         setCachedData(cacheKey, newData);
 
-        // Mettre à jour les états
         setData(newData);
         setMetrics({
           fetchTime,
@@ -343,56 +321,38 @@ export const useHRMinimal = (options: UseHRMinimalOptions = {}) => {
           dataSize,
           lastUpdate: new Date(),
         });
-
-        // // console.log('✅ HR data loaded:', {
-        //   leaveRequests: newData.leaveRequests.length,
-        //   absenceTypes: newData.absenceTypes.length,
-        //   attendances: newData.attendances.length,
-        //   employees: newData.employees.length,
-        //   isSuperAdmin: isSuper,
-        //   scope: isSuper ? 'ALL_TENANTS' : `TENANT_${tenantId}`,
-        //   fetchTime: `${fetchTime.toFixed(2)}ms`,
-        //   dataSize: `${(dataSize / 1024).toFixed(2)}KB`,
-        //   cacheKey
-        // });
       } catch (error: any) {
         console.error('❌ Error fetching HR data:', error);
         setError(error.message || 'Erreur de chargement');
-        // Toast removed to prevent render loop - error state is sufficient
       } finally {
         setLoading(false);
       }
     };
 
     fetchData();
-  }, [tenantId, rolesLoading, isSuperAdminValue]); // ✅ Callbacks are stable, no need to include them
+  }, [tenantId, rolesLoading, isSuperAdminValue]);
 
-  // Fonction de refresh optimisée avec invalidation cache global
+  // Fonction de refresh optimisée
   const refresh = useCallback(() => {
-    const cacheKey = getCacheKey(tenantId, isSuperAdminValue); // ✅ Utiliser la valeur stable
+    const cacheKey = getCacheKey(tenantId, isSuperAdminValue);
     cacheManager.invalidate(cacheKey);
     fetchedRef.current = false;
     tenantIdRef.current = null;
     setLoading(true);
   }, [tenantId, isSuperAdminValue, getCacheKey]);
 
-  // Fonction pour charger plus de données (pagination)
+  // Fonction pour charger plus de données
   const loadMore = useCallback(
     async (resource: keyof HRData) => {
       if (!enablePagination) return;
-
       setLoading(true);
       try {
         const currentData = data[resource];
         const currentLimit = limits[resource as keyof typeof limits] || 20;
-        const newLimit = currentLimit + 20; // Charger 20 de plus
-
-        // Mettre à jour les limites et invalider le cache pour re-fetch
+        const newLimit = currentLimit + 20;
         const cacheKey = getCacheKey(tenantId, isSuperAdminValue);
         cacheManager.invalidate(cacheKey);
         fetchedRef.current = false;
-
-        // Le prochain useEffect fera un fetch avec la nouvelle limite
         setLoading(true);
       } catch (error) {
         console.error('Error loading more:', error);
@@ -401,17 +361,15 @@ export const useHRMinimal = (options: UseHRMinimalOptions = {}) => {
     [enablePagination, data, limits, tenantId, isSuperAdminValue, getCacheKey]
   );
 
-  // Fonction pour vider tout le cache HR (utilise le cache global)
   const clearCache = useCallback(() => {
     cacheManager.invalidatePattern('hr:*');
   }, []);
 
-  // Fonction pour obtenir les statistiques de cache global
   const getCacheStats = useCallback(() => {
     return cacheManager.getStats();
   }, []);
 
-  // Cleanup lors du démontage
+  // Cleanup
   useEffect(() => {
     return () => {
       if (abortControllerRef.current) {
@@ -420,40 +378,22 @@ export const useHRMinimal = (options: UseHRMinimalOptions = {}) => {
     };
   }, []);
 
-  // Déterminer les informations d'accès pour l'UX
   const currentUserRole = userRoles[0]?.roles?.name || 'Aucun rôle';
   const requiredRole = 'manager_hr ou tenant_admin';
-
-  // SOLUTION TEMPORAIRE : Récupérer le tenant_id depuis user_roles si useTenant échoue
   const tenantIdFromRoles = userRoles[0]?.tenant_id;
   const effectiveTenantId = tenantId || tenantIdFromRoles;
-
-  // Vérifier si l'utilisateur a le bon rôle
   const hasRequiredRole =
     isSuperAdminValue || currentUserRole === 'manager_hr' || currentUserRole === 'tenant_admin';
-
   const hasAccess = hasRequiredRole && !!effectiveTenantId;
 
-  // ✅ CORRECTION: Console.log supprimé - causait la boucle infinie
-  // Debug désactivé car il s'exécutait à chaque render
-
   return {
-    // Données
     ...data,
-
-    // États
     loading,
     error,
-
-    // Métriques de performance
     metrics,
     pagination,
-
-    // Permissions optimisées
     canAccess: hasAccess,
     isSuperAdmin: isSuperAdminValue,
-
-    // Informations d'accès pour l'UX
     accessInfo: {
       hasAccess,
       currentRole: currentUserRole,
@@ -464,14 +404,11 @@ export const useHRMinimal = (options: UseHRMinimalOptions = {}) => {
           : 'insufficient_permissions'
         : null,
     },
-
-    // Actions optimisées
     refresh,
-    refreshData: refresh, // Alias pour compatibilité
+    refreshData: refresh,
     clearCache,
     getCacheStats,
-
-    // Utilitaires
+    loadMore, // Export loadMore
     isDataStale: metrics.lastUpdate && Date.now() - metrics.lastUpdate.getTime() > CACHE_TTL,
     cacheKey: getCacheKey(tenantId, isSuperAdminValue),
   };

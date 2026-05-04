@@ -26,6 +26,7 @@ import { useUserRoles } from '@/hooks/useUserRoles';
 import { useTenant } from '@/contexts/TenantContext';
 import { useScrollDirection } from '@/hooks/use-scroll-direction';
 import { useIsMobileLayout } from '@/hooks/use-mobile';
+import FuturisticBackground from '@/components/ui/FuturisticBackground';
 
 interface AppLayoutWithSidebarProps {
   children: React.ReactNode;
@@ -81,6 +82,7 @@ export const AppLayoutWithSidebar: React.FC<AppLayoutWithSidebarProps> = ({
 
   return (
     <div className="flex h-screen overflow-hidden">
+      <FuturisticBackground />
       {/* Sidebar Desktop - Toujours visible sur large screens */}
       <div className="hidden lg:block">
         <NotionStyleSidebar
@@ -161,12 +163,11 @@ export const AppLayoutWithSidebar: React.FC<AppLayoutWithSidebarProps> = ({
             <div className="flex items-center gap-3">
               {/* Logo de l'entreprise */}
               {currentTenant?.logo_url ? (
-                <div className="border-primary/20 bg-background flex h-10 w-10 items-center justify-center overflow-hidden rounded-lg border-2 shadow-sm">
+                <div className="border-primary/20 bg-background flex h-10 w-auto max-w-[12rem] min-w-[2.5rem] items-center justify-center overflow-hidden rounded-lg border-2 px-1 shadow-sm">
                   <img
                     src={currentTenant.logo_url}
                     alt={`Logo ${tenantName}`}
-                    className="h-full w-full object-contain"
-                    referrerPolicy="no-referrer"
+                    className="h-full w-auto object-contain"
                   />
                 </div>
               ) : (

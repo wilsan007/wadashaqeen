@@ -23,6 +23,8 @@ import {
   Clock,
   Trash2,
   RefreshCw,
+  Plus,
+  Trash,
 } from 'lucide-react';
 import {
   useCollaboratorInvitation,
@@ -31,6 +33,234 @@ import {
 import { useMultiplePlaceholderHandler } from '@/hooks/usePlaceholderHandler';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Progress } from '@/components/ui/progress';
+
+/**
+ * 🎯 Composant: BulkInvitationForm
+ * Gestion de l'ajout en masse de collaborateurs
+ */
+const BulkInvitationForm: React.FC<{
+  availableRoles: AvailableRole[];
+  loadingRoles: boolean;
+  sendInvitation: (form: CollaboratorInvitationForm) => Promise<boolean>;
+  refreshInvitations: () => Promise<void>;
+}> = ({ availableRoles, loadingRoles, sendInvitation, refreshInvitations }) => {
+  const [rows, setRows] = useState<CollaboratorInvitationForm[]>([
+    { email: '', fullName: '', roleToAssign: '' },
+    { email: '', fullName: '', roleToAssign: '' },
+    { email: '', fullName: '', roleToAssign: '' },
+  ]);
+  const [isBulkSending, setIsBulkSending] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [results, setResults] = useState<{ success: number; failed: number } | null>(null);
+  const { toast } = useToast();
+
+  // Set default role for new rows
+  useEffect(() => {
+    if (availableRoles.length > 0) {
+      setRows(prev =>
+        prev.map(row =>
+          !row.roleToAssign ? { ...row, roleToAssign: availableRoles[0].value } : row
+        )
+      );
+    }
+  }, [availableRoles]);
+
+  const addRow = () => {
+    setRows([
+      ...rows,
+      {
+        email: '',
+        fullName: '',
+        roleToAssign: availableRoles.length > 0 ? availableRoles[0].value : '',
+      },
+    ]);
+  };
+
+  const removeRow = (index: number) => {
+    if (rows.length > 1) {
+      setRows(rows.filter((_, i) => i !== index));
+    }
+  };
+
+  const updateRow = (index: number, field: keyof CollaboratorInvitationForm, value: string) => {
+    const newRows = [...rows];
+    newRows[index] = { ...newRows[index], [field]: value };
+    setRows(newRows);
+  };
+
+  const handleBulkSubmit = async () => {
+    // Filter out empty rows
+    const validRows = rows.filter(r => r.email.trim() && r.fullName.trim());
+
+    if (validRows.length === 0) {
+      toast({
+        title: '⚠️ Aucune donnée',
+        description: 'Veuillez remplir au moins une ligne complète',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsBulkSending(true);
+    setProgress(0);
+    setResults(null);
+    let successCount = 0;
+    let failedCount = 0;
+
+    for (let i = 0; i < validRows.length; i++) {
+      const success = await sendInvitation(validRows[i]);
+      if (success) successCount++;
+      else failedCount++;
+
+      // Update progress
+      setProgress(Math.round(((i + 1) / validRows.length) * 100));
+    }
+
+    setIsBulkSending(false);
+    setResults({ success: successCount, failed: failedCount });
+
+    // Clear form on partial or full success if needed, or just leave it for review ?
+    // Generally good to keep them or clear them. Let's keep them but maybe confirm.
+    if (failedCount === 0) {
+      setRows([
+        {
+          email: '',
+          fullName: '',
+          roleToAssign: availableRoles.length > 0 ? availableRoles[0].value : '',
+        },
+      ]);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              Invitation en Masse
+            </CardTitle>
+            <CardDescription>Ajoutez plusieurs collaborateurs rapidement</CardDescription>
+          </div>
+          <Button variant="outline" size="sm" onClick={addRow} disabled={isBulkSending}>
+            <Plus className="mr-1 h-4 w-4" />
+            Ajouter une ligne
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {results && (
+          <Alert
+            className={`mb-4 ${results.failed === 0 ? 'border-green-200 bg-green-50' : 'border-orange-200 bg-orange-50'}`}
+          >
+            <div className="flex items-center gap-2">
+              {results.failed === 0 ? (
+                <CheckCircle2 className="h-5 w-5 text-green-600" />
+              ) : (
+                <XCircle className="h-5 w-5 text-orange-600" />
+              )}
+              <div className="flex-1">
+                <p className="text-sm font-medium">
+                  Traitement terminé : {results.success} succès, {results.failed} échecs.
+                </p>
+              </div>
+            </div>
+          </Alert>
+        )}
+
+        {isBulkSending && (
+          <div className="mb-4 space-y-2">
+            <div className="text-muted-foreground flex justify-between text-xs">
+              <span>Envoi en cours...</span>
+              <span>{progress}%</span>
+            </div>
+            <Progress value={progress} className="h-2" />
+          </div>
+        )}
+
+        <div className="space-y-2">
+          <div className="text-muted-foreground grid grid-cols-12 gap-2 px-1 text-sm font-medium">
+            <div className="col-span-4">Email</div>
+            <div className="col-span-3">Nom complet</div>
+            <div className="col-span-4">Rôle</div>
+            <div className="col-span-1"></div>
+          </div>
+
+          {rows.map((row, index) => (
+            <div key={index} className="grid grid-cols-12 items-center gap-2">
+              <div className="col-span-4">
+                <Input
+                  placeholder="email@exemple.com"
+                  value={row.email}
+                  onChange={e => updateRow(index, 'email', e.target.value)}
+                  disabled={isBulkSending}
+                  className="h-9"
+                />
+              </div>
+              <div className="col-span-3">
+                <Input
+                  placeholder="Nom Prénom"
+                  value={row.fullName}
+                  onChange={e => updateRow(index, 'fullName', e.target.value)}
+                  disabled={isBulkSending}
+                  className="h-9"
+                />
+              </div>
+              <div className="col-span-4">
+                <Select
+                  value={row.roleToAssign}
+                  onValueChange={val => updateRow(index, 'roleToAssign', val)}
+                  disabled={isBulkSending || loadingRoles}
+                >
+                  <SelectTrigger className="h-9">
+                    <SelectValue placeholder="Rôle" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableRoles.map(r => (
+                      <SelectItem key={r.value} value={r.value}>
+                        {r.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="col-span-1 text-center">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => removeRow(index)}
+                  disabled={isBulkSending || rows.length === 1}
+                  className="text-muted-foreground h-8 w-8 hover:text-red-500"
+                >
+                  <Trash className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="flex justify-end pt-4">
+          <Button onClick={handleBulkSubmit} disabled={isBulkSending || loadingRoles}>
+            {isBulkSending ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Traitement...
+              </>
+            ) : (
+              <>
+                <Send className="mr-2 h-4 w-4" />
+                Envoyer les invitations
+              </>
+            )}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
 
 /**
  * 🎯 Composant: CollaboratorInvitation
@@ -306,197 +536,226 @@ export const CollaboratorInvitation: React.FC = () => {
           FORMULAIRE D'INVITATION (Pattern Stripe)
           ============================================================================ */}
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <UserPlus className="h-5 w-5" />
-                Inviter un collaborateur
-              </CardTitle>
-              <CardDescription>Ajoutez un nouveau membre à votre équipe</CardDescription>
-            </div>
-            <Button variant="outline" size="sm" onClick={refreshInvitations} disabled={isLoading}>
-              <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-            </Button>
-          </div>
-        </CardHeader>
+      {/* ============================================================================
+          TABS & FORMULAIRES (Invitation Simple vs Masse)
+          ============================================================================ */}
 
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Informations principales */}
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="email">
-                  Email <span className="text-red-500">*</span>
-                </Label>
-                <div className="relative">
-                  <Mail className="text-muted-foreground absolute top-3 left-3 h-4 w-4" />
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder={getPlaceholder('email', form.email)}
-                    value={form.email}
-                    onChange={e => handleInputChange('email', e.target.value)}
-                    onFocus={() => handleFocus('email')}
-                    disabled={isSending}
-                    className="pl-10"
-                    required
-                  />
+      <Tabs defaultValue="single" className="w-full">
+        <TabsList className="mb-4 grid w-full grid-cols-2">
+          <TabsTrigger value="single">Invitation Simple</TabsTrigger>
+          <TabsTrigger value="bulk">Invitation en Masse</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="single">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    <UserPlus className="h-5 w-5" />
+                    Inviter un collaborateur
+                  </CardTitle>
+                  <CardDescription>Ajoutez un nouveau membre à votre équipe</CardDescription>
                 </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={refreshInvitations}
+                  disabled={isLoading}
+                >
+                  <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+                </Button>
               </div>
+            </CardHeader>
 
-              <div className="space-y-2">
-                <Label htmlFor="fullName">
-                  Nom complet <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="fullName"
-                  type="text"
-                  placeholder={getPlaceholder('fullName', form.fullName)}
-                  value={form.fullName}
-                  onChange={e => handleInputChange('fullName', e.target.value)}
-                  onFocus={() => handleFocus('fullName')}
-                  disabled={isSending}
-                  required
-                />
-              </div>
-            </div>
+            <CardContent>
+              <form onSubmit={handleSubmit} className="space-y-6">
+                {/* Informations principales */}
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="email">
+                      Email <span className="text-red-500">*</span>
+                    </Label>
+                    <div className="relative">
+                      <Mail className="text-muted-foreground absolute top-3 left-3 h-4 w-4" />
+                      <Input
+                        id="email"
+                        type="email"
+                        placeholder={getPlaceholder('email', form.email)}
+                        value={form.email}
+                        onChange={e => handleInputChange('email', e.target.value)}
+                        onFocus={() => handleFocus('email')}
+                        disabled={isSending}
+                        className="pl-10"
+                        required
+                      />
+                    </div>
+                  </div>
 
-            {/* Rôle */}
-            <div className="space-y-2">
-              <Label htmlFor="role">
-                Rôle <span className="text-red-500">*</span>
-              </Label>
-              <Select
-                value={showCustomRole ? 'autre' : form.roleToAssign}
-                onValueChange={handleRoleChange}
-                disabled={isSending || loadingRoles}
-              >
-                <SelectTrigger>
-                  <SelectValue
-                    placeholder={loadingRoles ? 'Chargement des rôles...' : 'Sélectionner un rôle'}
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  {loadingRoles ? (
-                    <SelectItem value="loading" disabled>
-                      <div className="flex items-center gap-2">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        <span>Chargement...</span>
-                      </div>
-                    </SelectItem>
-                  ) : availableRoles.length === 0 ? (
-                    <SelectItem value="empty" disabled>
-                      <span className="text-muted-foreground">Aucun rôle disponible</span>
-                    </SelectItem>
-                  ) : (
-                    <>
-                      {availableRoles.map(role => (
-                        <SelectItem key={role.value} value={role.value}>
-                          <div className="flex flex-col">
-                            <span className="font-medium">{role.label}</span>
-                            <span className="text-muted-foreground text-xs">
-                              {role.description}
-                            </span>
+                  <div className="space-y-2">
+                    <Label htmlFor="fullName">
+                      Nom complet <span className="text-red-500">*</span>
+                    </Label>
+                    <Input
+                      id="fullName"
+                      type="text"
+                      placeholder={getPlaceholder('fullName', form.fullName)}
+                      value={form.fullName}
+                      onChange={e => handleInputChange('fullName', e.target.value)}
+                      onFocus={() => handleFocus('fullName')}
+                      disabled={isSending}
+                      required
+                    />
+                  </div>
+                </div>
+
+                {/* Rôle */}
+                <div className="space-y-2">
+                  <Label htmlFor="role">
+                    Rôle <span className="text-red-500">*</span>
+                  </Label>
+                  <Select
+                    value={showCustomRole ? 'autre' : form.roleToAssign}
+                    onValueChange={handleRoleChange}
+                    disabled={isSending || loadingRoles}
+                  >
+                    <SelectTrigger>
+                      <SelectValue
+                        placeholder={
+                          loadingRoles ? 'Chargement des rôles...' : 'Sélectionner un rôle'
+                        }
+                      />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {loadingRoles ? (
+                        <SelectItem value="loading" disabled>
+                          <div className="flex items-center gap-2">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <span>Chargement...</span>
                           </div>
                         </SelectItem>
-                      ))}
-                      {/* Option "Autre" */}
-                      <SelectItem value="autre">
-                        <div className="flex flex-col">
-                          <span className="font-medium">✏️ Autre</span>
-                          <span className="text-muted-foreground text-xs">
-                            Spécifier un rôle personnalisé
-                          </span>
-                        </div>
-                      </SelectItem>
+                      ) : availableRoles.length === 0 ? (
+                        <SelectItem value="empty" disabled>
+                          <span className="text-muted-foreground">Aucun rôle disponible</span>
+                        </SelectItem>
+                      ) : (
+                        <>
+                          {availableRoles.map(role => (
+                            <SelectItem key={role.value} value={role.value}>
+                              <div className="flex flex-col">
+                                <span className="font-medium">{role.label}</span>
+                                <span className="text-muted-foreground text-xs">
+                                  {role.description}
+                                </span>
+                              </div>
+                            </SelectItem>
+                          ))}
+                          {/* Option "Autre" */}
+                          <SelectItem value="autre">
+                            <div className="flex flex-col">
+                              <span className="font-medium">✏️ Autre</span>
+                              <span className="text-muted-foreground text-xs">
+                                Spécifier un rôle personnalisé
+                              </span>
+                            </div>
+                          </SelectItem>
+                        </>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Champ rôle personnalisé (conditionnel) */}
+                {showCustomRole && (
+                  <div className="space-y-2">
+                    <Label htmlFor="customRole">
+                      Rôle personnalisé <span className="text-red-500">*</span>
+                    </Label>
+                    <Input
+                      id="customRole"
+                      type="text"
+                      placeholder="Ex: Consultant, Stagiaire, Freelance..."
+                      value={customRole}
+                      onChange={e => setCustomRole(e.target.value)}
+                      disabled={isSending}
+                      required
+                      className="border-primary"
+                    />
+                    <p className="text-muted-foreground text-xs">
+                      💡 Ce rôle personnalisé sera créé pour ce collaborateur
+                    </p>
+                  </div>
+                )}
+
+                {/* Informations optionnelles */}
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="department">Département (optionnel)</Label>
+                    <Input
+                      id="department"
+                      type="text"
+                      placeholder={getPlaceholder('department', form.department || '')}
+                      value={form.department}
+                      onChange={e => handleInputChange('department', e.target.value)}
+                      onFocus={() => handleFocus('department')}
+                      disabled={isSending}
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="jobPosition">Poste (optionnel)</Label>
+                    <Input
+                      id="jobPosition"
+                      type="text"
+                      placeholder={getPlaceholder('jobPosition', form.jobPosition || '')}
+                      value={form.jobPosition}
+                      onChange={e => handleInputChange('jobPosition', e.target.value)}
+                      onFocus={() => handleFocus('jobPosition')}
+                      disabled={isSending}
+                    />
+                  </div>
+                </div>
+
+                {/* Erreur */}
+                {error && (
+                  <Alert variant="destructive">
+                    <XCircle className="h-4 w-4" />
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                )}
+
+                {/* Bouton d'envoi */}
+                <Button
+                  type="submit"
+                  disabled={isSending || !form.email.trim() || !form.fullName.trim()}
+                  className="w-full md:w-auto"
+                >
+                  {isSending ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Envoi en cours...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="mr-2 h-4 w-4" />
+                      Envoyer l'invitation
                     </>
                   )}
-                </SelectContent>
-              </Select>
-            </div>
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-            {/* Champ rôle personnalisé (conditionnel) */}
-            {showCustomRole && (
-              <div className="space-y-2">
-                <Label htmlFor="customRole">
-                  Rôle personnalisé <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="customRole"
-                  type="text"
-                  placeholder="Ex: Consultant, Stagiaire, Freelance..."
-                  value={customRole}
-                  onChange={e => setCustomRole(e.target.value)}
-                  disabled={isSending}
-                  required
-                  className="border-primary"
-                />
-                <p className="text-muted-foreground text-xs">
-                  💡 Ce rôle personnalisé sera créé pour ce collaborateur
-                </p>
-              </div>
-            )}
-
-            {/* Informations optionnelles */}
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="department">Département (optionnel)</Label>
-                <Input
-                  id="department"
-                  type="text"
-                  placeholder={getPlaceholder('department', form.department || '')}
-                  value={form.department}
-                  onChange={e => handleInputChange('department', e.target.value)}
-                  onFocus={() => handleFocus('department')}
-                  disabled={isSending}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="jobPosition">Poste (optionnel)</Label>
-                <Input
-                  id="jobPosition"
-                  type="text"
-                  placeholder={getPlaceholder('jobPosition', form.jobPosition || '')}
-                  value={form.jobPosition}
-                  onChange={e => handleInputChange('jobPosition', e.target.value)}
-                  onFocus={() => handleFocus('jobPosition')}
-                  disabled={isSending}
-                />
-              </div>
-            </div>
-
-            {/* Erreur */}
-            {error && (
-              <Alert variant="destructive">
-                <XCircle className="h-4 w-4" />
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
-
-            {/* Bouton d'envoi */}
-            <Button
-              type="submit"
-              disabled={isSending || !form.email.trim() || !form.fullName.trim()}
-              className="w-full md:w-auto"
-            >
-              {isSending ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Envoi en cours...
-                </>
-              ) : (
-                <>
-                  <Send className="mr-2 h-4 w-4" />
-                  Envoyer l'invitation
-                </>
-              )}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+        <TabsContent value="bulk">
+          <BulkInvitationForm
+            availableRoles={availableRoles}
+            loadingRoles={loadingRoles}
+            sendInvitation={sendInvitation}
+            refreshInvitations={refreshInvitations}
+          />
+        </TabsContent>
+      </Tabs>
 
       {/* ============================================================================
           INVITATIONS EN ATTENTE (Pattern Notion)

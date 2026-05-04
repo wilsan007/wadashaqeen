@@ -48,28 +48,38 @@ interface MyTasksViewProps {
 type FilterType = 'all' | 'todo' | 'doing' | 'done';
 type SortType = 'date' | 'priority' | 'project';
 
+import { TaskDetailDialog } from './TaskDetailDialog';
+
+// ... (imports remain the same)
+
 export const MyTasksView: React.FC<MyTasksViewProps> = ({
   limit,
   compact = false,
   showAllTasks = false,
 }) => {
-  const { tasks, loading, updateTask } = useTasks();
   const { profile } = useUserProfile();
+
+  const filters = useMemo(() => {
+    if (showAllTasks) return undefined;
+    // Si pas de profil chargé, on met un ID impossible (Nil UUID) pour ne rien charger
+    // au lieu de tout charger par défaut
+    if (!profile?.userId) return { assignee_id: '00000000-0000-0000-0000-000000000000' };
+    return { assignee_id: profile.userId };
+  }, [showAllTasks, profile?.userId]);
+
+  const { tasks, loading, updateTask } = useTasks(filters);
   const [filter, setFilter] = useState<FilterType>('all');
   const [sort, setSort] = useState<SortType>('date');
   const [showCompleted, setShowCompleted] = useState(false);
 
+  // State pour le dialog de détails
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+
   // Filtrage et Tri
   const filteredTasks = useMemo(() => {
     let result = tasks.filter(t => {
-      // Filtrer par utilisateur courant si showAllTasks est faux
-      if (!showAllTasks && profile?.userId) {
-        // Vérifier assignee_id ou assigned_to (selon le modèle)
-        const isAssigned = t.assignee_id === profile.userId || t.assigned_to === profile.userId;
-        if (!isAssigned) return false;
-      }
-
-      if (!showCompleted && t.status === 'done') return false;
+      if (!showCompleted && filter !== 'done' && t.status === 'done') return false;
       if (filter === 'all') return true;
       if (filter === 'done') return t.status === 'done';
       if (filter === 'doing') return t.status === 'doing' || t.status === 'in_progress';
@@ -147,6 +157,18 @@ export const MyTasksView: React.FC<MyTasksViewProps> = ({
     handleStatusChange(taskId, 'done');
   };
 
+  const handleTaskClick = (task: Task) => {
+    setSelectedTask(task);
+    setIsDialogOpen(true);
+  };
+
+  const handleSaveTask = async (updatedTask: any) => {
+    if (selectedTask) {
+      await updateTask(selectedTask.id, updatedTask);
+      // Le hook useTasks mettra à jour la liste automatiquement
+    }
+  };
+
   if (loading) {
     return (
       <div className="space-y-4">
@@ -159,7 +181,7 @@ export const MyTasksView: React.FC<MyTasksViewProps> = ({
 
   return (
     <div className="animate-in fade-in-50 space-y-8 duration-700">
-      {/* Header & Filtres Futuristes */}
+      {/* ... (Header & Filters remain the same) */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h2 className="bg-gradient-to-r from-violet-600 to-fuchsia-600 bg-clip-text text-3xl font-bold text-transparent dark:from-violet-400 dark:to-fuchsia-400">
@@ -229,6 +251,7 @@ export const MyTasksView: React.FC<MyTasksViewProps> = ({
             tasks={groupedTasks.urgent}
             onUpdate={updateTask}
             onComplete={handleQuickComplete}
+            onTaskClick={handleTaskClick}
             gradient="from-rose-500/10 to-orange-500/10"
             borderColor="border-rose-500/20"
           />
@@ -242,6 +265,7 @@ export const MyTasksView: React.FC<MyTasksViewProps> = ({
             tasks={groupedTasks.today}
             onUpdate={updateTask}
             onComplete={handleQuickComplete}
+            onTaskClick={handleTaskClick}
             gradient="from-blue-500/10 to-cyan-500/10"
             borderColor="border-blue-500/20"
           />
@@ -255,6 +279,7 @@ export const MyTasksView: React.FC<MyTasksViewProps> = ({
             tasks={groupedTasks.week}
             onUpdate={updateTask}
             onComplete={handleQuickComplete}
+            onTaskClick={handleTaskClick}
             gradient="from-violet-500/10 to-purple-500/10"
             borderColor="border-violet-500/20"
           />
@@ -268,6 +293,7 @@ export const MyTasksView: React.FC<MyTasksViewProps> = ({
             tasks={groupedTasks.upcoming}
             onUpdate={updateTask}
             onComplete={handleQuickComplete}
+            onTaskClick={handleTaskClick}
             gradient="from-emerald-500/10 to-teal-500/10"
             borderColor="border-emerald-500/20"
           />
@@ -281,6 +307,7 @@ export const MyTasksView: React.FC<MyTasksViewProps> = ({
             tasks={groupedTasks.completed}
             onUpdate={updateTask}
             onComplete={handleQuickComplete}
+            onTaskClick={handleTaskClick}
             gradient="from-slate-500/10 to-gray-500/10"
             borderColor="border-slate-500/20"
             isCompleted
@@ -302,6 +329,13 @@ export const MyTasksView: React.FC<MyTasksViewProps> = ({
           </div>
         )}
       </div>
+
+      <TaskDetailDialog
+        open={isDialogOpen}
+        onOpenChange={setIsDialogOpen}
+        task={selectedTask}
+        onSave={handleSaveTask}
+      />
     </div>
   );
 };
@@ -313,10 +347,21 @@ const TaskSection: React.FC<{
   tasks: Task[];
   onUpdate: any;
   onComplete: any;
+  onTaskClick: (task: Task) => void;
   gradient: string;
   borderColor: string;
   isCompleted?: boolean;
-}> = ({ title, icon, tasks, onUpdate, onComplete, gradient, borderColor, isCompleted }) => (
+}> = ({
+  title,
+  icon,
+  tasks,
+  onUpdate,
+  onComplete,
+  onTaskClick,
+  gradient,
+  borderColor,
+  isCompleted,
+}) => (
   <div className="space-y-4">
     <div className="flex items-center gap-2 px-1">
       {icon}
@@ -333,6 +378,7 @@ const TaskSection: React.FC<{
           task={task}
           onUpdate={onUpdate}
           onComplete={onComplete}
+          onClick={() => onTaskClick(task)}
           gradient={gradient}
           borderColor={borderColor}
           isCompleted={isCompleted}
@@ -347,17 +393,19 @@ const TaskItem: React.FC<{
   task: Task;
   onUpdate: any;
   onComplete: any;
+  onClick: () => void;
   gradient: string;
   borderColor: string;
   isCompleted?: boolean;
-}> = ({ task, onUpdate, onComplete, gradient, borderColor, isCompleted }) => {
+}> = ({ task, onUpdate, onComplete, onClick, gradient, borderColor, isCompleted }) => {
   const permissions = useTaskEditPermissions({ task });
   const isOverdue =
     task.due_date && isPast(parseISO(task.due_date)) && !isToday(parseISO(task.due_date));
 
   return (
     <div
-      className={`group bg-card/50 relative overflow-hidden rounded-xl border p-4 backdrop-blur-md transition-all duration-300 hover:scale-[1.01] hover:shadow-lg ${borderColor} ${isCompleted ? 'opacity-60 grayscale' : ''}`}
+      onClick={onClick}
+      className={`group bg-card/50 relative cursor-pointer overflow-hidden rounded-xl border p-4 backdrop-blur-md transition-all duration-300 hover:scale-[1.01] hover:shadow-lg ${borderColor} ${isCompleted ? 'opacity-60 grayscale' : ''}`}
     >
       {/* Fond Dégradé Subtil */}
       <div
@@ -370,7 +418,10 @@ const TaskItem: React.FC<{
       <div className="relative z-10 flex items-start gap-4">
         {/* Bouton Check */}
         <button
-          onClick={() => onComplete(task.id)}
+          onClick={e => {
+            e.stopPropagation();
+            onComplete(task.id);
+          }}
           className={`mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-all duration-300 ${
             isCompleted
               ? 'border-primary bg-primary text-primary-foreground'
@@ -384,12 +435,14 @@ const TaskItem: React.FC<{
           <div className="flex items-start justify-between gap-2">
             <div className="space-y-1">
               <div className="flex items-center gap-2">
-                <EditableTaskTitle
-                  value={task.title}
-                  onChange={value => onUpdate(task.id, { title: value })}
-                  readOnly={!permissions.canEditTitle || isCompleted}
-                  className={`text-base font-semibold ${isCompleted ? 'text-muted-foreground line-through' : ''}`}
-                />
+                <div onClick={e => e.stopPropagation()}>
+                  <EditableTaskTitle
+                    value={task.title}
+                    onChange={value => onUpdate(task.id, { title: value })}
+                    readOnly={!permissions.canEditTitle || isCompleted}
+                    className={`text-base font-semibold ${isCompleted ? 'text-muted-foreground line-through' : ''}`}
+                  />
+                </div>
                 {isOverdue && !isCompleted && (
                   <Badge
                     variant="destructive"
@@ -423,18 +476,22 @@ const TaskItem: React.FC<{
             )}
 
             {/* Priorité */}
-            <EditableTaskPriority
-              value={task.priority}
-              onChange={value => onUpdate(task.id, { priority: value })}
-              readOnly={!permissions.canEditPriority || isCompleted}
-            />
+            <div onClick={e => e.stopPropagation()}>
+              <EditableTaskPriority
+                value={task.priority}
+                onChange={value => onUpdate(task.id, { priority: value })}
+                readOnly={!permissions.canEditPriority || isCompleted}
+              />
+            </div>
 
             {/* Statut */}
-            <EditableTaskStatus
-              value={task.status}
-              onChange={value => onUpdate(task.id, { status: value })}
-              readOnly={!permissions.canEditStatus || isCompleted}
-            />
+            <div onClick={e => e.stopPropagation()}>
+              <EditableTaskStatus
+                value={task.status}
+                onChange={value => onUpdate(task.id, { status: value })}
+                readOnly={!permissions.canEditStatus || isCompleted}
+              />
+            </div>
 
             {/* Projet */}
             {(task.projects?.name || task.project_id) && (
@@ -445,12 +502,15 @@ const TaskItem: React.FC<{
             )}
 
             {/* Assigné */}
-            <div className="ml-auto">
+            <div className="ml-auto" onClick={e => e.stopPropagation()}>
               <EditableTaskAssignee
                 value={task.assigned_to || task.assignee_id || null}
                 onChange={value => onUpdate(task.id, { assigned_to: value })}
                 readOnly={!permissions.canEditAssignee || isCompleted}
                 taskTenantId={task.tenant_id}
+                initialName={
+                  typeof task.assignee === 'string' ? task.assignee : task.assignee?.full_name
+                }
               />
             </div>
           </div>

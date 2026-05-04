@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { sendEmail } from '../_shared/smtpClient.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -169,40 +170,30 @@ serve(async req => {
           if (roleError) throw new Error(`Role Error: ${roleError.message}`);
         }
 
-        // E. Send Email with Credentials
-        const resendApiKey = Deno.env.get('RESEND_API_KEY');
-        if (resendApiKey) {
-          const emailRes = await fetch('https://api.resend.com/emails', {
-            method: 'POST',
-            headers: {
-              Authorization: `Bearer ${resendApiKey}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              from: 'Wadashaqayn <onboarding@wadashaqayn.org>',
-              to: [email],
-              subject: 'Bienvenue chez Wadashaqayn - Vos identifiants',
-              html: `
-                                <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
-                                    <h2>Bienvenue ${fullName} !</h2>
-                                    <p>Votre compte employé a été créé avec succès.</p>
-                                    <p>Voici vos identifiants de connexion :</p>
-                                    <div style="background: #f4f4f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
-                                        <p style="margin: 5px 0;"><strong>Email :</strong> ${email}</p>
-                                        <p style="margin: 5px 0;"><strong>Mot de passe temporaire :</strong> ${isNewUser ? tempPassword : '(Votre mot de passe existant)'}</p>
-                                    </div>
-                                    ${isNewUser ? '<p>Nous vous recommandons de changer votre mot de passe dès votre première connexion.</p>' : ''}
-                                    <a href="${Deno.env.get('SITE_URL') ?? 'https://wadashaqayn.org'}" style="background: #6366f1; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">Se connecter</a>
-                                </div>
-                            `,
-            }),
+        // E. Send Email with Credentials (SMTP)
+        try {
+          await sendEmail({
+            from: 'Wadashaqayn <onboarding@wadashaqayn.org>',
+            to: email,
+            subject: 'Bienvenue chez Wadashaqayn - Vos identifiants',
+            html: `
+                <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+                    <h2>Bienvenue ${fullName} !</h2>
+                    <p>Votre compte employé a été créé avec succès.</p>
+                    <p>Voici vos identifiants de connexion :</p>
+                    <div style="background: #f4f4f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                        <p style="margin: 5px 0;"><strong>Email :</strong> ${email}</p>
+                        <p style="margin: 5px 0;"><strong>Mot de passe temporaire :</strong> ${isNewUser ? tempPassword : '(Votre mot de passe existant)'}</p>
+                    </div>
+                    ${isNewUser ? '<p>Nous vous recommandons de changer votre mot de passe dès votre première connexion.</p>' : ''}
+                    <a href="${Deno.env.get('SITE_URL') ?? 'https://wadashaqayn.org'}" style="background: #6366f1; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">Se connecter</a>
+                </div>
+            `,
           });
-
-          if (!emailRes.ok) {
-            console.error(`Failed to send email to ${email}:`, await emailRes.text());
-            // We don't fail the import if email fails, but we log it.
-            results.errors.push({ email, error: "Compte créé mais échec de l'envoi d'email" });
-          }
+        } catch (emailErr) {
+          console.error(`Failed to send email to ${email}:`, emailErr);
+          // We don't fail the import if email fails, but we log it.
+          results.errors.push({ email, error: "Compte créé mais échec de l'envoi d'email" });
         }
 
         results.success++;

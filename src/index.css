@@ -5,12 +5,15 @@
   0% {
     transform: translate(0px, 0px) scale(1);
   }
+
   33% {
     transform: translate(30px, -50px) scale(1.1);
   }
+
   66% {
     transform: translate(-20px, 20px) scale(0.9);
   }
+
   100% {
     transform: translate(0px, 0px) scale(1);
   }
@@ -21,6 +24,7 @@
   100% {
     background-position: 0% 50%;
   }
+
   50% {
     background-position: 100% 50%;
   }
@@ -31,6 +35,7 @@
   100% {
     opacity: 1;
   }
+
   50% {
     opacity: 0.8;
   }
@@ -70,6 +75,7 @@
   from {
     transform: translateX(0%);
   }
+
   to {
     transform: translateX(-50%);
   }
@@ -393,9 +399,11 @@ All colors MUST be HSL for consistency.
     0% {
       background-position: 0% 50%;
     }
+
     50% {
       background-position: 100% 50%;
     }
+
     100% {
       background-position: 0% 50%;
     }
@@ -405,6 +413,7 @@ All colors MUST be HSL for consistency.
     0% {
       transform: translateX(-100%);
     }
+
     100% {
       transform: translateX(100%);
     }
@@ -425,39 +434,59 @@ All colors MUST be HSL for consistency.
     transform: translateY(-2px);
   }
 
-  /* Scrollbar personnalisée pour le Gantt */
-  .scrollbar-thin {
+  /* Global Scrollbar Styling - Ultra thin and auto-hiding behavior */
+  * {
     scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+    /* Hide by default for Firefox */
+    transition: scrollbar-color 0.3s ease;
+  }
+
+  /* Show on hover for Firefox */
+  *:hover {
     scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
   }
 
-  .scrollbar-thin::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+  *::-webkit-scrollbar {
+    width: 4px;
+    /* Extremely thin */
+    height: 4px;
   }
 
-  .scrollbar-thin::-webkit-scrollbar-track {
+  *::-webkit-scrollbar-track {
     background: transparent;
   }
 
-  .scrollbar-thin::-webkit-scrollbar-thumb {
-    background: hsl(var(--muted-foreground) / 0.3);
-    border-radius: 4px;
+  *::-webkit-scrollbar-thumb {
+    background-color: transparent;
+    /* Hidden by default */
+    border-radius: 20px;
+    border: none;
   }
 
-  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-    background: hsl(var(--muted-foreground) / 0.5);
+  /* Show on container hover for Webkit */
+  *:hover::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--muted-foreground) / 0.3);
   }
 
-  .dark .scrollbar-thin {
+  *::-webkit-scrollbar-thumb:hover {
+    background-color: hsl(var(--muted-foreground) / 0.6);
+    /* Darker when grabbing */
+  }
+
+  .dark * {
+    scrollbar-color: transparent transparent;
+  }
+
+  .dark *:hover {
     scrollbar-color: hsl(var(--muted-foreground) / 0.4) transparent;
   }
 
-  .dark .scrollbar-thin::-webkit-scrollbar-thumb {
-    background: hsl(var(--muted-foreground) / 0.4);
+  .dark *:hover::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--muted-foreground) / 0.4);
   }
 
-  .dark .scrollbar-thin::-webkit-scrollbar-thumb:hover {
-    background: hsl(var(--muted-foreground) / 0.6);
+  .dark *::-webkit-scrollbar-thumb:hover {
+    background-color: hsl(var(--muted-foreground) / 0.7);
   }
 }

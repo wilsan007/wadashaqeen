@@ -25,10 +25,6 @@ export function TaskTableWithOnboarding() {
   const { toast } = useToast();
   const { tenantId } = useTenant();
 
-  // État de stabilisation pour éviter les flashes
-  const [isStabilizing, setIsStabilizing] = useState(true);
-  const [dataStable, setDataStable] = useState(false);
-
   // État pour le modal de création
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [initialValues, setInitialValues] = useState<any>(null);
@@ -45,29 +41,13 @@ export function TaskTableWithOnboarding() {
     return demo === 'true';
   });
 
-  // Délai de stabilisation pour éviter les flashes visuels
-  useEffect(() => {
-    if (!loading) {
-      // Attendre 300ms après la fin du chargement pour stabiliser l'affichage
-      const timer = setTimeout(() => {
-        setIsStabilizing(false);
-        setDataStable(true);
-      }, 300);
-
-      return () => clearTimeout(timer);
-    } else {
-      setIsStabilizing(true);
-      setDataStable(false);
-    }
-  }, [loading]);
-
   // Afficher EmptyState si:
-  // 1. Données stables (pas de chargement + délai écoulé)
+  // 1. Pas de chargement
   // 2. Aucune tâche
   // 3. Onboarding pas encore masqué
   // 4. Pas en mode démo
   const shouldShowOnboarding =
-    dataStable && tasks.length === 0 && !onboardingDismissed && !showDemoData;
+    !loading && tasks.length === 0 && !onboardingDismissed && !showDemoData;
 
   // Créer des tâches mockées pour le mode démo avec vrais UUIDs
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -291,9 +271,9 @@ export function TaskTableWithOnboarding() {
     });
   };
 
-  // ⏳ ÉTAPE 1 : Afficher l'écran de chargement pendant le chargement OU la stabilisation
+  // ⏳ ÉTAPE 1 : Afficher l'écran de chargement pendant le chargement
   // Cela évite les flashes visuels désagréables
-  if (loading || isStabilizing) {
+  if (loading) {
     return <BrandedLoadingScreen appName="Wadashaqayn" logoSrc="/logo-w.svg" />;
   }
 

@@ -17,11 +17,21 @@ export async function clearAllUserData(): Promise<void> {
   console.log('🔒 SÉCURITÉ: Nettoyage complet des données utilisateur...');
 
   try {
-    // 1️⃣ Déconnexion Supabase
-    await supabase.auth.signOut();
+    // 1️⃣ Lancer les tâches asynchrones en parallèle (non-bloquant pour le nettoyage local)
+    const signOutPromise = supabase.auth.signOut();
 
-    // 2️⃣ Vider LocalStorage (sauf les préférences système non-sensibles)
-    const keysToPreserve = ['theme', 'language']; // Préférences UI uniquement
+    const clearCachePromise = (async () => {
+      if ('caches' in window) {
+        const cacheNames = await caches.keys();
+        await Promise.all(cacheNames.map(cacheName => caches.delete(cacheName)));
+      }
+    })();
+
+    // 2️⃣ Nettoyage SYNCHRONE immédiat (Local & Session Storage, Cookies)
+    // C'est ce qui garantit que l'utilisateur est "déconnecté" localement instantanément
+
+    // Vider LocalStorage (sauf les préférences système non-sensibles)
+    const keysToPreserve = ['theme', 'language'];
     const allKeys = Object.keys(localStorage);
     allKeys.forEach(key => {
       if (!keysToPreserve.includes(key)) {
@@ -29,28 +39,27 @@ export async function clearAllUserData(): Promise<void> {
       }
     });
 
-    // 3️⃣ Vider SessionStorage (TOUT)
+    // Vider SessionStorage
     sessionStorage.clear();
 
-    // 4️⃣ Vider les cookies Supabase (via attributs sécurisés)
+    // Vider les cookies
     document.cookie.split(';').forEach(c => {
       document.cookie = c
         .replace(/^ +/, '')
         .replace(/=.*/, '=;expires=' + new Date().toUTCString() + ';path=/');
     });
 
-    // 5️⃣ Invalider le cache du navigateur pour les requêtes API
-    if ('caches' in window) {
-      const cacheNames = await caches.keys();
-      await Promise.all(cacheNames.map(cacheName => caches.delete(cacheName)));
-    }
+    // 3️⃣ Attendre les tâches asynchrones avec un timeout strict
+    // On ne veut pas faire attendre l'utilisateur plus de 500ms
+    await Promise.race([
+      Promise.all([signOutPromise, clearCachePromise]),
+      new Promise(resolve => setTimeout(resolve, 500)),
+    ]);
 
-    // 6️⃣ Forcer un refresh complet de la page (invalide tous les états React)
-    // Utiliser replace pour éviter le retour arrière
+    // 4️⃣ Redirection finale
     window.location.replace('/login?cleared=true');
   } catch (error) {
     console.error('❌ Erreur lors du nettoyage:', error);
-    // En cas d'erreur, rediriger quand même vers login par sécurité
     window.location.replace('/login?error=cleanup_failed');
   }
 }

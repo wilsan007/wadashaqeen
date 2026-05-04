@@ -29,6 +29,19 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
+  DndContext,
+  DragOverlay,
+  useDraggable,
+  useDroppable,
+  DragEndEvent,
+  DragStartEvent,
+  closestCenter,
+  TouchSensor,
+  MouseSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import {
   format,
   startOfMonth,
   endOfMonth,
@@ -43,16 +56,84 @@ import {
   getDay,
 } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import { generateICal } from '@/utils/calendar';
+import { GoogleCalendarSync } from '@/components/calendar/GoogleCalendarSync';
+
+// Composant Draggable Task (Point)
+const DraggableTaskDot = ({ task, colorClass }: { task: Task; colorClass: string }) => {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: task.id,
+    data: { task },
+  });
+
+  return (
+    <div
+      ref={setNodeRef}
+      {...listeners}
+      {...attributes}
+      className={`h-2 w-2 cursor-grab rounded-full active:cursor-grabbing ${colorClass} ${
+        isDragging ? 'opacity-50' : ''
+      }`}
+      title={task.title}
+    />
+  );
+};
+
+// Composant Droppable Day
+const DroppableDay = ({
+  day,
+  children,
+  isCurrentMonth,
+  isSelected,
+  isTodayDay,
+  onClick,
+}: {
+  day: Date;
+  children: React.ReactNode;
+  isCurrentMonth: boolean;
+  isSelected: boolean;
+  isTodayDay: boolean;
+  onClick: () => void;
+}) => {
+  const { setNodeRef, isOver } = useDroppable({
+    id: format(day, 'yyyy-MM-dd'),
+    data: { date: day },
+  });
+
+  return (
+    <button
+      ref={setNodeRef}
+      onClick={onClick}
+      className={`group relative min-h-[80px] rounded-2xl p-2 text-left transition-all duration-300 ${
+        !isCurrentMonth ? 'opacity-30 grayscale' : 'opacity-100'
+      } ${
+        isSelected
+          ? 'bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 shadow-lg ring-2 shadow-violet-500/10 ring-violet-500'
+          : 'hover:scale-[1.02] hover:bg-white/5'
+      } ${isTodayDay && !isSelected ? 'bg-white/10 ring-1 ring-white/20' : ''} ${
+        isOver ? 'scale-105 bg-violet-500/30 ring-2 ring-violet-400' : ''
+      }`}
+    >
+      {children}
+    </button>
+  );
+};
 
 type ViewMode = 'month' | 'week' | 'day';
 
 export const TaskCalendar: React.FC = () => {
-  const { tasks, loading } = useTasks();
+  const { tasks, loading, updateTask } = useTasks();
   const { employees, loading: employeesLoading } = useEmployees();
   const [viewMode, setViewMode] = useState<ViewMode>('month');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
   const [selectedAssignee, setSelectedAssignee] = useState<string>('all');
+  const [activeId, setActiveId] = useState<string | null>(null);
+
+  const sensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 10 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } })
+  );
 
   // Calculer la plage de dates affichée
   const { startDate, endDate, days } = useMemo(() => {
@@ -131,8 +212,42 @@ export const TaskCalendar: React.FC = () => {
         return 'bg-amber-500 shadow-amber-500/50';
       case 'low':
         return 'bg-emerald-500 shadow-emerald-500/50';
+      case 'urgent':
+        return 'bg-purple-600 shadow-purple-600/50 animate-pulse';
       default:
         return 'bg-slate-500 shadow-slate-500/50';
+    }
+  };
+
+  const getProjectColor = (projectId?: string) => {
+    // Logique de couleur par projet (simulée pour l'instant)
+    if (!projectId) return 'bg-slate-500';
+    const colors = ['bg-blue-500', 'bg-green-500', 'bg-yellow-500', 'bg-pink-500', 'bg-indigo-500'];
+    const index = projectId.charCodeAt(0) % colors.length;
+    return colors[index];
+  };
+
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveId(event.active.id as string);
+  };
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveId(null);
+
+    if (over && active.id !== over.id) {
+      const dateStr = over.id as string;
+      const taskId = active.id as string;
+
+      // Mettre à jour la tâche
+      try {
+        await updateTask(taskId, {
+          due_date: dateStr, // On suppose que l'API accepte YYYY-MM-DD
+        });
+        // Feedback visuel ou toast ici
+      } catch (error) {
+        console.error('Erreur lors du déplacement de la tâche', error);
+      }
     }
   };
 
@@ -202,6 +317,17 @@ export const TaskCalendar: React.FC = () => {
                 <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
+
+            {/* Export iCal */}
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => generateICal(tasks)}
+              className="ml-2 rounded-full border-white/10 hover:bg-white/10"
+              title="Exporter iCal"
+            >
+              <CalendarIcon className="h-4 w-4" />
+            </Button>
           </div>
         </div>
       </div>
@@ -210,67 +336,81 @@ export const TaskCalendar: React.FC = () => {
         {/* Calendrier Principal */}
         <Card className="border-none bg-white/5 shadow-xl backdrop-blur-xl lg:col-span-2 dark:bg-slate-900/50">
           <CardContent className="p-6">
-            {/* Jours Semaine */}
-            <div className="mb-4 grid grid-cols-7">
-              {['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'].map(day => (
-                <div
-                  key={day}
-                  className="text-muted-foreground py-2 text-center text-sm font-semibold"
-                >
-                  {day}
-                </div>
-              ))}
-            </div>
-
-            {/* Grille Jours */}
-            <div className="grid grid-cols-7 gap-2">
-              {days.map(day => {
-                const dayTasks = tasksByDate.get(format(day, 'yyyy-MM-dd')) || [];
-                const isCurrentMonth = day.getMonth() === currentDate.getMonth();
-                const isSelected = selectedDate && isSameDay(day, selectedDate);
-                const isTodayDay = isToday(day);
-
-                return (
-                  <button
-                    key={day.toISOString()}
-                    onClick={() => setSelectedDate(day)}
-                    className={`group relative min-h-[80px] rounded-2xl p-2 text-left transition-all duration-300 ${!isCurrentMonth ? 'opacity-30 grayscale' : 'opacity-100'} ${
-                      isSelected
-                        ? 'bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 shadow-lg ring-2 shadow-violet-500/10 ring-violet-500'
-                        : 'hover:scale-[1.02] hover:bg-white/5'
-                    } ${isTodayDay && !isSelected ? 'bg-white/10 ring-1 ring-white/20' : ''} `}
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
+            >
+              {/* Jours Semaine */}
+              <div className="mb-4 grid grid-cols-7">
+                {['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'].map(day => (
+                  <div
+                    key={day}
+                    className="text-muted-foreground py-2 text-center text-sm font-semibold"
                   >
-                    <div className="mb-1 flex items-start justify-between">
-                      <span className={`text-sm font-bold ${isTodayDay ? 'text-violet-400' : ''}`}>
-                        {format(day, 'd')}
-                      </span>
-                      {dayTasks.length > 0 && (
-                        <Badge
-                          variant="secondary"
-                          className="h-5 min-w-[1.25rem] bg-white/10 px-1 text-[10px] backdrop-blur-sm"
-                        >
-                          {dayTasks.length}
-                        </Badge>
-                      )}
-                    </div>
+                    {day}
+                  </div>
+                ))}
+              </div>
 
-                    {/* Indicateurs de tâches (Points) */}
-                    <div className="flex flex-wrap gap-1">
-                      {dayTasks.slice(0, 4).map((task, i) => (
-                        <div
-                          key={task.id}
-                          className={`h-1.5 w-1.5 rounded-full ${getPriorityColor(task.priority)}`}
-                          title={task.title}
-                        />
-                      ))}
-                      {dayTasks.length > 4 && (
-                        <div className="bg-muted-foreground h-1.5 w-1.5 rounded-full" />
-                      )}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
+              {/* Grille Jours */}
+              <div className="grid grid-cols-7 gap-2">
+                {days.map(day => {
+                  const dayTasks = tasksByDate.get(format(day, 'yyyy-MM-dd')) || [];
+                  const isCurrentMonth = day.getMonth() === currentDate.getMonth();
+                  const isSelected = selectedDate && isSameDay(day, selectedDate);
+                  const isTodayDay = isToday(day);
+
+                  return (
+                    <DroppableDay
+                      key={day.toISOString()}
+                      day={day}
+                      isCurrentMonth={isCurrentMonth}
+                      isSelected={!!isSelected}
+                      isTodayDay={isTodayDay}
+                      onClick={() => setSelectedDate(day)}
+                    >
+                      <div className="mb-1 flex items-start justify-between">
+                        <span
+                          className={`text-sm font-bold ${isTodayDay ? 'text-violet-400' : ''}`}
+                        >
+                          {format(day, 'd')}
+                        </span>
+                        {dayTasks.length > 0 && (
+                          <Badge
+                            variant="secondary"
+                            className="h-5 min-w-[1.25rem] bg-white/10 px-1 text-[10px] backdrop-blur-sm"
+                          >
+                            {dayTasks.length}
+                          </Badge>
+                        )}
+                      </div>
+
+                      {/* Indicateurs de tâches (Points Draggable) */}
+                      <div className="flex flex-wrap gap-1">
+                        {dayTasks.slice(0, 6).map(task => (
+                          <DraggableTaskDot
+                            key={task.id}
+                            task={task}
+                            colorClass={getPriorityColor(task.priority)}
+                          />
+                        ))}
+                        {dayTasks.length > 6 && (
+                          <div className="bg-muted-foreground h-1.5 w-1.5 rounded-full" />
+                        )}
+                      </div>
+                    </DroppableDay>
+                  );
+                })}
+              </div>
+
+              <DragOverlay>
+                {activeId ? (
+                  <div className="h-4 w-4 animate-pulse rounded-full bg-violet-500 shadow-lg ring-2 ring-white" />
+                ) : null}
+              </DragOverlay>
+            </DndContext>
           </CardContent>
         </Card>
 
@@ -348,6 +488,9 @@ export const TaskCalendar: React.FC = () => {
             </Card>
           </div>
         </div>
+
+        {/* Google Calendar Sync */}
+        <GoogleCalendarSync />
       </div>
     </div>
   );

@@ -106,13 +106,30 @@ export function EnhancedEmployeeManagement() {
 
   // Fetch departments separately since useHRMinimal doesn't export them
   const [departments, setDepartments] = useState<any[]>([]);
+  const [hierarchyLevels, setHierarchyLevels] = useState<any[]>([]);
 
   useEffect(() => {
     const fetchDepartments = async () => {
       const { data } = await supabase.from('departments').select('*');
       if (data) setDepartments(data);
     };
+
+    const fetchLevels = async () => {
+      const { data: session } = await supabase.auth.getSession();
+      if (!session.session?.user) return;
+
+      // Get tenant_id from user metadata or context would be better, but let's query levels directly
+      // The RLS will filter for us anyway based on auth.
+      const { data } = await supabase
+        .from('organization_levels')
+        .select('*')
+        .order('rank_order', { ascending: true });
+
+      if (data) setHierarchyLevels(data);
+    };
+
     fetchDepartments();
+    fetchLevels();
   }, []);
 
   const [newEmployee, setNewEmployee] = useState({
@@ -476,9 +493,51 @@ export function EnhancedEmployeeManagement() {
     </Card>
   );
 
+  const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+
+  const handleEditClick = (employee: Employee) => {
+    setEditingEmployee(employee);
+    setIsEditOpen(true);
+  };
+
+  const handleUpdateEmployee = async () => {
+    if (!editingEmployee) return;
+
+    try {
+      const { error } = await supabase
+        .from('employees')
+        .update({
+          full_name: editingEmployee.full_name,
+          department_id: editingEmployee.department_id,
+          job_title: editingEmployee.job_title,
+          hire_date: editingEmployee.hire_date,
+          contract_type: editingEmployee.contract_type,
+          // email is usually not editable directly or handled separately
+        })
+        .eq('id', editingEmployee.id);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Succès',
+        description: 'Employé mis à jour avec succès.',
+      });
+      setIsEditOpen(false);
+      refresh();
+    } catch (error: any) {
+      console.error('Error updating employee:', error);
+      toast({
+        title: 'Erreur',
+        description: "Impossible de mettre à jour l'employé.",
+        variant: 'destructive',
+      });
+    }
+  };
+
   return (
     <div className="relative space-y-4 p-4 md:space-y-6 md:p-6">
-      {/* Gradient Background */}
+      {/* ... (keep existing background and header) ... */}
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-purple-50/50 via-blue-50/30 to-cyan-50/50 dark:from-purple-950/20 dark:via-blue-950/10 dark:to-cyan-950/20" />
 
       <div className="relative z-10">
@@ -498,6 +557,7 @@ export function EnhancedEmployeeManagement() {
             </p>
           </div>
           <ResponsiveModal open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+            {/* ... (keep existing add dialog code) ... */}
             <div className="flex w-full gap-2 sm:w-auto">
               <input
                 type="file"
@@ -809,7 +869,7 @@ export function EnhancedEmployeeManagement() {
                             <Eye className="mr-2 h-4 w-4" />
                             Voir détails
                           </DropdownMenuItem>
-                          <DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleEditClick(employee)}>
                             <Edit className="mr-2 h-4 w-4" />
                             Modifier
                           </DropdownMenuItem>
@@ -827,6 +887,176 @@ export function EnhancedEmployeeManagement() {
             </Table>
           </div>
         )}
+
+        {/* Edit Employee Modal */}
+        <ResponsiveModal open={isEditOpen} onOpenChange={setIsEditOpen}>
+          <ResponsiveModalContent className="sm:max-w-[600px]">
+            <ResponsiveModalHeader>
+              <ResponsiveModalTitle>Modifier l'employé</ResponsiveModalTitle>
+            </ResponsiveModalHeader>
+            {editingEmployee && (
+              <div className="grid gap-4 px-4 py-4 md:px-0">
+                <div className="space-y-2">
+                  <Label htmlFor="edit-fullName">Nom complet</Label>
+                  <Input
+                    id="edit-fullName"
+                    value={editingEmployee.full_name}
+                    onChange={e =>
+                      setEditingEmployee({ ...editingEmployee, full_name: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-department">Département</Label>
+                    <Select
+                      value={editingEmployee.department_id || undefined}
+                      onValueChange={value =>
+                        setEditingEmployee({ ...editingEmployee, department_id: value })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Sélectionner" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {departments?.map(dept => (
+                          <SelectItem key={dept.id} value={dept.id}>
+                            {dept.name}
+                          </SelectItem>
+                        )) || []}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* HIERARCHY LEVEL SELECTION */}
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-hierarchy">Niveau Hiérarchique (Poste)</Label>
+                    {hierarchyLevels.length > 0 ? (
+                      <Select
+                        value={(editingEmployee as any).organization_level_id || undefined}
+                        onValueChange={value => {
+                          const level = hierarchyLevels.find(l => l.id === value);
+                          setEditingEmployee({
+                            ...editingEmployee,
+                            job_title: level ? level.name : editingEmployee.job_title,
+                            [`organization_level_id` as any]: value,
+                          });
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Sélectionner un niveau" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {hierarchyLevels.map(level => (
+                            <SelectItem key={level.id} value={level.id}>
+                              <div className="flex items-center gap-2">
+                                <Badge
+                                  variant="outline"
+                                  className="flex h-5 w-5 items-center justify-center p-0"
+                                >
+                                  {level.rank_order}
+                                </Badge>
+                                {level.name}
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Input
+                        id="edit-jobTitle"
+                        value={editingEmployee.job_title || ''}
+                        onChange={e =>
+                          setEditingEmployee({ ...editingEmployee, job_title: e.target.value })
+                        }
+                        placeholder="Aucun modèle défini"
+                      />
+                    )}
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-hireDate">Date d'embauche</Label>
+                    <Input
+                      id="edit-hireDate"
+                      type="date"
+                      value={editingEmployee.hire_date || ''}
+                      onChange={e =>
+                        setEditingEmployee({ ...editingEmployee, hire_date: e.target.value })
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="edit-contractType">Type de contrat</Label>
+                    <Select
+                      value={editingEmployee.contract_type || undefined}
+                      onValueChange={value =>
+                        setEditingEmployee({ ...editingEmployee, contract_type: value })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Sélectionner" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="CDI">CDI</SelectItem>
+                        <SelectItem value="CDD">CDD</SelectItem>
+                        <SelectItem value="Freelance">Freelance</SelectItem>
+                        <SelectItem value="Stage">Stage</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <Button
+                  onClick={async () => {
+                    if (!editingEmployee) return;
+
+                    try {
+                      // Prepare update payload
+                      const updates: any = {
+                        full_name: editingEmployee.full_name,
+                        department_id: editingEmployee.department_id,
+                        job_title: editingEmployee.job_title,
+                        hire_date: editingEmployee.hire_date,
+                        contract_type: editingEmployee.contract_type,
+                      };
+
+                      // Add organization_level_id if present
+                      if ((editingEmployee as any).organization_level_id) {
+                        updates.organization_level_id = (
+                          editingEmployee as any
+                        ).organization_level_id;
+                      }
+
+                      const { error } = await supabase
+                        .from('employees')
+                        .update(updates)
+                        .eq('id', editingEmployee.id);
+
+                      if (error) throw error;
+
+                      toast({
+                        title: 'Succès',
+                        description: 'Employé mis à jour avec succès.',
+                      });
+                      setIsEditOpen(false);
+                      refresh();
+                    } catch (error: any) {
+                      console.error('Error updating employee:', error);
+                      toast({
+                        title: 'Erreur',
+                        description: "Impossible de mettre à jour l'employé.",
+                        variant: 'destructive',
+                      });
+                    }
+                  }}
+                  className="mt-4 w-full"
+                >
+                  Mettre à jour
+                </Button>
+              </div>
+            )}
+          </ResponsiveModalContent>
+        </ResponsiveModal>
 
         {/* Employee Details Modal */}
         {selectedEmployee && (

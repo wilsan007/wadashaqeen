@@ -9,7 +9,11 @@
 
 // @ts-nocheck
 import { useMemo, useCallback } from 'react';
-import { useTasksEnterprise, type Task as EnterpriseTask } from '../useTasksEnterprise';
+import {
+  useTasksEnterprise,
+  type Task as EnterpriseTask,
+  type TaskFilters,
+} from '../useTasksEnterprise';
 import { useProjectsEnterprise, type Project as EnterpriseProject } from '../useProjectsEnterprise';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -25,11 +29,11 @@ export type Project = EnterpriseProject;
 /**
  * 🎯 useTasks - Wrapper complet avec ancienne API
  */
-export function useTasks() {
+export function useTasks(filters?: TaskFilters) {
   const { toast } = useToast();
 
   // Hook Enterprise (cache + métriques)
-  const enterpriseHook = useTasksEnterprise();
+  const enterpriseHook = useTasksEnterprise(filters);
 
   const {
     tasks: enterpriseTasks,

@@ -33,6 +33,24 @@ interface ProjectTableViewProps {
   tasks: Task[];
 }
 
+const getStatusBadge = (status: string) => {
+  const statusConfig = {
+    planning: { label: 'Planification', color: 'bg-gray-500 text-white' },
+    active: { label: 'En cours', color: 'bg-blue-500 text-white' },
+    completed: { label: 'Terminé', color: 'bg-green-500 text-white' },
+    on_hold: { label: 'En pause', color: 'bg-yellow-500 text-white' },
+  };
+  return (
+    statusConfig[status as keyof typeof statusConfig] || { label: status, color: 'bg-gray-500' }
+  );
+};
+
+const getAssigneeName = (assignee: string | { full_name: string } | null): string => {
+  if (!assignee) return 'Non assigné';
+  if (typeof assignee === 'string') return assignee;
+  return assignee.full_name || 'Non assigné';
+};
+
 export const ProjectTableView: React.FC<ProjectTableViewProps> = ({ projects, tasks }) => {
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const tasksScrollRef = useRef<HTMLDivElement>(null);
@@ -65,25 +83,7 @@ export const ProjectTableView: React.FC<ProjectTableViewProps> = ({ projects, ta
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    const statusConfig = {
-      planning: { label: 'Planification', color: 'bg-gray-500 text-white' },
-      active: { label: 'En cours', color: 'bg-blue-500 text-white' },
-      completed: { label: 'Terminé', color: 'bg-green-500 text-white' },
-      on_hold: { label: 'En pause', color: 'bg-yellow-500 text-white' },
-    };
-    return (
-      statusConfig[status as keyof typeof statusConfig] || { label: status, color: 'bg-gray-500' }
-    );
-  };
-
-  const getAssigneeName = (assignee: string | { full_name: string } | null): string => {
-    if (!assignee) return 'Non assigné';
-    if (typeof assignee === 'string') return assignee;
-    return assignee.full_name || 'Non assigné';
-  };
-
-  const ProjectList = () => (
+  const renderProjectList = () => (
     <div className="bg-background h-full border-r">
       <div className="bg-muted/50 border-b p-4">
         <h3 className="text-lg font-semibold">📁 Projets</h3>
@@ -154,7 +154,7 @@ export const ProjectTableView: React.FC<ProjectTableViewProps> = ({ projects, ta
     </div>
   );
 
-  const TasksList = () => (
+  const renderTasksList = () => (
     <div className="bg-background h-full">
       <div className="bg-muted/50 border-b p-4">
         <h3 className="text-lg font-semibold">📝 Tâches Associées</h3>
@@ -293,17 +293,11 @@ export const ProjectTableView: React.FC<ProjectTableViewProps> = ({ projects, ta
               Retour aux projets
             </Button>
           </div>
-          <div className="flex-1 overflow-auto">
-            <TasksList />
-          </div>
+          <div className="flex-1 overflow-auto">{renderTasksList()}</div>
         </div>
       );
     }
-    return (
-      <div className="h-full overflow-auto">
-        <ProjectList />
-      </div>
-    );
+    return <div className="h-full overflow-auto">{renderProjectList()}</div>;
   }
 
   return (
@@ -313,14 +307,14 @@ export const ProjectTableView: React.FC<ProjectTableViewProps> = ({ projects, ta
     >
       {/* Panel gauche - Projets */}
       <ResizablePanel defaultSize={40} minSize={30}>
-        <ProjectList />
+        {renderProjectList()}
       </ResizablePanel>
 
       <ResizableHandle withHandle />
 
       {/* Panel droit - Tâches */}
       <ResizablePanel defaultSize={60} minSize={40}>
-        <TasksList />
+        {renderTasksList()}
       </ResizablePanel>
     </ResizablePanelGroup>
   );

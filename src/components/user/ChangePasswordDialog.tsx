@@ -30,6 +30,8 @@ export const ChangePasswordDialog: React.FC<ChangePasswordDialogProps> = ({
 }) => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [formData, setFormData] = useState({
@@ -41,6 +43,15 @@ export const ChangePasswordDialog: React.FC<ChangePasswordDialogProps> = ({
     e.preventDefault();
 
     // Validation
+    if (!currentPassword) {
+      toast({
+        title: '❌ Mot de passe actuel requis',
+        description: 'Veuillez entrer votre mot de passe actuel',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     if (formData.newPassword.length < 8) {
       toast({
         title: '❌ Mot de passe trop court',
@@ -62,6 +73,25 @@ export const ChangePasswordDialog: React.FC<ChangePasswordDialogProps> = ({
     setLoading(true);
 
     try {
+      // 1. Vérifier le mot de passe actuel
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user || !user.email) {
+        throw new Error('Utilisateur non trouvé');
+      }
+
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: user.email,
+        password: currentPassword,
+      });
+
+      if (signInError) {
+        throw new Error('Mot de passe actuel incorrect');
+      }
+
+      // 2. Mettre à jour le mot de passe
       const { error } = await supabase.auth.updateUser({
         password: formData.newPassword,
       });
@@ -75,6 +105,7 @@ export const ChangePasswordDialog: React.FC<ChangePasswordDialogProps> = ({
 
       // Réinitialiser et fermer
       setFormData({ newPassword: '', confirmPassword: '' });
+      setCurrentPassword('');
       onOpenChange(false);
     } catch (error: any) {
       console.error('Erreur changement mot de passe:', error);
@@ -94,12 +125,42 @@ export const ChangePasswordDialog: React.FC<ChangePasswordDialogProps> = ({
         <ResponsiveModalHeader>
           <ResponsiveModalTitle>Modifier le mot de passe</ResponsiveModalTitle>
           <ResponsiveModalDescription>
-            Entrez votre nouveau mot de passe (minimum 8 caractères)
+            Pour votre sécurité, veuillez confirmer votre mot de passe actuel
           </ResponsiveModalDescription>
         </ResponsiveModalHeader>
 
         <form onSubmit={handleSubmit}>
           <div className="grid gap-4 py-4">
+            {/* Mot de passe actuel */}
+            <div className="space-y-2">
+              <Label htmlFor="currentPassword">Mot de passe actuel</Label>
+              <div className="relative">
+                <Input
+                  id="currentPassword"
+                  type={showCurrentPassword ? 'text' : 'password'}
+                  value={currentPassword}
+                  onChange={e => setCurrentPassword(e.target.value)}
+                  disabled={loading}
+                  required
+                  className="pr-10"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute top-0 right-0 h-full px-3 hover:bg-transparent"
+                  onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                  disabled={loading}
+                >
+                  {showCurrentPassword ? (
+                    <EyeOff className="text-muted-foreground h-4 w-4" />
+                  ) : (
+                    <Eye className="text-muted-foreground h-4 w-4" />
+                  )}
+                </Button>
+              </div>
+            </div>
+
             {/* Nouveau mot de passe */}
             <div className="space-y-2">
               <Label htmlFor="newPassword">Nouveau mot de passe</Label>

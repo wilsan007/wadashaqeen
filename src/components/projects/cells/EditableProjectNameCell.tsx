@@ -134,7 +134,7 @@ export const EditableProjectNameCell: React.FC<EditableProjectNameCellProps> = (
             onClick={() => !readOnly && setIsEditing(true)}
             className={cn(
               'w-full rounded px-2 py-1 font-semibold transition-colors',
-              !readOnly && 'cursor-text hover:bg-gray-100 dark:hover:bg-gray-800',
+              !readOnly && 'hover:bg-accent/10 cursor-text',
               readOnly && 'cursor-not-allowed opacity-60',
               !value && 'text-muted-foreground'
             )}

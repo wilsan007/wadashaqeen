@@ -105,14 +105,47 @@ export const ChangeLogoDialog: React.FC<ChangeLogoDialogProps> = ({
       const fileExt = selectedFile.name.split('.').pop()?.toLowerCase();
       const fileName = `${currentTenant.id}/logo-${Date.now()}.${fileExt}`;
 
-      // Upload logo direct
+      // 🧹 NETTOYAGE: Supprimer les anciens logos du dossier du tenant
+      const { data: existingFiles } = await supabase.storage
+        .from('company-logos')
+        .list(currentTenant.id);
 
-      // Upload DIRECT du File sans options
+      if (existingFiles && existingFiles.length > 0) {
+        const filesToRemove = existingFiles.map(f => `${currentTenant.id}/${f.name}`);
+        await supabase.storage.from('company-logos').remove(filesToRemove);
+        console.log('🧹 Anciens logos supprimés:', filesToRemove);
+      }
+
+      // Déterminer le type MIME manuellement pour éviter application/json
+      let contentType = selectedFile.type;
+      const ext = selectedFile.name.split('.').pop()?.toLowerCase();
+
+      if (
+        !contentType ||
+        contentType === 'application/json' ||
+        contentType === 'application/octet-stream'
+      ) {
+        if (ext === 'png') contentType = 'image/png';
+        else if (ext === 'jpg' || ext === 'jpeg') contentType = 'image/jpeg';
+        else if (ext === 'webp') contentType = 'image/webp';
+        else if (ext === 'svg') contentType = 'image/svg+xml';
+        else contentType = 'image/jpeg'; // Fallback par défaut
+      }
+
+      console.log('🔍 [DEBUG] Original File Type:', selectedFile.type);
+      console.log('🔍 [DEBUG] Calculated Content-Type:', contentType);
+
+      // 🚨 CRITIQUE: Convertir en Blob pour forcer le type MIME
+      // Cela écrase toute métadonnée incorrecte du fichier original
+      const fileBlob = selectedFile.slice(0, selectedFile.size, contentType);
+
+      // Upload du BLOB
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('company-logos')
-        .upload(fileName, selectedFile, {
+        .upload(fileName, fileBlob, {
           cacheControl: '3600',
           upsert: true,
+          contentType: contentType,
         });
 
       if (uploadError) throw uploadError;
@@ -180,13 +213,13 @@ export const ChangeLogoDialog: React.FC<ChangeLogoDialogProps> = ({
         <div className="grid gap-4 py-4">
           {/* Zone de prévisualisation */}
           <div className="flex flex-col items-center gap-4">
-            <div className="border-muted-foreground/25 bg-muted/10 relative h-32 w-32 overflow-hidden rounded-lg border-2 border-dashed">
+            <div className="border-muted-foreground/25 bg-muted/10 relative h-32 w-auto max-w-full min-w-[8rem] overflow-hidden rounded-lg border-2 border-dashed px-2">
               {previewUrl ? (
                 <>
                   <img
                     src={previewUrl}
                     alt="Aperçu logo"
-                    className="h-full w-full object-contain p-2"
+                    className="h-full w-auto object-contain"
                   />
                   {selectedFile && (
                     <Button

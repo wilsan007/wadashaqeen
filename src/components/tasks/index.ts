@@ -4,4 +4,4 @@
  */
 
 export { ModernTaskCreationDialog } from './ModernTaskCreationDialog';
-export { ModernTaskEditDialog } from './ModernTaskEditDialog';
+export { TaskDetailDialog } from './TaskDetailDialog';

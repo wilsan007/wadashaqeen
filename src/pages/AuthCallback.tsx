@@ -143,11 +143,17 @@ export default function AuthCallback() {
       console.log('   - Rôle:', data.role_name);
       console.log('');
 
-      setStatus('✅ Organisation créée ! Redirection...');
+      // 🔄 FORCE REFRESH SESSION to update claims/roles
+      console.log('🔄 Rafraîchissement de la session pour mettre à jour les droits...');
+      const { error: refreshError } = await supabase.auth.refreshSession();
+      if (refreshError) console.warn('⚠️ Refresh session warning:', refreshError);
+
+      setStatus('✅ Organisation créée ! Configuration du mot de passe...');
 
       setTimeout(() => {
-        console.log('→ Redirection vers /dashboard');
-        navigate('/dashboard');
+        console.log('→ Redirection vers /update-password');
+        // Rediriger vers la définition du mot de passe car c'est un magic link sans password
+        navigate('/update-password?welcome=true');
       }, 1500);
     } catch (error: any) {
       console.error('');
@@ -254,10 +260,43 @@ export default function AuthCallback() {
         }
 
         // ============================================================================
+        // GESTION RÉCUPÉRATION MOT DE PASSE
+        // ============================================================================
+        if (type === 'recovery') {
+          console.log('🔐 Mode récupération de mot de passe détecté');
+          setStatus('Vérification du lien de récupération...');
+
+          // Établir la session avec les tokens de l'URL
+          const access_token = hashParams.get('access_token');
+          const refresh_token = hashParams.get('refresh_token');
+
+          if (access_token && refresh_token) {
+            const { error } = await supabase.auth.setSession({
+              access_token,
+              refresh_token,
+            });
+
+            if (!error) {
+              console.log('✅ Session de récupération établie');
+              setStatus('Redirection vers la page de modification...');
+              setTimeout(() => {
+                navigate('/update-password');
+              }, 1000);
+              return;
+            } else {
+              console.error('❌ Erreur session récupération:', error);
+              setStatus('Lien invalide ou expiré');
+              setTimeout(() => navigate('/auth'), 3000);
+              return;
+            }
+          }
+        }
+
+        // ============================================================================
         // GESTION INVITATIONS AVEC ROUTING INTELLIGENT
         // ============================================================================
 
-        if (invitation && type === 'magiclink') {
+        if (invitation && (type === 'magiclink' || type === 'invite')) {
           console.log('🔧 Traitement invitation Magic Link...');
           console.log('📌 Type détecté:', invitation);
 
@@ -327,6 +366,9 @@ export default function AuthCallback() {
                   console.log('   - Tenant ID:', data.tenant_id);
                   console.log('   - Profile créé:', data.profile_created);
                   console.log('');
+
+                  // 🔄 FORCE REFRESH SESSION
+                  await supabase.auth.refreshSession();
 
                   setStatus('✅ Configuration terminée ! Redirection...');
 

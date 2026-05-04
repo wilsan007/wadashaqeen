@@ -1,4 +1,4 @@
-export type ViewMode = 'day' | 'week' | 'month';
+export type ViewMode = 'week' | 'month' | 'quarter';
 
 export interface GanttTask {
   id: string;
@@ -31,14 +31,6 @@ export const statusColors = {
 
 export const getViewConfig = (viewMode: ViewMode): ViewConfig => {
   switch (viewMode) {
-    case 'day':
-      return {
-        unitWidth: 40,
-        headerHeight: 80,
-        getUnit: (date: Date) => date.getDate().toString(),
-        getSubUnit: (date: Date) => date.toLocaleDateString('fr-FR', { month: 'short' }),
-        unitDuration: 1,
-      };
     case 'week':
       return {
         unitWidth: 120,
@@ -58,13 +50,35 @@ export const getViewConfig = (viewMode: ViewMode): ViewConfig => {
           `${date.toLocaleDateString('fr-FR', { month: 'short' })} ${date.getFullYear()}`,
         unitDuration: 30,
       };
+    case 'quarter':
+      return {
+        unitWidth: 240,
+        headerHeight: 80,
+        getUnit: (date: Date) => {
+          const quarter = Math.floor(date.getMonth() / 3) + 1;
+          return `T${quarter} ${date.getFullYear()}`;
+        },
+        getSubUnit: (date: Date) => {
+          const quarter = Math.floor(date.getMonth() / 3);
+          const startMonth = new Date(date.getFullYear(), quarter * 3, 1).toLocaleDateString(
+            'fr-FR',
+            { month: 'short' }
+          );
+          const endMonth = new Date(date.getFullYear(), quarter * 3 + 2, 1).toLocaleDateString(
+            'fr-FR',
+            { month: 'short' }
+          );
+          return `${startMonth} - ${endMonth}`;
+        },
+        unitDuration: 90, // Approx 3 mois
+      };
     default:
       return {
-        unitWidth: 40,
+        unitWidth: 120,
         headerHeight: 80,
         getUnit: () => '',
         getSubUnit: () => '',
-        unitDuration: 1,
+        unitDuration: 7,
       };
   }
 };
@@ -83,7 +97,15 @@ export const getTaskWidth = (task: GanttTask, config: ViewConfig) => {
 };
 
 export const getTotalUnits = (startDate: Date, endDate: Date, config: ViewConfig) => {
-  // Pour le mode mois, calculer le nombre de mois entre les dates
+  // Pour le mode trimestre (3 mois)
+  if (config.unitDuration === 90) {
+    const monthsDiff =
+      (endDate.getFullYear() - startDate.getFullYear()) * 12 +
+      (endDate.getMonth() - startDate.getMonth());
+    return Math.max(1, Math.ceil((monthsDiff + 1) / 3));
+  }
+
+  // Pour le mode mois
   if (config.unitDuration === 30) {
     const monthsDiff =
       (endDate.getFullYear() - startDate.getFullYear()) * 12 +
@@ -91,7 +113,7 @@ export const getTotalUnits = (startDate: Date, endDate: Date, config: ViewConfig
     return Math.max(1, monthsDiff + 1); // +1 pour inclure le mois de fin
   }
 
-  // Pour jour et semaine, utiliser le calcul en jours
+  // Pour semaine, utiliser le calcul en jours
   const totalDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
   return Math.ceil(totalDays / config.unitDuration);
 };

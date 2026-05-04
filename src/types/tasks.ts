@@ -72,6 +72,7 @@ export interface Task {
   actual_hours?: number | null; // Alias de effort_spent_h
   assigned_to?: string | null; // Alias de assignee_id
   created_by?: string | null;
+  estimated_effort?: number | null; // Alias de effort_estimate_h
 }
 
 export interface TaskAction {

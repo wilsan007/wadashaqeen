@@ -92,6 +92,10 @@ export const useTasksEnterprise = (filters?: TaskFilters) => {
   const { tenantId } = useTenant();
   const { isSuperAdmin, isLoading: rolesLoading, userRoles } = useUserRoles();
 
+  // SOLUTION TEMPORAIRE : Récupérer le tenant_id depuis user_roles si useTenant échoue
+  const tenantIdFromRoles = userRoles[0]?.tenant_id;
+  const effectiveTenantId = tenantId || tenantIdFromRoles;
+
   // Refs pour optimisations (Pattern Stripe/Salesforce)
   const fetchedRef = useRef(false);
   const tenantIdRef = useRef<string | null>(null);
@@ -242,7 +246,7 @@ export const useTasksEnterprise = (filters?: TaskFilters) => {
         setError(null);
 
         const isSuper = isSuperAdmin();
-        const cacheKey = getCacheKey(tenantId, isSuper, filters, page);
+        const cacheKey = getCacheKey(effectiveTenantId, isSuper, filters, page);
 
         // Vérifier le cache d'abord (sauf si force refresh)
         if (!forceRefresh) {
@@ -260,7 +264,7 @@ export const useTasksEnterprise = (filters?: TaskFilters) => {
           }
         }
 
-        const query = buildQuery(isSuper, tenantId, filters, page, pagination.limit);
+        const query = buildQuery(isSuper, effectiveTenantId, filters, page, pagination.limit);
         const { data: tasks, error: tasksError, count } = await query;
 
         if (tasksError) {
@@ -364,7 +368,7 @@ export const useTasksEnterprise = (filters?: TaskFilters) => {
       }
     },
     [
-      tenantId,
+      effectiveTenantId,
       isSuperAdmin,
       filters,
       pagination.limit,
@@ -385,7 +389,7 @@ export const useTasksEnterprise = (filters?: TaskFilters) => {
     }
 
     // Super Admin peut accéder aux données même sans tenant_id
-    if (!tenantId && !isSuperAdmin()) {
+    if (!effectiveTenantId && !isSuperAdmin()) {
       // console.log('⚠️ No tenant ID available and not Super Admin');
       setLoading(false);
       return;
@@ -393,7 +397,7 @@ export const useTasksEnterprise = (filters?: TaskFilters) => {
 
     // Éviter les refetch inutiles
     const filtersChanged = JSON.stringify(filters) !== JSON.stringify(filtersRef.current);
-    const tenantChanged = tenantIdRef.current !== tenantId;
+    const tenantChanged = tenantIdRef.current !== effectiveTenantId;
 
     if (fetchedRef.current && !filtersChanged && !tenantChanged) {
       // console.log('📦 Tasks data already fetched, skipping...');
@@ -402,11 +406,11 @@ export const useTasksEnterprise = (filters?: TaskFilters) => {
 
     // Marquer comme en cours de fetch
     fetchedRef.current = true;
-    tenantIdRef.current = tenantId;
+    tenantIdRef.current = effectiveTenantId;
     filtersRef.current = filters;
 
     fetchTasks(1);
-  }, [tenantId, rolesLoading, filters, fetchTasks, isSuperAdmin]);
+  }, [effectiveTenantId, rolesLoading, filters, fetchTasks, isSuperAdmin]);
 
   // Fonctions utilitaires optimisées (Pattern Enterprise)
   const refresh = useCallback(() => {
@@ -485,10 +489,6 @@ export const useTasksEnterprise = (filters?: TaskFilters) => {
   // Déterminer les informations d'accès pour l'UX
   const currentUserRole = userRoles[0]?.roles?.name || 'Aucun rôle';
   const requiredRole = 'project_manager, tenant_admin ou super_admin';
-
-  // SOLUTION TEMPORAIRE : Récupérer le tenant_id depuis user_roles si useTenant échoue
-  const tenantIdFromRoles = userRoles[0]?.tenant_id;
-  const effectiveTenantId = tenantId || tenantIdFromRoles;
 
   // Vérifier si l'utilisateur a le bon rôle
   const hasRequiredRole =

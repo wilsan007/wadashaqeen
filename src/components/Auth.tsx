@@ -37,6 +37,7 @@ export const Auth = ({ onAuthStateChange }: AuthProps) => {
   }, [email, password, fullName, forceHidePlaceholder]);
   const [loading, setLoading] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
   const { toast } = useToast();
 
   // Gérer les erreurs d'URL (ex: retour de callback échoué)
@@ -109,14 +110,31 @@ export const Auth = ({ onAuthStateChange }: AuthProps) => {
     return { error };
   };
 
+  const resetPassword = async (email: string) => {
+    const redirectUrl = `${window.location.origin}/auth/callback?type=recovery`;
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: redirectUrl,
+    });
+    return { error };
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      const { error } = isSignUp
-        ? await signUp(email, password, fullName)
-        : await signIn(email, password);
+      let error;
+
+      if (isForgotPassword) {
+        const result = await resetPassword(email);
+        error = result.error;
+      } else if (isSignUp) {
+        const result = await signUp(email, password, fullName);
+        error = result.error;
+      } else {
+        const result = await signIn(email, password);
+        error = result.error;
+      }
 
       if (error) {
         // Gestion d'erreurs moderne pour l'authentification
@@ -160,6 +178,13 @@ export const Auth = ({ onAuthStateChange }: AuthProps) => {
           description: errorMessage,
           variant: 'destructive',
         });
+      } else if (isForgotPassword) {
+        toast({
+          title: 'Email envoyé',
+          description:
+            'Si un compte existe avec cet email, vous recevrez un lien de réinitialisation.',
+        });
+        setIsForgotPassword(false);
       } else if (isSignUp) {
         toast({
           title: 'Inscription réussie',
@@ -216,16 +241,20 @@ export const Auth = ({ onAuthStateChange }: AuthProps) => {
     <div className="bg-background flex min-h-screen items-center justify-center">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle>{isSignUp ? 'Créer un compte' : 'Connexion'}</CardTitle>
+          <CardTitle>
+            {isForgotPassword ? 'Mot de passe oublié' : isSignUp ? 'Créer un compte' : 'Connexion'}
+          </CardTitle>
           <CardDescription>
-            {isSignUp
-              ? "Créez votre compte admin pour accéder à l'application"
-              : 'Connectez-vous avec vos identifiants admin'}
+            {isForgotPassword
+              ? 'Entrez votre email pour recevoir un lien de réinitialisation'
+              : isSignUp
+                ? "Créez votre compte admin pour accéder à l'application"
+                : 'Connectez-vous avec vos identifiants admin'}
           </CardDescription>
         </CardHeader>
         <CardContent>
           {/* OAuth Google activé ✅ */}
-          {!showMFAInput && !isSignUp && <SocialAuth />}
+          {!showMFAInput && !isSignUp && !isForgotPassword && <SocialAuth />}
 
           {showMFAInput ? (
             <form onSubmit={handleMFAVerification} className="space-y-4">
@@ -302,33 +331,68 @@ export const Auth = ({ onAuthStateChange }: AuthProps) => {
                   required
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="password">Mot de passe</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  onFocus={() => handleFocus('password')}
-                  onClick={() => handleFocus('password')}
-                  placeholder={getPlaceholder('password', password)}
-                  autoComplete="off"
-                  autoCorrect="off"
-                  autoCapitalize="off"
-                  spellCheck="false"
-                  required
-                />
-              </div>
+              {!isForgotPassword && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="password">Mot de passe</Label>
+                    {!isSignUp && (
+                      <Button
+                        variant="link"
+                        className="h-auto p-0 text-xs"
+                        onClick={() => setIsForgotPassword(true)}
+                        type="button"
+                      >
+                        Mot de passe oublié ?
+                      </Button>
+                    )}
+                  </div>
+                  <Input
+                    id="password"
+                    type="password"
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    onFocus={() => handleFocus('password')}
+                    onClick={() => handleFocus('password')}
+                    placeholder={getPlaceholder('password', password)}
+                    autoComplete="off"
+                    autoCorrect="off"
+                    autoCapitalize="off"
+                    spellCheck="false"
+                    required
+                  />
+                </div>
+              )}
               <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? 'Chargement...' : isSignUp ? 'Créer le compte' : 'Se connecter'}
+                {loading
+                  ? 'Chargement...'
+                  : isForgotPassword
+                    ? 'Envoyer le lien'
+                    : isSignUp
+                      ? 'Créer le compte'
+                      : 'Se connecter'}
               </Button>
+              <div className="mt-4 text-center">
+                <Button
+                  variant="link"
+                  type="button"
+                  onClick={() => {
+                    if (isForgotPassword) {
+                      setIsForgotPassword(false);
+                    } else {
+                      setIsSignUp(!isSignUp);
+                    }
+                  }}
+                  className="text-sm"
+                >
+                  {isForgotPassword
+                    ? 'Retour à la connexion'
+                    : isSignUp
+                      ? 'Déjà un compte ? Se connecter'
+                      : 'Créer un compte admin'}
+                </Button>
+              </div>
             </form>
           )}
-          <div className="mt-4 text-center">
-            <Button variant="link" onClick={() => setIsSignUp(!isSignUp)} className="text-sm">
-              {isSignUp ? 'Déjà un compte ? Se connecter' : 'Créer un compte admin'}
-            </Button>
-          </div>
         </CardContent>
       </Card>
     </div>

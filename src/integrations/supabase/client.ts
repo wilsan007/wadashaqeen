@@ -6,6 +6,16 @@ const SUPABASE_URL =
   import.meta.env.VITE_SUPABASE_URL || 'https://qliinxtanjdnwxlvnxji.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
+if (!import.meta.env.VITE_SUPABASE_URL) {
+  console.warn('⚠️ VITE_SUPABASE_URL is missing in .env. Using fallback URL:', SUPABASE_URL);
+}
+
+if (!import.meta.env.VITE_SUPABASE_ANON_KEY) {
+  console.error('🚨 VITE_SUPABASE_ANON_KEY is missing in .env! Authentication will fail.');
+} else {
+  console.log('✅ Supabase Key loaded (length: ' + SUPABASE_PUBLISHABLE_KEY.length + ')');
+}
+
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 

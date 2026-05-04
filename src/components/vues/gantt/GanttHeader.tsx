@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Calendar, CalendarDays, Clock } from '@/lib/icons';
 import { useIsMobile } from '@/hooks/use-mobile';
 
-type ViewMode = 'day' | 'week' | 'month';
+import { ViewMode } from '@/lib/ganttHelpers';
 
 interface GanttHeaderProps {
   viewMode: ViewMode;
@@ -27,15 +27,6 @@ export const GanttHeader = ({ viewMode, onViewModeChange }: GanttHeaderProps) =>
         {/* Contrôles de zoom */}
         <div className="flex gap-2">
           <Button
-            variant={viewMode === 'day' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => onViewModeChange('day')}
-            className="transition-smooth hover-glow gap-1"
-          >
-            <Clock className="h-4 w-4" />
-            Jour
-          </Button>
-          <Button
             variant={viewMode === 'week' ? 'default' : 'outline'}
             size="sm"
             onClick={() => onViewModeChange('week')}
@@ -52,6 +43,15 @@ export const GanttHeader = ({ viewMode, onViewModeChange }: GanttHeaderProps) =>
           >
             <Calendar className="h-4 w-4" />
             Mois
+          </Button>
+          <Button
+            variant={viewMode === 'quarter' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => onViewModeChange('quarter')}
+            className="transition-smooth hover-glow gap-1"
+          >
+            <Clock className="h-4 w-4" />
+            Trimestre
           </Button>
         </div>
       </div>
