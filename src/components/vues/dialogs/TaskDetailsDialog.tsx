@@ -28,6 +28,7 @@ import {
   History,
 } from '@/lib/icons';
 import { type Task } from '@/hooks/optimized';
+import { useTaskDetails } from '@/hooks/useTaskDetails';
 import { TaskHistorySection } from '@/components/task/TaskHistorySection';
 import { priorityColors, statusColors, formatDate } from '@/lib/taskHelpers';
 
@@ -38,29 +39,17 @@ interface TaskDetailsDialogProps {
 }
 
 export const TaskDetailsDialog = ({ open, onOpenChange, task }: TaskDetailsDialogProps) => {
-  // TODO: Réactiver quand useTaskDetails sera créé
-  // const {
-  //   taskDetails,
-  //   loading,
-  //   department,
-  //   subtasks,
-  //   comments,
-  //   risks,
-  //   dependencies,
-  //   totalEffort,
-  //   participants
-  // } = useTaskDetails(task?.id);
-
-  // Données temporaires en attendant le hook
-  const loading = false;
-  const taskDetails = null;
-  const department = null;
-  const subtasks = [];
-  const comments = [];
-  const risks = [];
-  const dependencies = [];
-  const totalEffort = 0;
-  const participants = [];
+  const {
+    taskDetails,
+    department,
+    subtasks,
+    comments,
+    risks,
+    dependencies,
+    totalEffort,
+    participants,
+    isLoading: loading,
+  } = useTaskDetails(task?.id);
 
   if (!task) return null;
 

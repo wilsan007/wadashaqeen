@@ -149,7 +149,7 @@ export const ActivityFormWithAssignment: React.FC<ActivityFormWithAssignmentProp
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] max-w-2xl">
+      <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-xl">
             {mode === 'edit' ? "Modifier l'activité" : 'Nouvelle activité opérationnelle'}

@@ -224,7 +224,7 @@ export const ActionTemplateForm: React.FC<ActionTemplateFormProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] max-w-3xl">
+      <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-xl">
             {initialData?.title ? "Modifier l'action" : 'Nouvelle action'}

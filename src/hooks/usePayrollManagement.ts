@@ -61,18 +61,15 @@ export const usePayrollManagement = () => {
   const { userContext } = useAuthFilterContext();
 
   const fetchPayrollData = useCallback(async () => {
-    console.log('🔄 [usePayrollManagement] fetchPayrollData called', {
       userContext: !!userContext,
     });
 
     if (!userContext) {
-      console.log('❌ [usePayrollManagement] No userContext, aborting');
       return;
     }
 
     try {
       setLoading(true);
-      console.log('⏳ [usePayrollManagement] Starting Supabase queries...');
 
       // Fetch payroll periods avec filtrage
       let periodsQuery = supabase
@@ -121,7 +118,6 @@ export const usePayrollManagement = () => {
 
       if (employeesError) throw employeesError;
 
-      console.log('✅ [usePayrollManagement] Data fetched successfully', {
         periods: periods?.length,
         payrolls: payrolls?.length,
       });

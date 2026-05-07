@@ -105,7 +105,6 @@ export const TenantProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         if (profileError) {
           // Si pas de profil trouvé, c'est peut-être un nouveau tenant owner
           if (profileError.code === 'PGRST116') {
-            console.log('Aucun profil trouvé - possiblement un nouveau tenant owner');
             setLoading(false);
             return;
           }

@@ -10,7 +10,6 @@ import { supabase } from '@/integrations/supabase/client';
  * Utilisé en cas d'erreur de refresh token ou de session corrompue
  */
 export const cleanupSession = async (): Promise<void> => {
-  console.log('🧹 Nettoyage complet de la session...');
 
   try {
     // 1. Déconnecter de Supabase
@@ -35,7 +34,6 @@ export const cleanupSession = async (): Promise<void> => {
       }
     });
 
-    console.log('✅ Session nettoyée avec succès');
   } catch (error) {
     console.error('❌ Erreur lors du nettoyage de la session:', error);
     // En dernier recours, tout nettoyer
@@ -111,18 +109,11 @@ export const debugSession = async (): Promise<void> => {
       error,
     } = await supabase.auth.getSession();
 
-    console.log('Session:', session);
-    console.log('Erreur:', error);
-    console.log('User:', session?.user);
-    console.log('Access Token:', session?.access_token ? '✅ Présent' : '❌ Absent');
-    console.log('Refresh Token:', session?.refresh_token ? '✅ Présent' : '❌ Absent');
-    console.log(
       'Expires At:',
       session?.expires_at ? new Date(session.expires_at * 1000).toLocaleString() : 'N/A'
     );
 
     // Vérifier le localStorage
-    console.log('\n📦 LocalStorage:');
     Object.keys(localStorage).forEach(key => {
       if (
         key.includes('supabase') ||
@@ -130,7 +121,6 @@ export const debugSession = async (): Promise<void> => {
         key === 'lastActivity' ||
         key === 'manualLogout'
       ) {
-        console.log(`  ${key}:`, localStorage.getItem(key)?.substring(0, 50) + '...');
       }
     });
   } catch (error) {

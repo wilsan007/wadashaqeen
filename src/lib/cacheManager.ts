@@ -188,7 +188,6 @@ class EnterpriseCache {
 
     if (cleanedCount > 0) {
       this.updateCacheSize();
-      console.log(`🧹 Cache cleanup: ${cleanedCount} expired entries removed`);
     }
 
     return cleanedCount;
@@ -224,7 +223,6 @@ class EnterpriseCache {
    * Précharger des données critiques
    */
   preload(entries: Array<{ key: string; data: any; type?: CacheType }>): void {
-    console.log(`🚀 Preloading ${entries.length} cache entries`);
     entries.forEach(({ key, data, type }) => {
       this.set(key, data, type);
     });
@@ -249,7 +247,6 @@ class EnterpriseCache {
       const toDelete = entries.slice(0, Math.floor(this.MAX_ENTRIES * 0.1)); // Supprimer 10%
       toDelete.forEach(([key]) => this.cache.delete(key));
 
-      console.log(`🗑️ Cache eviction: ${toDelete.length} least used entries removed`);
     }
   }
 

@@ -12,7 +12,6 @@ export const InvitationHandler = () => {
 
     // Si c'est une invitation et qu'on n'est PAS DÉJÀ sur la page de callback
     if (isInvitation && !isCallbackPage) {
-      console.log('🔄 InvitationHandler: Redirection FORCÉE vers /auth/callback');
       // Utilisation de window.location pour forcer le rechargement et contourner le routeur si bloqué
       const targetUrl = `/auth/callback${location.search}${location.hash}`;
       window.location.href = targetUrl;

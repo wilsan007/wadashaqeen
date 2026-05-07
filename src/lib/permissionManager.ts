@@ -506,7 +506,6 @@ class PermissionManager {
     expiredKeys.forEach(key => this.evaluationCache.delete(key));
 
     if (expiredKeys.length > 0) {
-      console.log(`🧹 Cache d'évaluation nettoyé: ${expiredKeys.length} entrées expirées`);
     }
   }
 
@@ -527,7 +526,6 @@ class PermissionManager {
    */
   addCustomRule(rule: PermissionRule): void {
     this.customRules.push(rule);
-    console.log(`📋 Règle personnalisée ajoutée: ${rule.name}`);
   }
 
   /**
@@ -537,7 +535,6 @@ class PermissionManager {
     const index = this.customRules.findIndex(rule => rule.id === ruleId);
     if (index !== -1) {
       const removedRule = this.customRules.splice(index, 1)[0];
-      console.log(`🗑️ Règle personnalisée supprimée: ${removedRule.name}`);
     }
   }
 
@@ -586,7 +583,6 @@ class PermissionManager {
 
     keysToDelete.forEach(key => this.evaluationCache.delete(key));
 
-    console.log(
       `🗑️ Cache d'évaluation invalidé pour l'utilisateur ${userId}: ${keysToDelete.length} entrées`
     );
   }

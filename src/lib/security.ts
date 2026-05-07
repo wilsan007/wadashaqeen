@@ -14,7 +14,6 @@ import { supabase } from '@/integrations/supabase/client';
  * entre différents utilisateurs sur le même navigateur/appareil.
  */
 export async function clearAllUserData(): Promise<void> {
-  console.log('🔒 SÉCURITÉ: Nettoyage complet des données utilisateur...');
 
   try {
     // 1️⃣ Lancer les tâches asynchrones en parallèle (non-bloquant pour le nettoyage local)
@@ -109,12 +108,10 @@ export function setupSecurityListeners(): () => void {
   // Listener sur les changements d'auth Supabase
   const { data: authListener } = supabase.auth.onAuthStateChange(async (event, session) => {
     if (event === 'SIGNED_OUT') {
-      console.log('🔒 SIGNED_OUT détecté, nettoyage complet...');
       await clearAllUserData();
     }
 
     if (event === 'SIGNED_IN' && session) {
-      console.log('🔐 SIGNED_IN détecté, vérification intégrité...');
       await verifySessionIntegrity();
     }
   });
@@ -148,7 +145,6 @@ export async function secureLogout(): Promise<void> {
   // Marquer la déconnexion en cours
   sessionStorage.setItem('logging_out', 'true');
 
-  console.log('🚪 Déconnexion sécurisée en cours...');
 
   // Nettoyage complet
   await clearAllUserData();

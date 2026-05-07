@@ -70,7 +70,6 @@ export const TaskEditDialog: React.FC<TaskEditDialogProps> = ({
     }
     setLoading(true);
     try {
-      console.log('Mise à jour de la tâche:', { title, assignee, priority, status });
       onSave?.();
       onOpenChange(false);
     } catch (error) {

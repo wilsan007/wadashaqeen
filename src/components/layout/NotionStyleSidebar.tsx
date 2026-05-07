@@ -13,6 +13,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { useTenant } from '@/contexts/TenantContext';
 // 🚀 OPTIMISATION BUNDLE - Import depuis barrel export optimisé
 import {
   ChevronDown,
@@ -61,6 +62,7 @@ export const NotionStyleSidebar: React.FC<NotionStyleSidebarProps> = ({
   signOut,
 }) => {
   const location = useLocation();
+  const { currentTenant } = useTenant();
 
   // État de rétractation avec persistance localStorage
   const [isCollapsed, setIsCollapsed] = useState(() => {
@@ -158,7 +160,7 @@ export const NotionStyleSidebar: React.FC<NotionStyleSidebarProps> = ({
   return (
     <aside
       className={cn(
-        'sticky top-0 flex h-screen flex-col transition-all duration-300',
+        'sticky top-0 flex h-[100dvh] flex-col transition-all duration-300',
         'border-r border-zinc-800 bg-zinc-950 text-white',
         isCollapsed ? 'w-16' : 'w-64'
       )}
@@ -166,11 +168,23 @@ export const NotionStyleSidebar: React.FC<NotionStyleSidebarProps> = ({
       {/* Header Sidebar avec bouton Toggle */}
       <div className="flex items-center justify-between border-b border-zinc-800 p-4">
         <Link to="/" className="flex items-center gap-2 overflow-hidden" onClick={onLinkClick}>
-          <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-blue-600 to-purple-600">
-            <span className="text-sm font-bold text-white">W</span>
-          </div>
+          {currentTenant?.logo_url ? (
+            <img
+              src={currentTenant.logo_url}
+              alt={currentTenant.name}
+              className="h-8 w-8 flex-shrink-0 rounded object-contain bg-white/10"
+            />
+          ) : (
+            <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-blue-600 to-purple-600">
+              <span className="text-sm font-bold text-white">
+                {currentTenant?.name ? currentTenant.name.charAt(0).toUpperCase() : 'W'}
+              </span>
+            </div>
+          )}
           {!isCollapsed && (
-            <span className="text-base font-semibold whitespace-nowrap">Wadashaqayn</span>
+            <span className="text-base font-semibold whitespace-nowrap">
+              {currentTenant?.name || 'Wadashaqayn'}
+            </span>
           )}
         </Link>
 

@@ -38,6 +38,16 @@ import { useProjects } from '@/hooks/optimized';
 import { useHRMinimal } from '@/hooks/useHRMinimal';
 import { format, parseISO } from 'date-fns';
 import { fr } from 'date-fns/locale';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface SavedSearch {
   id: string;
@@ -84,6 +94,7 @@ export const AdvancedTaskSearch: React.FC = () => {
 
   const [filters, setFilters] = useState<SearchFilters>(DEFAULT_FILTERS);
   const [selectedTasks, setSelectedTasks] = useState<Set<string>>(new Set());
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [savedSearches, setSavedSearches] = useState<SavedSearch[]>([
     {
       id: '1',
@@ -232,9 +243,12 @@ export const AdvancedTaskSearch: React.FC = () => {
     }
   };
 
-  const handleBulkDelete = async () => {
-    if (!confirm(`Supprimer ${selectedTasks.size} tâche(s) ?`)) return;
+  const handleBulkDelete = () => {
+    setConfirmDeleteOpen(true);
+  };
 
+  const confirmBulkDelete = async () => {
+    setConfirmDeleteOpen(false);
     try {
       await Promise.all(Array.from(selectedTasks).map(id => deleteTask(id)));
       setSelectedTasks(new Set());
@@ -277,6 +291,23 @@ export const AdvancedTaskSearch: React.FC = () => {
 
   return (
     <div className="animate-in fade-in-50 space-y-6 duration-700">
+      <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer {selectedTasks.size} tâche(s) ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Cette action est irréversible. Les tâches sélectionnées seront définitivement supprimées.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmBulkDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Supprimer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Header & Recherche */}
       <div className="relative">
         <div className="absolute inset-0 -z-10 bg-gradient-to-r from-violet-500/20 to-fuchsia-500/20 blur-3xl" />

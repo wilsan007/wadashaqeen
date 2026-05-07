@@ -79,17 +79,14 @@ export default function InvitePage() {
           if (!resp.ok) throw new Error(await resp.text());
 
           const data = await resp.json();
-          console.log('✅ Tenant owner créé:', data);
           navigate(`/dashboard`, { replace: true });
         }
         // COLLABORATEUR : Le webhook handle-collaborator-confirmation s'en charge automatiquement
         else if (type === 'collaborator') {
           setStatus('waiting');
-          console.log("ℹ️ Collaborateur - Webhook automatique va traiter l'invitation");
 
           // Attendre quelques secondes que le webhook traite
           setTimeout(() => {
-            console.log('✅ Redirection vers dashboard...');
             navigate(`/dashboard`, { replace: true });
           }, 3000);
         } else {

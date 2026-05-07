@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { PaieEmploye } from '../../types/payroll';
+import { toast } from '@/hooks/use-toast';
 
 interface EmployeePayrollFormProps {
   employeeId?: string;
@@ -63,7 +64,7 @@ export const EmployeePayrollForm: React.FC<EmployeePayrollFormProps> = ({
       onClose();
     } catch (error) {
       console.error(error);
-      alert('Erreur lors de la sauvegarde');
+      toast({ title: 'Erreur', description: 'Erreur lors de la sauvegarde.', variant: 'destructive' });
     } finally {
       setLoading(false);
     }

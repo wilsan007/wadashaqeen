@@ -121,18 +121,15 @@ export function setupSessionMonitoring(onSessionInvalid: () => void): () => void
   // Détection de fermeture du navigateur/onglet
   const handleBeforeUnload = () => {
     // Le marqueur sera automatiquement supprimé car sessionStorage se vide
-    console.log('🔒 Session terminée - fermeture du navigateur');
   };
 
   // Détection de visibilité (changement d'onglet, verrouillage écran, etc.)
   const handleVisibilityChange = async () => {
     if (document.hidden) {
-      console.log('🔒 Navigateur en arrière-plan');
     } else {
       // Vérifier si la session est toujours valide au retour
       const valid = isSessionValid();
       if (!valid) {
-        console.log('❌ Session invalide détectée au retour');
         await invalidateSession();
         onSessionInvalid();
       }
@@ -144,7 +141,6 @@ export function setupSessionMonitoring(onSessionInvalid: () => void): () => void
     // Vérifier la session à chaque retour de focus
     const valid = isSessionValid();
     if (!valid) {
-      console.log('❌ Session invalide - nouvelle session OS détectée');
       await invalidateSession();
       onSessionInvalid();
     }
@@ -154,7 +150,6 @@ export function setupSessionMonitoring(onSessionInvalid: () => void): () => void
       data: { session },
     } = await supabaseStrict.auth.getSession();
     if (session && isTokenExpired(session.expires_at)) {
-      console.log('⏰ Token JWT expiré (2h dépassées)');
       await invalidateSession();
       onSessionInvalid();
     }
@@ -172,7 +167,6 @@ export function setupSessionMonitoring(onSessionInvalid: () => void): () => void
     } = await supabaseStrict.auth.getSession();
 
     if (session && isTokenExpired(session.expires_at)) {
-      console.log('⏰ Token JWT expiré - déconnexion automatique');
       await invalidateSession();
       onSessionInvalid();
     }
@@ -206,8 +200,6 @@ export async function signInStrict(email: string, password: string) {
     throw error;
   }
 
-  console.log('✅ Connexion réussie - Session valide pour 2h');
-  console.log('🔑 Marqueur de session:', sessionMarker);
 
   return data;
 }
@@ -218,7 +210,6 @@ export async function signInStrict(email: string, password: string) {
 export async function getStrictSession() {
   // Vérifier le marqueur de session
   if (!isSessionValid()) {
-    console.log('❌ Session système invalide');
     await invalidateSession();
     return null;
   }
@@ -230,13 +221,11 @@ export async function getStrictSession() {
   } = await supabaseStrict.auth.getSession();
 
   if (error || !session) {
-    console.log('❌ Pas de session Supabase');
     return null;
   }
 
   // Vérifier l'expiration
   if (isTokenExpired(session.expires_at)) {
-    console.log('⏰ Token expiré');
     await invalidateSession();
     return null;
   }

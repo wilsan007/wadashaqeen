@@ -195,7 +195,6 @@ class RoleCacheManager {
       });
 
       if (expiredKeys.length > 0) {
-        console.log(`🧹 Cache nettoyé: ${expiredKeys.length} entrées expirées supprimées`);
       }
     }, 60000); // Nettoyer chaque minute
   }
@@ -359,7 +358,6 @@ class RoleCacheManager {
       this.removeFromStorage(key);
     });
 
-    console.log(
       `🗑️ Cache invalidé pour l'utilisateur ${userId}: ${keysToDelete.length} entrées supprimées`
     );
     this.notifyListeners('user_cache_invalidated', { userId, tenantId });
@@ -369,7 +367,6 @@ class RoleCacheManager {
    * Invalider tout le cache
    */
   invalidateAll(): void {
-    console.log('🗑️ Invalidation complète du cache des rôles');
     this.cache.clear();
 
     // Nettoyer localStorage
@@ -394,7 +391,6 @@ class RoleCacheManager {
     fetchRoles: () => Promise<UserRole[]>,
     fetchPermissions: () => Promise<UserPermission[]>
   ): Promise<void> {
-    console.log('🔄 Rafraîchissement forcé du cache pour:', userId);
 
     // Invalider le cache existant
     this.invalidateUser(userId, tenantId);
@@ -472,7 +468,6 @@ class RoleCacheManager {
     fetchRoles: () => Promise<UserRole[]>,
     fetchPermissions: () => Promise<UserPermission[]>
   ): Promise<void> {
-    console.log('⚡ Préchargement du cache pour:', userId);
 
     try {
       await Promise.all([
@@ -480,7 +475,6 @@ class RoleCacheManager {
         this.getPermissions(userId, tenantId, [], fetchPermissions),
       ]);
 
-      console.log('✅ Cache préchargé avec succès pour:', userId);
     } catch (error) {
       console.error('❌ Erreur lors du préchargement du cache:', error);
     }

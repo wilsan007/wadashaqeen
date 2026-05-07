@@ -445,6 +445,36 @@ export const useProjectsEnterprise = (filters?: ProjectFilters) => {
     [refresh]
   );
 
+  const createProject = useCallback(
+    async (projectData: {
+      name: string;
+      description?: string;
+      manager?: string | null;
+      status: string;
+      priority: string;
+      skills_required?: string[];
+      budget?: number;
+    }) => {
+      const insertTenantId = tenantId || userRoles[0]?.tenant_id;
+      if (!insertTenantId) throw new Error('Tenant non identifié');
+
+      const { error } = await supabase.from('projects').insert({
+        name: projectData.name,
+        description: projectData.description ?? null,
+        manager_id: projectData.manager ?? null,
+        status: projectData.status,
+        priority: projectData.priority,
+        skills_required: projectData.skills_required ?? [],
+        budget: projectData.budget ?? null,
+        tenant_id: insertTenantId,
+      });
+
+      if (error) throw error;
+      refresh();
+    },
+    [refresh, tenantId, userRoles]
+  );
+
   // Cleanup lors du démontage
   useEffect(() => {
     return () => {
@@ -498,6 +528,7 @@ export const useProjectsEnterprise = (filters?: ProjectFilters) => {
     clearCache,
     getCacheStats,
     updateProject, // ✅ Fonction d'édition inline
+    createProject, // ✅ Fonction de création
 
     // Utilitaires
     isDataStale: metrics.lastUpdate && Date.now() - metrics.lastUpdate.getTime() > CACHE_TTL,

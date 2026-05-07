@@ -65,7 +65,6 @@ export default function AcceptInvitation() {
     try {
       // A. Sign Up (Create Auth User)
       // DEBUG: Log invitation data
-      console.log('🔍 Invitation data:', {
         invitation_type: invitation.invitation_type,
         invitation_id: invitation.id,
         tenant_id: invitation.tenant_id,

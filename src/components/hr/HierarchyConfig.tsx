@@ -4,6 +4,16 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
@@ -29,6 +39,8 @@ export const HierarchyConfig = () => {
   const [levels, setLevels] = useState<OrganizationLevel[]>([]);
   const [loading, setLoading] = useState(false);
   const [newLevelName, setNewLevelName] = useState('');
+  const [pendingTemplate, setPendingTemplate] = useState<{ type: 'ministry' | 'corporate' | 'startup'; label: string } | null>(null);
+  const [pendingDeleteLevel, setPendingDeleteLevel] = useState<string | null>(null);
 
   // Load levels
   const loadLevels = async () => {
@@ -54,15 +66,15 @@ export const HierarchyConfig = () => {
   }, [tenant]);
 
   // Apply Template
-  const handleApplyTemplate = async (type: 'ministry' | 'corporate' | 'startup', label: string) => {
+  const handleApplyTemplate = (type: 'ministry' | 'corporate' | 'startup', label: string) => {
     if (!tenant) return;
-    if (
-      !confirm(
-        `Attention : Ceci va remplacer TOUTE la configuration actuelle par le modèle "${label}". Continuer ?`
-      )
-    )
-      return;
+    setPendingTemplate({ type, label });
+  };
 
+  const confirmApplyTemplate = async () => {
+    if (!tenant || !pendingTemplate) return;
+    const { type, label } = pendingTemplate;
+    setPendingTemplate(null);
     setLoading(true);
     try {
       await HierarchyService.applyTemplate(tenant.id, type);
@@ -103,8 +115,14 @@ export const HierarchyConfig = () => {
   };
 
   // Delete Level
-  const handleDeleteLevel = async (id: string) => {
-    if (!confirm('Supprimer ce niveau ?')) return;
+  const handleDeleteLevel = (id: string) => {
+    setPendingDeleteLevel(id);
+  };
+
+  const confirmDeleteLevel = async () => {
+    if (!pendingDeleteLevel) return;
+    const id = pendingDeleteLevel;
+    setPendingDeleteLevel(null);
     try {
       await HierarchyService.deleteLevel(id);
       loadLevels();
@@ -158,6 +176,42 @@ export const HierarchyConfig = () => {
 
   return (
     <div className="grid gap-6 md:grid-cols-2">
+      {/* Confirm apply template */}
+      <AlertDialog open={!!pendingTemplate} onOpenChange={open => { if (!open) setPendingTemplate(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Appliquer le modèle "{pendingTemplate?.label}" ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Ceci va remplacer TOUTE la configuration actuelle. Cette action est irréversible.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmApplyTemplate} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Appliquer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Confirm delete level */}
+      <AlertDialog open={!!pendingDeleteLevel} onOpenChange={open => { if (!open) setPendingDeleteLevel(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer ce niveau ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Cette action est irréversible. Le niveau ne doit pas être utilisé par des employés.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteLevel} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Supprimer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* Left: Configuration List */}
       <div className="space-y-6">
         <Card className="h-full border-t-4 border-t-blue-600 shadow-lg">

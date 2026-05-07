@@ -4,6 +4,16 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import {
   Select,
@@ -294,6 +304,7 @@ export const CollaboratorInvitation: React.FC = () => {
   // ============================================================================
   const [availableRoles, setAvailableRoles] = useState<AvailableRole[]>([]);
   const [loadingRoles, setLoadingRoles] = useState(true);
+  const [revokeTarget, setRevokeTarget] = useState<string | null>(null);
 
   const { toast } = useToast();
 
@@ -361,7 +372,6 @@ export const CollaboratorInvitation: React.FC = () => {
 
         setAvailableRoles(filteredRoles);
 
-        console.log('✅ Rôles chargés:', filteredRoles.length, 'rôles disponibles');
       } catch (err) {
         console.error('Exception chargement rôles:', err);
       } finally {
@@ -434,9 +444,14 @@ export const CollaboratorInvitation: React.FC = () => {
     }
   };
 
-  const handleRevoke = async (invitationId: string) => {
-    if (confirm('Êtes-vous sûr de vouloir annuler cette invitation ?')) {
-      await revokeInvitation(invitationId);
+  const handleRevoke = (invitationId: string) => {
+    setRevokeTarget(invitationId);
+  };
+
+  const confirmRevoke = async () => {
+    if (revokeTarget) {
+      await revokeInvitation(revokeTarget);
+      setRevokeTarget(null);
     }
   };
 
@@ -476,6 +491,24 @@ export const CollaboratorInvitation: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {/* Confirm revoke dialog */}
+      <AlertDialog open={!!revokeTarget} onOpenChange={open => { if (!open) setRevokeTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Annuler l'invitation ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Cette invitation sera révoquée et le lien envoyé ne sera plus utilisable.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmRevoke} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Confirmer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* ============================================================================
           STATISTIQUES (Pattern Linear)
           ============================================================================ */}

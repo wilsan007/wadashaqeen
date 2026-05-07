@@ -73,17 +73,14 @@ export function useOnboardingOffboarding() {
   const { toast } = useToast();
 
   const fetchData = useCallback(async () => {
-    console.log('🔄 [useOnboardingOffboarding] fetchData called', { userContext: !!userContext });
 
     if (!userContext) {
-      console.log('❌ [useOnboardingOffboarding] No userContext, aborting');
       return;
     }
 
     try {
       setLoading(true);
       setError(null);
-      console.log('⏳ [useOnboardingOffboarding] Starting Supabase queries...');
 
       // 🔒 Construire les queries avec filtrage
       let onboardingQuery = supabase
@@ -125,7 +122,6 @@ export function useOnboardingOffboarding() {
       if (onboardingTasksRes.error) throw onboardingTasksRes.error;
       if (offboardingTasksRes.error) throw offboardingTasksRes.error;
 
-      console.log('✅ [useOnboardingOffboarding] Data fetched successfully', {
         onboarding: onboardingRes.data?.length,
         offboarding: offboardingRes.data?.length,
       });

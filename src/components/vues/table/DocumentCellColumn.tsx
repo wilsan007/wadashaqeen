@@ -69,7 +69,6 @@ export const DocumentCellColumn = ({ task, isSubtask }: DocumentCellProps) => {
       const fileExt = file.name.split('.').pop();
       const fileName = `${task.id}/${Date.now()}.${fileExt}`;
 
-      console.log('Uploading file:', fileName);
       const { error: uploadError } = await supabase.storage
         .from('task-documents')
         .upload(fileName, file);
@@ -79,7 +78,6 @@ export const DocumentCellColumn = ({ task, isSubtask }: DocumentCellProps) => {
         throw uploadError;
       }
 
-      console.log('File uploaded successfully, inserting into database...');
 
       // Récupérer l'utilisateur actuel
       const {

@@ -60,17 +60,14 @@ export function useExpenseManagement() {
   const { toast } = useToast();
 
   const fetchData = useCallback(async () => {
-    console.log('🔄 [useExpenseManagement] fetchData called', { userContext: !!userContext });
 
     if (!userContext) {
-      console.log('❌ [useExpenseManagement] No userContext, aborting');
       return;
     }
 
     try {
       setLoading(true);
       setError(null);
-      console.log('⏳ [useExpenseManagement] Starting Supabase queries...');
 
       // 🔒 Construire les queries avec filtrage
       let reportsQuery = supabase
@@ -98,7 +95,6 @@ export function useExpenseManagement() {
       if (itemsRes.error) throw itemsRes.error;
       if (categoriesRes.error) throw categoriesRes.error;
 
-      console.log('✅ [useExpenseManagement] Data fetched successfully', {
         reports: reportsRes.data?.length,
         items: itemsRes.data?.length,
       });

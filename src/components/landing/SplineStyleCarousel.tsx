@@ -1,214 +1,266 @@
-import React, { useRef, useState, useEffect } from 'react';
-import {
-  motion,
-  useMotionValue,
-  useSpring,
-  useTransform,
-  animate,
-  useMotionTemplate,
-} from 'framer-motion';
-import {
-  ArrowRight,
-  BarChart3,
-  Users,
-  Zap,
-  Clock,
-  Shield,
-  Globe,
-  Sparkles,
-  Layout,
-  Cpu,
-  Lock,
-} from 'lucide-react';
+/**
+ * SplineStyleCarousel — Carousel 3D premium avec double rangée en sens opposé
+ * Design: Spotlight cards + Infinite marquee + glassmorphism
+ */
 
-// --- Types ---
-interface Feature {
-  icon: React.ElementType;
+import React, { useRef, useState } from 'react';
+import { motion, useSpring, useTransform, useMotionValue } from 'framer-motion';
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface ModuleCard {
+  icon: string;
   title: string;
   description: string;
-  color: string; // Tailwind gradient class
-  glowColor: string; // CSS hex color for spotlight
+  tag: string;
+  gradient: string;
+  glow: string;
+  available: boolean;
 }
 
-// --- Spotlight 3D Card ---
-const SpotlightCard = ({ feature }: { feature: Feature }) => {
-  const ref = useRef<HTMLDivElement>(null);
+// ─── Data ─────────────────────────────────────────────────────────────────────
 
-  // Mouse tracking
+const MODULES: ModuleCard[] = [
+  {
+    icon: '📊',
+    title: 'Tableaux de bord',
+    description: 'KPIs en temps réel avec graphiques interactifs',
+    tag: 'Disponible',
+    gradient: 'from-blue-600 via-cyan-500 to-teal-500',
+    glow: '#06b6d4',
+    available: true,
+  },
+  {
+    icon: '📋',
+    title: 'Gestion de tâches',
+    description: 'Organisez et suivez vos projets complexes',
+    tag: 'Disponible',
+    gradient: 'from-violet-600 via-purple-500 to-fuchsia-500',
+    glow: '#a855f7',
+    available: true,
+  },
+  {
+    icon: '📅',
+    title: 'Vue Gantt',
+    description: 'Planification visuelle avec dépendances',
+    tag: 'Disponible',
+    gradient: 'from-emerald-600 via-green-500 to-teal-400',
+    glow: '#10b981',
+    available: true,
+  },
+  {
+    icon: '🎯',
+    title: 'Vue Kanban',
+    description: 'Workflow agile et flexible par équipe',
+    tag: 'Disponible',
+    gradient: 'from-orange-600 via-amber-500 to-yellow-400',
+    glow: '#f97316',
+    available: true,
+  },
+  {
+    icon: '👥',
+    title: 'Gestion RH',
+    description: 'Équipes, absences et performances',
+    tag: 'Disponible',
+    gradient: 'from-indigo-600 via-blue-500 to-cyan-400',
+    glow: '#6366f1',
+    available: true,
+  },
+  {
+    icon: '⏱️',
+    title: 'Suivi du temps',
+    description: 'Timesheet et pointage intelligents',
+    tag: 'Disponible',
+    gradient: 'from-teal-600 via-cyan-500 to-sky-400',
+    glow: '#14b8a6',
+    available: true,
+  },
+  {
+    icon: '💰',
+    title: 'Notes de frais',
+    description: 'Gestion et validation des dépenses',
+    tag: 'Disponible',
+    gradient: 'from-yellow-600 via-amber-500 to-orange-400',
+    glow: '#f59e0b',
+    available: true,
+  },
+  {
+    icon: '🎓',
+    title: 'Formation',
+    description: 'Catalogue et suivi des compétences',
+    tag: 'Disponible',
+    gradient: 'from-pink-600 via-rose-500 to-red-400',
+    glow: '#ec4899',
+    available: true,
+  },
+  {
+    icon: '🤖',
+    title: 'Automatisations',
+    description: 'Workflows sans code, IA intégrée',
+    tag: 'Bientôt',
+    gradient: 'from-violet-700 via-purple-600 to-indigo-500',
+    glow: '#8b5cf6',
+    available: false,
+  },
+  {
+    icon: '📈',
+    title: 'Analytics IA',
+    description: 'Prédictions et insights avancés',
+    tag: 'Bientôt',
+    gradient: 'from-blue-700 via-indigo-600 to-violet-500',
+    glow: '#6366f1',
+    available: false,
+  },
+  {
+    icon: '🔔',
+    title: 'Notifications',
+    description: 'Alertes temps réel multi-canal',
+    tag: 'Disponible',
+    gradient: 'from-red-600 via-rose-500 to-pink-400',
+    glow: '#ef4444',
+    available: true,
+  },
+  {
+    icon: '📱',
+    title: 'App Mobile',
+    description: 'iOS et Android natif',
+    tag: 'Bientôt',
+    gradient: 'from-cyan-600 via-blue-500 to-indigo-400',
+    glow: '#0ea5e9',
+    available: false,
+  },
+];
+
+// Split into two rows
+const ROW_1 = MODULES.slice(0, 6);
+const ROW_2 = MODULES.slice(6, 12);
+
+// ─── 3D Spotlight Card ────────────────────────────────────────────────────────
+
+const SpotlightCard = ({ card }: { card: ModuleCard }) => {
+  const cardRef = useRef<HTMLDivElement>(null);
   const mouseX = useMotionValue(0);
   const mouseY = useMotionValue(0);
 
-  // 3D Tilt Values
-  const rotateX = useSpring(useTransform(mouseY, [-0.5, 0.5], [15, -15]), {
-    stiffness: 300,
-    damping: 30,
+  const rotateX = useSpring(useTransform(mouseY, [-0.5, 0.5], [12, -12]), {
+    stiffness: 400, damping: 35,
   });
-  const rotateY = useSpring(useTransform(mouseX, [-0.5, 0.5], [-15, 15]), {
-    stiffness: 300,
-    damping: 30,
+  const rotateY = useSpring(useTransform(mouseX, [-0.5, 0.5], [-12, 12]), {
+    stiffness: 400, damping: 35,
   });
-  const scale = useSpring(1, { stiffness: 300, damping: 30 });
+  const scale = useSpring(1, { stiffness: 400, damping: 35 });
 
-  function onMouseMove({ currentTarget, clientX, clientY }: React.MouseEvent) {
-    const { left, top, width, height } = currentTarget.getBoundingClientRect();
-    const x = (clientX - left) / width - 0.5;
-    const y = (clientY - top) / height - 0.5;
+  const onMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    mouseX.set((e.clientX - rect.left) / rect.width - 0.5);
+    mouseY.set((e.clientY - rect.top) / rect.height - 0.5);
+    scale.set(1.04);
+    e.currentTarget.style.setProperty('--mx', `${e.clientX - rect.left}px`);
+    e.currentTarget.style.setProperty('--my', `${e.clientY - rect.top}px`);
+  };
 
-    mouseX.set(x);
-    mouseY.set(y);
-    scale.set(1.05);
-
-    // For spotlight
-    (currentTarget as HTMLElement).style.setProperty('--mouse-x', `${clientX - left}px`);
-    (currentTarget as HTMLElement).style.setProperty('--mouse-y', `${clientY - top}px`);
-  }
-
-  function onMouseLeave() {
+  const onMouseLeave = () => {
     mouseX.set(0);
     mouseY.set(0);
     scale.set(1);
-    rotateX.set(0);
-    rotateY.set(0);
-  }
+  };
 
   return (
     <motion.div
-      ref={ref}
-      style={{
-        rotateX,
-        rotateY,
-        scale,
-        transformStyle: 'preserve-3d',
-      }}
+      ref={cardRef}
+      style={{ rotateX, rotateY, scale, transformStyle: 'preserve-3d' }}
       onMouseMove={onMouseMove}
       onMouseLeave={onMouseLeave}
-      className="group relative h-[380px] w-[320px] flex-shrink-0 cursor-pointer rounded-3xl border border-white/5 bg-slate-900/60 p-8 backdrop-blur-xl transition-colors duration-500"
+      className="group relative flex h-[200px] w-[260px] flex-shrink-0 cursor-pointer flex-col justify-between overflow-hidden rounded-2xl border border-white/10 bg-slate-900/70 p-5 shadow-xl backdrop-blur-xl transition-shadow duration-300"
     >
-      {/* 🔦 Spotlight Effect (The "Reveal") */}
+      {/* Spotlight effect */}
       <div
-        className="pointer-events-none absolute -inset-px rounded-3xl opacity-0 transition duration-300 group-hover:opacity-100"
+        className="pointer-events-none absolute -inset-px rounded-2xl opacity-0 transition-opacity duration-300 group-hover:opacity-100"
         style={{
-          background: `radial-gradient(600px circle at var(--mouse-x) var(--mouse-y), ${feature.glowColor}25, transparent 40%)`,
-          zIndex: 0,
+          background: `radial-gradient(300px circle at var(--mx, 50%) var(--my, 50%), ${card.glow}30, transparent 50%)`,
         }}
       />
 
-      {/* Soft animated border gradient */}
+      {/* Ambient glow */}
       <div
-        className={`absolute inset-0 -z-10 rounded-3xl bg-gradient-to-br opacity-20 transition-opacity duration-500 group-hover:opacity-60 ${feature.color} blur-xl`}
+        className={`absolute inset-0 -z-10 rounded-2xl bg-gradient-to-br ${card.gradient} opacity-10 blur-xl transition-opacity duration-500 group-hover:opacity-30`}
       />
 
-      {/* 🧊 Content Layer (Floating Deep) */}
-      <div style={{ transform: 'translateZ(75px)' }} className="relative z-10 flex h-full flex-col">
-        {/* Floating Icon */}
+      {/* Top row: icon + badge */}
+      <div className="flex items-start justify-between" style={{ transform: 'translateZ(30px)' }}>
         <div
-          className={`mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br ${feature.color} text-white shadow-lg ring-1 shadow-black/40 ring-white/20`}
-          style={{ transform: 'translateZ(20px)' }} // Extra pop for icon
+          className={`flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br ${card.gradient} text-2xl shadow-lg ring-1 ring-white/20`}
         >
-          <feature.icon className="h-8 w-8" />
+          {card.icon}
         </div>
-
-        <h3 className="mb-3 text-3xl font-bold text-white drop-shadow-lg">{feature.title}</h3>
-
-        <p className="flex-grow text-base leading-relaxed font-medium text-slate-300">
-          {feature.description}
-        </p>
-
-        {/* Action Button */}
-        <div className="mt-8 flex items-center justify-between border-t border-white/10 pt-6">
-          <span
-            className="text-xs font-bold tracking-widest uppercase"
-            style={{ color: feature.glowColor }}
-          >
-            Explorer
-          </span>
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/5 transition-transform group-hover:scale-110 group-hover:bg-white/20">
-            <ArrowRight className="h-5 w-5 text-white" />
-          </div>
-        </div>
+        <span
+          className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${
+            card.available
+              ? 'border border-emerald-500/40 bg-emerald-500/20 text-emerald-300'
+              : 'border border-amber-500/40 bg-amber-500/20 text-amber-300'
+          }`}
+        >
+          {card.tag}
+        </span>
       </div>
+
+      {/* Text */}
+      <div style={{ transform: 'translateZ(20px)' }}>
+        <h3 className="mb-1 text-base font-bold text-white">{card.title}</h3>
+        <p className="text-xs leading-relaxed text-slate-400">{card.description}</p>
+      </div>
+
+      {/* Bottom gradient bar */}
+      <div className={`absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r ${card.gradient} opacity-40 group-hover:opacity-80 transition-opacity duration-300`} />
     </motion.div>
   );
 };
 
-// --- Features Data ---
-const FEATURES: Feature[] = [
-  {
-    icon: Layout,
-    title: 'Tableaux Modernes',
-    description: 'Une vue claire de vos KPIs avec des graphiques interactifs en temps réel.',
-    color: 'from-blue-600 to-cyan-500',
-    glowColor: '#06b6d4',
-  },
-  {
-    icon: Users,
-    title: 'Collaboration',
-    description: 'Un espace unifié pour vos équipes, éliminant les silos de communication.',
-    color: 'from-purple-600 to-fuchsia-500',
-    glowColor: '#d946ef',
-  },
-  {
-    icon: Zap,
-    title: 'Workflow IA',
-    description: 'Automatisez 80% de vos tâches répétitives grâce à notre moteur intelligent.',
-    color: 'from-amber-500 to-orange-500',
-    glowColor: '#f97316',
-  },
-  {
-    icon: Shield,
-    title: 'Sécurité Max',
-    description: 'Chiffrement de bout en bout et protection avancée des données sensibles.',
-    color: 'from-emerald-500 to-green-500',
-    glowColor: '#10b981',
-  },
-  {
-    icon: Globe,
-    title: 'Global Ready',
-    description: 'Support multi-langue et multi-devises pour une expansion sans limites.',
-    color: 'from-indigo-600 to-violet-600',
-    glowColor: '#6366f1',
-  },
-  {
-    icon: Cpu,
-    title: 'Performance',
-    description: 'Une infrastructure ultra-rapide optimisée pour les charges lourdes.',
-    color: 'from-rose-500 to-pink-500',
-    glowColor: '#ec4899',
-  },
-];
+// ─── Marquee Row ──────────────────────────────────────────────────────────────
 
-// --- Infinite Marquee Carousel ---
+const MarqueeRow = ({
+  cards,
+  direction = 1,
+  duration = 40,
+}: {
+  cards: ModuleCard[];
+  direction?: 1 | -1;
+  duration?: number;
+}) => {
+  const doubled = [...cards, ...cards];
+
+  return (
+    <div className="relative overflow-hidden">
+      <motion.div
+        className="flex gap-5 py-4"
+        animate={{ x: direction === 1 ? '-50%' : '0%' }}
+        initial={{ x: direction === 1 ? '0%' : '-50%' }}
+        transition={{ ease: 'linear', duration, repeat: Infinity }}
+        style={{ width: 'max-content' }}
+      >
+        {doubled.map((card, i) => (
+          <SpotlightCard key={`${card.title}-${i}`} card={card} />
+        ))}
+      </motion.div>
+    </div>
+  );
+};
+
+// ─── Main Export ──────────────────────────────────────────────────────────────
+
 export default function SplineStyleCarousel() {
   return (
-    <div className="perspective-1000 relative mx-auto w-full max-w-[100vw] overflow-hidden py-10">
-      {/* Side Fades for Seamless Look */}
-      <div className="pointer-events-none absolute top-0 left-0 z-20 h-full w-32 bg-gradient-to-r from-slate-950 to-transparent" />
-      <div className="pointer-events-none absolute top-0 right-0 z-20 h-full w-32 bg-gradient-to-l from-slate-950 to-transparent" />
+    <div
+      className="relative w-full overflow-hidden"
+      style={{ perspective: '1200px' }}
+    >
+      {/* Side fades */}
+      <div className="pointer-events-none absolute top-0 left-0 z-20 h-full w-24 bg-gradient-to-r from-slate-950 to-transparent md:w-40" />
+      <div className="pointer-events-none absolute top-0 right-0 z-20 h-full w-24 bg-gradient-to-l from-slate-950 to-transparent md:w-40" />
 
-      {/* Infinite Scroll Track */}
-      <div className="flex w-fit">
-        {/* Track 1 */}
-        <motion.div
-          className="flex gap-10 px-5"
-          animate={{ x: '-50%' }}
-          transition={{
-            ease: 'linear',
-            duration: 40, // Adjust speed (seconds to scroll half width)
-            repeat: Infinity,
-          }}
-          style={{ width: 'max-content' }}
-        >
-          {[...FEATURES, ...FEATURES].map((feature, idx) => (
-            <div key={`${feature.title}-${idx}`} className="py-10">
-              <SpotlightCard feature={feature} />
-            </div>
-          ))}
-        </motion.div>
-
-        {/* Track 2 (Duplicate for seamless loop if needed, but the map above handles it via pure CSS/motion repeat usually, 
-             actually simpler to just map list twice in one container and slide that container) 
-             Wait, I mapped FEATURES twice above. If the container is wide enough, transform x -50% works perfectly.
-         */}
+      <div className="space-y-2">
+        <MarqueeRow cards={ROW_1} direction={1} duration={45} />
+        <MarqueeRow cards={ROW_2} direction={-1} duration={38} />
       </div>
     </div>
   );

@@ -6,6 +6,16 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Shield, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface MFAFactor {
   id: string;
@@ -19,6 +29,7 @@ export const SecuritySettings = () => {
   const [mfaFactors, setMfaFactors] = useState<MFAFactor[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [pendingUnenrollId, setPendingUnenrollId] = useState<string | null>(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -47,13 +58,14 @@ export const SecuritySettings = () => {
     }
   };
 
-  const handleUnenroll = async (factorId: string) => {
-    const confirmed = window.confirm(
-      "Êtes-vous sûr de vouloir désactiver l'authentification à deux facteurs ? " +
-        'Cela réduira la sécurité de votre compte.'
-    );
+  const handleUnenroll = (factorId: string) => {
+    setPendingUnenrollId(factorId);
+  };
 
-    if (!confirmed) return;
+  const confirmUnenroll = async () => {
+    if (!pendingUnenrollId) return;
+    const factorId = pendingUnenrollId;
+    setPendingUnenrollId(null);
 
     try {
       const { error } = await supabase.auth.mfa.unenroll({ factorId });
@@ -96,6 +108,23 @@ export const SecuritySettings = () => {
 
   return (
     <div className="space-y-6">
+      <AlertDialog open={!!pendingUnenrollId} onOpenChange={open => { if (!open) setPendingUnenrollId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Désactiver l'authentification à deux facteurs ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Cela réduira la sécurité de votre compte. Cette action peut être annulée en reconfigurant le MFA.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmUnenroll} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Désactiver
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">

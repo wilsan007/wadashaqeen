@@ -81,7 +81,7 @@ export const ProjectCreationDialog: React.FC<ProjectCreationDialogProps> = ({
 
   const handleSubmit = async () => {
     if (!name.trim()) {
-      alert('Le nom du projet est obligatoire');
+      toast({ title: 'Champ obligatoire', description: 'Le nom du projet est obligatoire.', variant: 'destructive' });
       return;
     }
 
@@ -109,7 +109,7 @@ export const ProjectCreationDialog: React.FC<ProjectCreationDialogProps> = ({
 
       onOpenChange(false);
     } catch (error) {
-      alert('Erreur lors de la création du projet');
+      toast({ title: 'Erreur', description: 'Erreur lors de la création du projet.', variant: 'destructive' });
     } finally {
       setLoading(false);
     }

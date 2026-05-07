@@ -35,6 +35,16 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface OrgNodeProps {
   employee: Employee;
@@ -170,6 +180,7 @@ export const OrganizationChart: React.FC = () => {
   const [levels, setLevels] = useState<OrganizationLevel[]>([]);
   const [departments, setDepartments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [pendingDetach, setPendingDetach] = useState<string | null>(null);
 
   // Edit Mode State
   const [isEditMode, setIsEditMode] = useState(false);
@@ -264,14 +275,14 @@ export const OrganizationChart: React.FC = () => {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (
-      !confirm(
-        "Voulez-vous vraiment détacher cet employé de l'organigramme (supprimer le manager) ?\n\nPour supprimer définitivement l'employé, utilisez la gestion du personnel."
-      )
-    )
-      return;
+  const handleDelete = (id: string) => {
+    setPendingDetach(id);
+  };
 
+  const confirmDetach = async () => {
+    if (!pendingDetach) return;
+    const id = pendingDetach;
+    setPendingDetach(null);
     try {
       const { error } = await supabase.from('employees').update({ manager_id: null }).eq('id', id);
 
@@ -352,6 +363,23 @@ export const OrganizationChart: React.FC = () => {
 
   return (
     <Card className="h-full border-none bg-transparent shadow-none">
+      {/* Confirm detach dialog */}
+      <AlertDialog open={!!pendingDetach} onOpenChange={open => { if (!open) setPendingDetach(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Détacher cet employé ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Ceci supprimera le lien manager de cet employé dans l'organigramme. Pour supprimer définitivement l'employé, utilisez la gestion du personnel.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDetach} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Détacher
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <CardHeader className="flex flex-col items-start justify-between gap-4 px-0 pt-0 pb-4 md:flex-row md:items-center">
         <div>
           <CardTitle className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-2xl font-bold text-transparent">
@@ -434,7 +462,7 @@ export const OrganizationChart: React.FC = () => {
       </CardContent>
 
       <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-        <DialogContent>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>Ajouter un subordonné</DialogTitle>
             <DialogDescription>

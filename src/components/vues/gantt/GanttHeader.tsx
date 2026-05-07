@@ -1,6 +1,6 @@
 import { CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Calendar, CalendarDays, Clock } from '@/lib/icons';
+import { Calendar, CalendarDays, Clock, ZoomIn } from '@/lib/icons';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 import { ViewMode } from '@/lib/ganttHelpers';
@@ -27,13 +27,22 @@ export const GanttHeader = ({ viewMode, onViewModeChange }: GanttHeaderProps) =>
         {/* Contrôles de zoom */}
         <div className="flex gap-2">
           <Button
+            variant={viewMode === 'day' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => onViewModeChange('day')}
+            className="transition-smooth hover-glow gap-1"
+          >
+            <ZoomIn className="h-4 w-4" />
+            {!isMobile && 'Jour'}
+          </Button>
+          <Button
             variant={viewMode === 'week' ? 'default' : 'outline'}
             size="sm"
             onClick={() => onViewModeChange('week')}
             className="transition-smooth hover-glow gap-1"
           >
             <CalendarDays className="h-4 w-4" />
-            Semaine
+            {!isMobile && 'Semaine'}
           </Button>
           <Button
             variant={viewMode === 'month' ? 'default' : 'outline'}
@@ -42,7 +51,7 @@ export const GanttHeader = ({ viewMode, onViewModeChange }: GanttHeaderProps) =>
             className="transition-smooth hover-glow gap-1"
           >
             <Calendar className="h-4 w-4" />
-            Mois
+            {!isMobile && 'Mois'}
           </Button>
           <Button
             variant={viewMode === 'quarter' ? 'default' : 'outline'}
@@ -51,7 +60,7 @@ export const GanttHeader = ({ viewMode, onViewModeChange }: GanttHeaderProps) =>
             className="transition-smooth hover-glow gap-1"
           >
             <Clock className="h-4 w-4" />
-            Trimestre
+            {!isMobile && 'Trimestre'}
           </Button>
         </div>
       </div>

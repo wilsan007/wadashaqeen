@@ -1,7 +1,9 @@
 import React from 'react';
-import { GanttTask, ViewConfig, getTotalUnits } from '@/lib/ganttHelpers';
+import { GanttTask, ViewConfig, getTotalUnits, getUnitPosition, getTaskWidth } from '@/lib/ganttHelpers';
 import { GanttTaskBar } from './GanttTaskBar';
 import { GanttProjectBar } from './GanttProjectBar';
+import { DependencyLines } from '@/components/gantt/DependencyLines';
+import { TaskDependency } from '@/types/taskDependencies';
 
 interface ProjectData {
   projectId: string;
@@ -29,6 +31,7 @@ interface GanttTimelineProps {
   displayMode?: 'tasks' | 'projects';
   projectsOrder?: Array<{ id: string }>;
   projectsData?: ProjectData[];
+  dependencies?: TaskDependency[];
 }
 
 export const GanttTimeline = ({
@@ -43,6 +46,7 @@ export const GanttTimeline = ({
   displayMode = 'tasks',
   projectsOrder = [],
   projectsData = [],
+  dependencies = [],
 }: GanttTimelineProps) => {
   const totalUnits = getTotalUnits(startDate, endDate, config);
 
@@ -307,6 +311,26 @@ export const GanttTimeline = ({
 
   const horizontalLinePositions = getHorizontalLinePositions();
 
+  // Calculer les positions de chaque barre (pour le rendu des flèches SVG)
+  const taskPositions = React.useMemo(() => {
+    const positions = new Map<string, { id: string; top: number; left: number; width: number; height: number }>();
+    if (!dependencies.length) return positions;
+
+    tasks.forEach(task => {
+      const isSubtask = !!task.parent_id;
+      const taskRowHeight = isSubtask ? rowHeight * 0.7 : rowHeight;
+      const barPadding = isSubtask ? 7 : 10;
+      const left = getUnitPosition(task.startDate, startDate, config);
+      const width = getTaskWidth(task, config);
+      const top = getTaskVerticalPosition(task.id) + barPadding;
+      const height = taskRowHeight - barPadding * 2;
+      positions.set(task.id, { id: task.id, top, left, width, height });
+    });
+
+    return positions;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tasks, config, startDate, rowHeight, displayMode, projectsOrder, dependencies]);
+
   return (
     <div className="h-full w-full">
       <div
@@ -410,6 +434,14 @@ export const GanttTimeline = ({
             />
           );
         })}
+
+        {/* Flèches de dépendances SVG — rendu au-dessus des barres */}
+        {dependencies.length > 0 && (
+          <DependencyLines
+            dependencies={dependencies}
+            taskPositions={taskPositions}
+          />
+        )}
       </div>
     </div>
   );

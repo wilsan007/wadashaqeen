@@ -1,0 +1,60 @@
+{
+  "dashboard": {
+    "title": "Dashboard",
+    "projects": "Projects",
+    "team": "Team",
+    "tasks": "Tasks",
+    "taskDistribution": "Task distribution"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "projects": "Projects",
+    "tasks": "Tasks",
+    "calendar": "Calendar",
+    "hr": "HR",
+    "analytics": "Analytics",
+    "settings": "Settings",
+    "inbox": "Inbox",
+    "operations": "Operations",
+    "gantt": "Gantt"
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "An error occurred",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create",
+    "search": "Search",
+    "filter": "Filter",
+    "export": "Export",
+    "viewDetails": "View details",
+    "noData": "No data available"
+  },
+  "tasks": {
+    "title": "Tasks",
+    "status": {
+      "todo": "To Do",
+      "in_progress": "In Progress",
+      "done": "Done",
+      "completed": "Completed",
+      "blocked": "Blocked",
+      "review": "In Review"
+    },
+    "priority": {
+      "low": "Low",
+      "medium": "Medium",
+      "high": "High",
+      "urgent": "Urgent"
+    }
+  },
+  "auth": {
+    "login": "Login",
+    "logout": "Logout",
+    "email": "Email",
+    "password": "Password",
+    "forgotPassword": "Forgot your password?",
+    "noAccount": "No account yet?"
+  }
+}

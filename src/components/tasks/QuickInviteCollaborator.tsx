@@ -86,10 +86,6 @@ export const QuickInviteCollaborator: React.FC<QuickInviteCollaboratorProps> = (
 
       if (!profile?.tenant_id) throw new Error('Tenant non trouvé');
 
-      console.log('🚀 Envoi invitation collaborateur rapide...');
-      console.log('📧 Email:', formData.email);
-      console.log('👤 Nom:', formData.full_name);
-      console.log('🏢 Tenant:', profile.tenant_id);
 
       // Appeler l'Edge Function send-collaborator-invitation
       const response = await fetch(
@@ -116,8 +112,6 @@ export const QuickInviteCollaborator: React.FC<QuickInviteCollaboratorProps> = (
 
       const result = await response.json();
 
-      console.log('✅ Invitation envoyée avec succès');
-      console.log('📋 Résultat:', result);
 
       // Animation de succès
       setSuccess(true);

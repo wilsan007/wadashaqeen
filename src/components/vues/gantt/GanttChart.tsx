@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent } from '@/components/ui/card';
 // Hooks optimisés avec cache intelligent et métriques
 import { useTasks, type Task } from '@/hooks/optimized';
@@ -27,6 +28,9 @@ import {
   getTotalUnits,
   ViewConfig,
 } from '@/lib/ganttHelpers';
+import { TaskDependency } from '@/types/taskDependencies';
+import { CACHE_TTL } from '@/lib/queryConfig';
+import { supabase } from '@/integrations/supabase/client';
 import { assignProjectColors, getTaskColor, ProjectColorMap } from '@/lib/ganttColors';
 
 const GanttChart = () => {
@@ -56,6 +60,42 @@ const GanttChart = () => {
     originalStartDate: Date;
     originalEndDate: Date;
   } | null>(null);
+
+  // ─── Dépendances entre tâches ──────────────────────────────────────────────
+  // IDs des tâches actuellement affichées (triés → clé de cache stable)
+  const taskIds = React.useMemo(
+    () =>
+      (displayMode === 'tasks' ? filteredTasks.map(t => t.id) : projects.map(p => p.id)).sort(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [displayMode, filteredTasks.length, projects.length]
+  );
+
+  // Query TanStack v5 : fetch des dépendances pour les tâches visibles
+  const { data: dependenciesData } = useQuery<TaskDependency[]>({
+    queryKey: ['task-dependencies', taskIds.join(',')],
+    queryFn: async () => {
+      if (!taskIds.length) return [];
+      const { data, error } = await supabase
+        .from('task_dependencies')
+        .select('id, task_id, depends_on_task_id, dependency_type, tenant_id, created_at, updated_at')
+        .in('task_id', taskIds);
+      if (error) throw error;
+      // Mapper null → undefined pour aligner avec l'interface TaskDependency
+      return (data ?? []).map(row => ({
+        id: row.id,
+        task_id: row.task_id,
+        depends_on_task_id: row.depends_on_task_id,
+        dependency_type: row.dependency_type,
+        tenant_id: row.tenant_id ?? undefined,
+        created_at: row.created_at,
+        updated_at: row.updated_at ?? undefined,
+      }));
+    },
+    enabled: taskIds.length > 0,
+    ...CACHE_TTL.realtime,
+  });
+
+  const dependencies = dependenciesData ?? [];
 
   const { tasks, loading, error, updateTaskDates, refresh } = useTasks();
   const { projects, loading: projectsLoading, error: projectsError } = useProjects();
@@ -713,6 +753,7 @@ const GanttChart = () => {
                   displayMode={displayMode}
                   projectsOrder={projects}
                   projectsData={projectsData}
+                  dependencies={dependencies}
                 />
               </div>
             </div>

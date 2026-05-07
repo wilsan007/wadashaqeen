@@ -139,7 +139,7 @@ export class AuthErrorHandler {
         suggestion: 'Vérifiez votre boîte mail et cliquez sur le lien de confirmation.',
         actionButton: {
           text: "Renvoyer l'email",
-          action: () => console.log('Resend confirmation email'),
+          action: () => { /* TODO: appeler supabase.auth.resend() */ },
         },
         severity: 'warning',
         code: 'AUTH_400_EMAIL_NOT_CONFIRMED',

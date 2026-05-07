@@ -325,7 +325,7 @@ export class ErrorFactory {
       actions: [
         {
           text: "Renvoyer l'email",
-          action: () => console.log('Resend confirmation email'),
+          action: () => { /* TODO: appeler supabase.auth.resend() */ },
           variant: 'outline',
         },
       ],

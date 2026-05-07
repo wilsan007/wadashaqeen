@@ -52,7 +52,6 @@ const CollaboratorSetup: React.FC = () => {
           return;
         }
 
-        console.log('✅ Session trouvée pour:', session.user.email);
 
         // Vérifier si le profil existe déjà
         setState({
@@ -66,7 +65,6 @@ const CollaboratorSetup: React.FC = () => {
 
         const checkProfile = async (): Promise<boolean> => {
           attemptCount++;
-          console.log(`🔍 Tentative ${attemptCount}/${maxAttempts} - Vérification profil...`);
 
           const { data: profile, error: profileError } = await supabase
             .from('profiles')
@@ -75,12 +73,10 @@ const CollaboratorSetup: React.FC = () => {
             .single();
 
           if (profileError) {
-            console.log('⏳ Profil non encore créé, attente...');
             return false;
           }
 
           if (profile) {
-            console.log('✅ Profil trouvé !');
             setState({
               status: 'success',
               message: 'Votre compte a été configuré avec succès !',

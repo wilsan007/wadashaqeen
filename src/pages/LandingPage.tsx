@@ -12,12 +12,11 @@ import {
   Globe,
   Menu,
   X,
-  CreditCard,
   Mail,
   MessageCircle,
   TrendingUp,
-  Layout,
 } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import FuturisticBackground from '@/components/ui/FuturisticBackground';
 import SplineStyleCarousel from '@/components/landing/SplineStyleCarousel';
@@ -26,6 +25,7 @@ import { NeonSolutionCards } from '@/components/landing/NeonSolutions';
 import { CyberpunkPricing } from '@/components/landing/CyberpunkPricing';
 import { StatsExcellence } from '@/components/landing/StatsExcellence';
 import { DashboardPreview } from '@/components/landing/DashboardPreview';
+import { Testimonials } from '@/components/landing/Testimonials';
 
 // Module Card Component
 interface ModuleCardProps {
@@ -306,57 +306,112 @@ export default function LandingPage() {
 
       {/* Hero Section */}
       <section className="relative z-10 container mx-auto px-4 pt-20 pb-10 text-center sm:pt-24 sm:pb-12 md:pt-32 md:pb-20">
-        <div className="mx-auto max-w-4xl">
-          <div className="animate-pulse-subtle mb-3 inline-flex items-center gap-1.5 rounded-full border border-cyan-500/30 bg-gradient-to-r from-cyan-500/20 to-purple-500/20 px-3 py-1.5 text-xs font-medium text-cyan-300 shadow-lg shadow-cyan-500/20 backdrop-blur-sm sm:mb-4 sm:gap-2 md:mb-6 md:px-4 md:py-2 md:text-sm">
-            <Zap className="h-3 w-3 text-cyan-400 md:h-4 md:w-4" />
-            <span className="hidden sm:inline">La plateforme de gestion tout-en-un</span>
-            <span className="sm:hidden">Gestion tout-en-un</span>
-          </div>
-
-          <h1 className="mb-3 px-2 text-2xl leading-tight font-bold text-white drop-shadow-2xl sm:mb-4 sm:text-3xl md:mb-6 md:text-5xl lg:text-6xl xl:text-7xl">
-            Organisez vos projets sur{' '}
-            <span className="animate-gradient bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400 bg-clip-text text-transparent">
-              une plateforme unique
+        <div className="mx-auto max-w-5xl">
+          {/* Badge new */}
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            className="mb-6 inline-flex items-center gap-2 rounded-full border border-cyan-500/30 bg-gradient-to-r from-cyan-500/15 to-purple-500/15 px-4 py-2 text-sm font-medium text-cyan-300 shadow-lg shadow-cyan-500/20 backdrop-blur-sm"
+          >
+            <span className="relative flex h-2 w-2">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-cyan-400 opacity-75" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-cyan-500" />
             </span>
-          </h1>
+            <Zap className="h-4 w-4 text-cyan-400" />
+            <span>La plateforme de gestion tout-en-un · 100% Djiboutienne</span>
+          </motion.div>
 
-          <p className="mb-6 px-4 text-base leading-relaxed text-gray-300 sm:mb-8 sm:text-xl md:text-2xl">
-            Connectez de manière harmonieuse toutes vos données, équipes et processus sur une
-            plateforme intuitive qui booste votre productivité.
-          </p>
+          <motion.h1
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, delay: 0.1 }}
+            className="mb-4 px-2 text-3xl leading-tight font-extrabold text-white drop-shadow-2xl sm:text-4xl md:text-6xl lg:text-7xl"
+          >
+            Pilotez tout votre{' '}
+            <span className="relative inline-block">
+              <span className="bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400 bg-clip-text text-transparent">
+                business
+              </span>
+              <span className="absolute -bottom-1 left-0 right-0 h-px bg-gradient-to-r from-cyan-400/0 via-blue-400/70 to-purple-400/0" />
+            </span>
+            {' '}depuis un seul endroit
+          </motion.h1>
 
-          <div className="flex flex-col items-center justify-center gap-3 px-4 sm:flex-row sm:gap-4">
+          <motion.p
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, delay: 0.2 }}
+            className="mb-8 px-4 text-base leading-relaxed text-gray-300 sm:text-xl md:text-2xl"
+          >
+            Projets · Équipes · RH · Temps · Dépenses — tout centralisé, en temps réel.
+          </motion.p>
+
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, delay: 0.3 }}
+            className="flex flex-col items-center justify-center gap-3 px-4 sm:flex-row sm:gap-4"
+          >
             <Link to="/auth/signup" className="w-full sm:w-auto">
               <Button
                 size="lg"
-                className="h-12 w-full transform bg-gradient-to-r from-cyan-500 via-blue-500 to-purple-500 px-6 text-base font-bold shadow-2xl shadow-cyan-500/50 transition-all duration-300 hover:scale-105 hover:from-cyan-400 hover:via-blue-400 hover:to-purple-400 hover:shadow-cyan-500/70 sm:h-14 sm:w-auto sm:px-8 sm:text-lg"
+                className="group h-14 w-full transform bg-gradient-to-r from-cyan-500 via-blue-500 to-purple-500 px-8 text-base font-bold shadow-2xl shadow-cyan-500/40 transition-all duration-300 hover:scale-105 hover:shadow-cyan-500/60 sm:w-auto sm:text-lg"
               >
                 Démarrer gratuitement
-                <ArrowRight className="ml-2 h-4 w-4 sm:h-5 sm:w-5" />
+                <ArrowRight className="ml-2 h-5 w-5 transition-transform group-hover:translate-x-1" />
               </Button>
             </Link>
-          </div>
+            <Link to="/login" className="w-full sm:w-auto">
+              <Button
+                size="lg"
+                variant="outline"
+                className="h-14 w-full border-white/20 bg-white/5 text-white backdrop-blur-sm hover:border-cyan-500/50 hover:bg-cyan-500/10 sm:w-auto"
+              >
+                Se connecter
+              </Button>
+            </Link>
+          </motion.div>
 
-          <p className="mt-4 flex flex-wrap items-center justify-center gap-4 px-4 text-xs text-gray-400 sm:mt-6 sm:text-sm">
-            <span className="flex items-center gap-1">
-              <span className="text-green-400">✓</span> Essai gratuit de 14 jours
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="text-green-400">✓</span> Sans carte bancaire
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="text-green-400">✓</span> Configuration en 2 minutes
-            </span>
-          </p>
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.7, delay: 0.5 }}
+            className="mt-6 flex flex-wrap items-center justify-center gap-4 px-4 text-xs text-gray-400 sm:text-sm"
+          >
+            {['Essai gratuit 14 jours', 'Sans carte bancaire', 'Configuration 2 min'].map(item => (
+              <span key={item} className="flex items-center gap-1.5">
+                <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                {item}
+              </span>
+            ))}
+          </motion.p>
 
-          {/* Badge Produit Local - Futuriste */}
-          <div className="mt-8 inline-flex items-center gap-3 rounded-full border-2 border-emerald-400/50 bg-gradient-to-r from-emerald-500/20 to-green-500/20 px-6 py-3 shadow-lg shadow-emerald-500/20 backdrop-blur-sm">
-            <span className="text-3xl">🇩🇯</span>
-            <div className="text-left">
-              <p className="text-sm font-bold text-emerald-300">100% Produit Local</p>
-              <p className="text-xs text-emerald-400">Conçu et développé à Djibouti</p>
+          {/* Social proof numbers */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.7, delay: 0.6 }}
+            className="mt-10 flex flex-wrap items-center justify-center gap-6 sm:gap-10"
+          >
+            {[
+              { value: '200+', label: 'Entreprises clientes' },
+              { value: '12', label: 'Modules intégrés' },
+              { value: '99.9%', label: 'Uptime garanti' },
+            ].map(stat => (
+              <div key={stat.label} className="text-center">
+                <p className="text-2xl font-extrabold text-white sm:text-3xl">{stat.value}</p>
+                <p className="text-xs text-slate-400 sm:text-sm">{stat.label}</p>
+              </div>
+            ))}
+            <div className="flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-4 py-2">
+              <span className="text-2xl">🇩🇯</span>
+              <div className="text-left">
+                <p className="text-xs font-bold text-emerald-300">100% Local</p>
+                <p className="text-[10px] text-emerald-500">Made in Djibouti</p>
+              </div>
             </div>
-          </div>
+          </motion.div>
         </div>
       </section>
 
@@ -550,6 +605,9 @@ export default function LandingPage() {
 
       <StatsExcellence />
 
+      {/* Testimonials */}
+      <Testimonials />
+
       {/* CTA Section */}
       <section className="relative z-10 container mx-auto px-4 py-12 sm:py-16 md:py-20">
         <div className="rounded-2xl bg-gradient-to-r from-cyan-500 via-blue-500 to-purple-500 p-8 text-center text-white shadow-2xl shadow-cyan-500/30 sm:rounded-3xl sm:p-10 md:p-12 lg:p-16">
@@ -683,12 +741,12 @@ export default function LandingPage() {
               <h4 className="mb-4 font-semibold text-white">Légal</h4>
               <ul className="space-y-2 text-sm">
                 <li>
-                  <Link to="/privacy-policy" className="transition-colors hover:text-cyan-400">
+                  <Link to="/privacy" className="transition-colors hover:text-cyan-400">
                     Politique de confidentialité
                   </Link>
                 </li>
                 <li>
-                  <Link to="/terms-of-use" className="transition-colors hover:text-cyan-400">
+                  <Link to="/terms" className="transition-colors hover:text-cyan-400">
                     Conditions d'utilisation
                   </Link>
                 </li>
@@ -697,13 +755,13 @@ export default function LandingPage() {
           </div>
 
           <div className="mt-12 border-t border-gray-800 pt-8 text-center text-sm">
-            <p>© 2025 Wadashaqayn. Tous droits réservés.</p>
+            <p>© {new Date().getFullYear()} Wadashaqayn. Tous droits réservés.</p>
             <p className="mt-2 text-xs text-gray-400">
-              <Link to="/privacy-policy" className="transition-colors hover:text-cyan-400">
+              <Link to="/privacy" className="transition-colors hover:text-cyan-400">
                 Politique de confidentialité
               </Link>
-              {' • '}
-              <Link to="/terms-of-use" className="transition-colors hover:text-cyan-400">
+              {' · '}
+              <Link to="/terms" className="transition-colors hover:text-cyan-400">
                 Conditions d'utilisation
               </Link>
             </p>

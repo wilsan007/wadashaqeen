@@ -274,7 +274,6 @@ export const TaskActionColumns = ({
                                 (attachmentCounts[`${task.id}-${action.id}`] || 0) === 0
                               }
                               onCheckedChange={() => {
-                                console.log(
                                   'Checkbox clicked - Task ID:',
                                   task.id,
                                   'Action ID:',

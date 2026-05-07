@@ -41,7 +41,6 @@ export const useForceLandscape = (): UseForceLandscapeReturn => {
 
       // Log pour debug (en dev uniquement)
       if (process.env.NODE_ENV === 'development') {
-        console.log('📱 Orientation:', {
           width,
           height,
           landscape,

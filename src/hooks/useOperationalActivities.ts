@@ -269,7 +269,6 @@ export function useOperationalActivities(options: UseOperationalActivitiesOption
           created_by: user.id,
         };
 
-        console.log('📤 Insertion activité avec tenant et user:', activityWithTenant);
 
         const { data, error: createError } = await supabase
           .from('operational_activities')
@@ -279,7 +278,6 @@ export function useOperationalActivities(options: UseOperationalActivitiesOption
 
         if (createError) throw createError;
 
-        console.log('✅ Activité insérée:', data);
 
         // Invalider le cache
         CACHE.clear();

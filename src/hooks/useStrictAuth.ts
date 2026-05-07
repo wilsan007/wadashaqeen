@@ -39,7 +39,6 @@ export function useStrictAuth() {
    * Gère la déconnexion forcée
    */
   const handleSessionInvalid = useCallback(async () => {
-    console.log('🔒 Session invalidée - redirection vers login');
 
     setState({
       user: null,
@@ -62,11 +61,9 @@ export function useStrictAuth() {
     let cleanup: (() => void) | undefined;
 
     const initializeAuth = async () => {
-      console.log('🔐 Initialisation authentification stricte...');
 
       // Initialiser le marqueur de session
       const marker = initializeSessionMarker();
-      console.log('🔑 Marqueur de session:', marker);
 
       // Vérifier s'il y a une session valide
       const session = await getStrictSession();
@@ -78,7 +75,6 @@ export function useStrictAuth() {
           loading: false,
           isAuthenticated: true,
         });
-        console.log('✅ Session valide trouvée');
       } else {
         setState({
           user: null,
@@ -86,7 +82,6 @@ export function useStrictAuth() {
           loading: false,
           isAuthenticated: false,
         });
-        console.log('❌ Aucune session valide');
       }
 
       // Mettre en place la surveillance de session
@@ -108,7 +103,6 @@ export function useStrictAuth() {
     const {
       data: { subscription },
     } = supabaseStrict.auth.onAuthStateChange(async (event, session) => {
-      console.log('🔐 Auth event:', event);
 
       if (event === 'SIGNED_IN' && session) {
         setState({
@@ -168,7 +162,6 @@ export function useStrictAuth() {
    * 🔒 Déconnexion sécurisée avec nettoyage complet
    */
   const signOut = useCallback(async () => {
-    console.log('🔒 SÉCURITÉ: Déconnexion sécurisée initiée...');
     setState(prev => ({ ...prev, loading: true }));
 
     // 🚨 CRITIQUE: Utiliser le nettoyage sécurisé complet

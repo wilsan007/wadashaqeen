@@ -81,7 +81,7 @@ export const AppLayoutWithSidebar: React.FC<AppLayoutWithSidebarProps> = ({
   }, [isMobileMenuOpen]);
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-[100dvh] overflow-hidden">
       <FuturisticBackground />
       {/* Sidebar Desktop - Toujours visible sur large screens */}
       <div className="hidden lg:block">
@@ -104,17 +104,15 @@ export const AppLayoutWithSidebar: React.FC<AppLayoutWithSidebarProps> = ({
           />
 
           {/* Sidebar Mobile - Design Moderne & Élégant */}
-          <div className="animate-in slide-in-from-left absolute inset-y-0 left-0 w-fit overflow-hidden rounded-r-3xl border-r border-white/10 bg-zinc-950 shadow-2xl duration-300">
-            {/* Contenu de la sidebar - Sans padding pour fusionner avec le fond */}
-            <div className="pb-6">
-              <NotionStyleSidebar
-                accessRights={accessRights}
-                accessLoading={accessLoading}
-                isTenantAdmin={isTenantAdmin}
-                signOut={signOut}
-                onLinkClick={() => setIsMobileMenuOpen(false)}
-              />
-            </div>
+          {/* overflow-y-auto au lieu de overflow-hidden : évite de clipper le footer sur iOS Safari */}
+          <div className="animate-in slide-in-from-left absolute inset-y-0 left-0 w-fit overflow-y-auto rounded-r-3xl border-r border-white/10 bg-zinc-950 shadow-2xl duration-300">
+            <NotionStyleSidebar
+              accessRights={accessRights}
+              accessLoading={accessLoading}
+              isTenantAdmin={isTenantAdmin}
+              signOut={signOut}
+              onLinkClick={() => setIsMobileMenuOpen(false)}
+            />
           </div>
         </div>
       )}
@@ -217,7 +215,8 @@ export const AppLayoutWithSidebar: React.FC<AppLayoutWithSidebarProps> = ({
         </header>
 
         {/* Page Content with Scroll - SANS ESPACE EN HAUT */}
-        <main className="bg-muted/30 flex-1 overflow-y-auto">
+        {/* Pas de overflow-y-auto ici : le scroll unique est géré par scrollContainerRef ci-dessus */}
+        <main className="bg-muted/30 flex-1">
           <div className="flex min-h-full w-full flex-col">
             <div className="flex-1">{children}</div>
             <footer className="text-muted-foreground py-6 text-center text-xs">
@@ -234,8 +233,4 @@ export const AppLayoutWithSidebar: React.FC<AppLayoutWithSidebarProps> = ({
               </p>
             </footer>
           </div>
-        </main>
-      </div>
-    </div>
-  );
-};
+        </m

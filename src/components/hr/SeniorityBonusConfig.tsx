@@ -5,6 +5,16 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   Table,
   TableBody,
   TableCell,
@@ -33,6 +43,7 @@ import { useTenant } from '@/hooks/useTenant';
 export const SeniorityBonusConfigPage: React.FC = () => {
   const { tenantId, loading: tenantLoading } = useTenant();
   const [userRole, setUserRole] = useState<string | null>(null);
+  const [pendingDeleteFreeze, setPendingDeleteFreeze] = useState<string | null>(null);
   const [configLoaded, setConfigLoaded] = useState(false); // Flag pour éviter les rechargements
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -151,7 +162,6 @@ export const SeniorityBonusConfigPage: React.FC = () => {
       } = await supabase.auth.getUser();
       if (!tenantId || !user) throw new Error('Organisation ou utilisateur introuvable');
 
-      console.log('Adding freeze period:', {
         tenantId,
         dateDebut: newFreezeStart,
         dateFin: newFreezeEnd || null,
@@ -184,9 +194,14 @@ export const SeniorityBonusConfigPage: React.FC = () => {
     }
   };
 
-  const handleDeleteFreeze = async (freezeId: string) => {
-    if (!confirm('Êtes-vous sûr de vouloir supprimer cette période de gel ?')) return;
+  const handleDeleteFreeze = (freezeId: string) => {
+    setPendingDeleteFreeze(freezeId);
+  };
 
+  const confirmDeleteFreeze = async () => {
+    if (!pendingDeleteFreeze) return;
+    const freezeId = pendingDeleteFreeze;
+    setPendingDeleteFreeze(null);
     try {
       await SeniorityBonusService.deleteFreezePeriod(freezeId);
       setMessage({ type: 'success', text: 'Période de gel supprimée' });
@@ -258,6 +273,23 @@ export const SeniorityBonusConfigPage: React.FC = () => {
 
   return (
     <div className="container mx-auto space-y-6 p-6">
+      <AlertDialog open={!!pendingDeleteFreeze} onOpenChange={open => { if (!open) setPendingDeleteFreeze(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer la période de gel ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Cette action est irréversible. La période de gel sera définitivement supprimée.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteFreeze} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              Supprimer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <div className="flex items-center gap-3">
         <TrendingUp className="h-8 w-8 text-purple-600" />
         <div>

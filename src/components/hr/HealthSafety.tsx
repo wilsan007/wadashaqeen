@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { useHealthSafety } from '@/hooks/useHealthSafety';
 import { CreateIncidentDialog, CreateSafetyDocumentDialog } from './HRActionDialogs';
+import { useToast } from '@/hooks/use-toast';
 
 interface Incident {
   id: string;
@@ -69,6 +70,7 @@ interface TrainingRecord {
 }
 
 export const HealthSafety = () => {
+  const { toast } = useToast();
   const {
     incidents,
     safetyDocuments,
@@ -344,7 +346,13 @@ export const HealthSafety = () => {
                         >
                           Marquer résolu
                         </Button>
-                        <Button size="sm" variant="outline">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() =>
+                            updateIncident(incident.id, { status: 'action-required' })
+                          }
+                        >
                           Ajouter action
                         </Button>
                       </div>
@@ -407,11 +415,31 @@ export const HealthSafety = () => {
                     )}
 
                     <div className="flex gap-2 border-t pt-4">
-                      <Button size="sm" className="flex-1">
+                      <Button
+                        size="sm"
+                        className="flex-1"
+                        onClick={() => {
+                          if (document.downloadUrl) {
+                            window.open(document.downloadUrl, '_blank');
+                          } else {
+                            toast({ title: 'Document non disponible', description: 'Aucun fichier associé à ce document.', variant: 'destructive' });
+                          }
+                        }}
+                      >
                         <Download className="mr-2 h-4 w-4" />
                         Télécharger
                       </Button>
-                      <Button size="sm" variant="outline">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          if (document.downloadUrl) {
+                            window.open(document.downloadUrl, '_blank');
+                          } else {
+                            toast({ title: 'Aperçu non disponible', description: 'Aucun fichier associé à ce document.', variant: 'destructive' });
+                          }
+                        }}
+                      >
                         <Eye className="mr-2 h-4 w-4" />
                         Voir
                       </Button>
@@ -479,7 +507,11 @@ export const HealthSafety = () => {
 
                     {record.status === 'completed' && record.certificateUrl && (
                       <div className="flex gap-2 border-t pt-4">
-                        <Button size="sm" variant="outline">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => window.open(record.certificateUrl!, '_blank')}
+                        >
                           <Download className="mr-2 h-4 w-4" />
                           Certificat
                         </Button>

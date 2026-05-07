@@ -2,6 +2,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 // Mock all dependencies
 vi.mock('@/contexts/RolesContext', () => ({
@@ -59,39 +60,42 @@ vi.mock('@/integrations/supabase/client', () => ({
 // Import real Dashboard component
 import Dashboard from '@/pages/Dashboard';
 
+vi.mock('@/services/project.service', () => ({
+  ProjectService: { getStats: vi.fn().mockResolvedValue({ total: 0, active: 0, completed: 0, overdue: 0 }) },
+}));
+vi.mock('@/services/employee.service', () => ({
+  EmployeeService: { getTeamStats: vi.fn().mockResolvedValue({ total: 0, active: 0, departments: 0 }) },
+}));
+vi.mock('@/services/task.service', () => ({
+  TaskService: { getMetrics: vi.fn().mockResolvedValue([]) },
+}));
+
+const renderWithProviders = (ui: React.ReactElement) => {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(
+    <QueryClientProvider client={qc}>
+      <BrowserRouter>{ui}</BrowserRouter>
+    </QueryClientProvider>
+  );
+};
+
 describe('Dashboard Page - Real Component', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   it('should render Dashboard component', () => {
-    const { container } = render(
-      <BrowserRouter>
-        <Dashboard />
-      </BrowserRouter>
-    );
-
+    const { container } = renderWithProviders(<Dashboard />);
     expect(container).toBeTruthy();
     expect(container.querySelector('div')).toBeInTheDocument();
   });
 
   it('should render without errors', () => {
-    expect(() => {
-      render(
-        <BrowserRouter>
-          <Dashboard />
-        </BrowserRouter>
-      );
-    }).not.toThrow();
+    expect(() => renderWithProviders(<Dashboard />)).not.toThrow();
   });
 
   it('should have proper structure', () => {
-    const { container } = render(
-      <BrowserRouter>
-        <Dashboard />
-      </BrowserRouter>
-    );
-
+    const { container } = renderWithProviders(<Dashboard />);
     expect(container.firstChild).toBeDefined();
   });
 });

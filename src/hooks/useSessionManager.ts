@@ -36,7 +36,6 @@ export const useSessionManager = () => {
   // 🔒 Déconnexion sécurisée avec nettoyage complet
   const signOut = useCallback(async () => {
     try {
-      console.log('🔒 SÉCURITÉ: Déconnexion via useSessionManager...');
 
       // ⚡️ OPTIMISATION: Mise à jour optimiste de l'UI
       // On vide l'état React immédiatement pour donner un feedback instantané
@@ -67,7 +66,6 @@ export const useSessionManager = () => {
 
         // Si le refresh token est invalide, nettoyer complètement
         if (error.message.includes('refresh') || error.message.includes('Invalid')) {
-          console.log('🧹 Nettoyage du localStorage suite à un refresh token invalide');
           await supabase.auth.signOut();
           localStorage.clear(); // Nettoyer tout le localStorage
           setUser(null);
@@ -85,7 +83,6 @@ export const useSessionManager = () => {
         localStorage.removeItem(MANUAL_LOGOUT_KEY);
       } else if (session && isSessionExpired()) {
         // Session expirée, forcer la déconnexion
-        console.log('⏰ Session expirée - Déconnexion automatique');
         await supabase.auth.signOut();
         localStorage.removeItem(LAST_ACTIVITY_KEY);
         localStorage.removeItem(MANUAL_LOGOUT_KEY);
@@ -162,7 +159,6 @@ export const useSessionManager = () => {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('🔄 Session Manager - Auth state changed:', event);
 
       // Gérer les erreurs de token
       if (event === 'TOKEN_REFRESHED' && !session) {
@@ -176,7 +172,6 @@ export const useSessionManager = () => {
       }
 
       if (event === 'SIGNED_OUT') {
-        console.log('🔒 Déconnexion détectée');
         setUser(null);
         setSession(null);
         setLoading(false);

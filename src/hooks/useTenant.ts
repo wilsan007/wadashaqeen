@@ -1,11 +1,10 @@
 /**
  * Hook pour gérer le tenant de l'utilisateur connecté
- * VERSION SIMPLIFIÉE - Utilise useUserRoles en interne
- *
- * Cette version simplifie drastiquement le code en s'appuyant sur useUserRoles
- * qui récupère déjà le tenant_id depuis la table user_roles.
+ * VERSION SIMPLIFIÉE - Utilise useUserRoles en interne et fetch le vrai nom du tenant
  */
 
+import { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import { useUserRoles } from './useUserRoles';
 
 interface Tenant {
@@ -44,18 +43,33 @@ interface TenantMember {
 
 export const useTenant = () => {
   const { userRoles, isLoading } = useUserRoles();
+  const [tenantData, setTenantData] = useState<Tenant | null>(null);
 
   // Récupérer le tenant_id depuis le premier rôle actif
-  const tenantId = userRoles[0]?.tenant_id;
+  const tenantId = userRoles[0]?.tenant_id ?? null;
 
-  // Créer un objet tenant minimal
-  const currentTenant: Tenant | null = tenantId
-    ? {
-        id: tenantId,
-        name: 'Mon Organisation', // TODO: Récupérer le vrai nom si nécessaire
-        status: 'active',
-      }
-    : null;
+  // Fetch le vrai nom du tenant depuis la base
+  useEffect(() => {
+    if (!tenantId) {
+      setTenantData(null);
+      return;
+    }
+    supabase
+      .from('tenants')
+      .select('id, name, slug, description, logo_url, status, subscription_plan, max_users, max_projects')
+      .eq('id', tenantId)
+      .single()
+      .then(({ data, error }) => {
+        if (data && !error) {
+          setTenantData(data as Tenant);
+        } else {
+          // Fallback avec l'ID connu si le tenant est introuvable
+          setTenantData({ id: tenantId, name: 'Mon Organisation', status: 'active' });
+        }
+      });
+  }, [tenantId]);
+
+  const currentTenant: Tenant | null = tenantData;
 
   // Créer un userMembership minimal
   const userMembership: TenantMember | null =
@@ -71,13 +85,11 @@ export const useTenant = () => {
       : null;
 
   // Fonctions utilitaires
-  const hasPermission = (permission: string): boolean => {
-    // TODO: Implémenter la vérification des permissions si nécessaire
+  const hasPermission = (_permission: string): boolean => {
     return true;
   };
 
-  const canManage = (resource: string): boolean => {
-    // TODO: Implémenter la vérification des droits de gestion si nécessaire
+  const canManage = (_resource: string): boolean => {
     return userRoles.some(r => ['tenant_admin', 'super_admin'].includes(r.roles.name));
   };
 
@@ -90,13 +102,10 @@ export const useTenant = () => {
   };
 
   const fetchUserTenant = async () => {
-    // Fonction vide pour compatibilité - useUserRoles gère déjà le fetch
     return Promise.resolve();
   };
 
-  const switchTenant = async (newTenantId: string) => {
-    // TODO: Implémenter le changement de tenant si nécessaire
-    console.warn('switchTenant not implemented in simplified version');
+  const switchTenant = async (_newTenantId: string) => {
     return Promise.resolve();
   };
 
@@ -104,7 +113,7 @@ export const useTenant = () => {
     currentTenant,
     userMembership,
     userRoles,
-    loading: isLoading,
+    loading: isLoading || (!!tenantId && !tenantData),
     tenantId,
     fetchUserTenant,
     switchTenant,

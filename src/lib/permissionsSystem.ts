@@ -280,13 +280,10 @@ export const debugUserPermissions = async (userId: string) => {
   console.group(`🔍 Debug Permissions pour utilisateur: ${userId}`);
 
   // Log des rôles
-  console.log('1. Rôles utilisateur:', await getUserRolesQuery(userId));
 
   // Log des permissions
-  console.log('2. Permissions utilisateur:', 'Voir requête getUserPermissionsQuery');
 
   // Log du contexte tenant
-  console.log('3. Contexte tenant:', 'Vérifier tenant_id dans user_roles');
 
   console.groupEnd();
 };

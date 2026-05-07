@@ -52,9 +52,12 @@ const Inbox = lazy(() => import('./pages/Inbox'));
 const OperationsPage = lazy(() =>
   import('./components/operations').then(m => ({ default: m.OperationsPage }))
 );
+const GanttPage = lazy(() => import('./pages/GanttPage'));
 const PerformanceMonitor = lazy(() => import('./components/dev/PerformanceMonitor'));
 const PrivacyPolicy = lazy(() => import('./pages/PrivacyPolicy'));
 const TermsOfUse = lazy(() => import('./pages/TermsOfUse'));
+const PrivacyPage = lazy(() => import('./pages/PrivacyPage'));
+const TermsPage = lazy(() => import('./pages/TermsPage'));
 const UpdatePassword = lazy(() => import('./pages/UpdatePassword'));
 
 import { useInactivityTimer } from '@/hooks/useInactivityTimer';
@@ -191,6 +194,14 @@ const MemoizedRoutes = memo(() => (
         }
       />
       <Route
+        path="/gantt/:projectId?"
+        element={
+          <ProtectedRoute requiredAccess="canAccessProjects">
+            <GanttPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/tasks"
         element={
           <ProtectedRoute requiredAccess="canAccessTasks">
@@ -255,8 +266,11 @@ const MemoizedRoutes = memo(() => (
       <Route path="/auth/callback" element={<AuthCallback />} />
       <Route path="/setup" element={<SetupAccount />} />
       <Route path="/invite/:inviteId" element={<InvitePage />} />
-      <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-      <Route path="/terms-of-use" element={<TermsOfUse />} />
+      <Route path="/privacy-policy" element={<PrivacyPage />} />
+      <Route path="/terms-of-use" element={<TermsPage />} />
+      {/* Routes canoniques des pages légales */}
+      <Route path="/privacy" element={<PrivacyPage />} />
+      <Route path="/terms" element={<TermsPage />} />
       <Route path="/update-password" element={<UpdatePassword />} />
 
       {/* Redirect /login to /dashboard if authenticated */}
@@ -384,18 +398,11 @@ function App() {
   const now = Date.now();
   renderCountRef.current += 1;
 
-  // Monitoring simplifié avec arrêt après stabilisation
-  const isStabilized = useRef(false);
-
-  if (!isStabilized.current) {
-    if (renderCountRef.current <= 3) {
-      console.log(`🚀 App rendered (${renderCountRef.current})`);
-    } else if (renderCountRef.current === 4) {
-      console.log(`✅ App stabilized after 4 renders`);
-      isStabilized.current = true; // Arrêter le monitoring
-    } else if (renderCountRef.current > 10) {
-      console.warn(`⚠️ ${renderCountRef.current} renders - possible loop`);
-      isStabilized.current = true; // Arrêter le monitoring
+  // Détection de boucle de rendu silencieuse en développement uniquement
+  if (import.meta.env.DEV && renderCountRef.current > 10) {
+    const isStabilized = renderCountRef.current === 11; // log une seule fois
+    if (isStabilized) {
+      // Warn discret uniquement en dev - pas de log en prod
     }
   }
 
@@ -424,6 +431,11 @@ function App() {
               <Route path="/setup-account" element={<SetupAccount />} />
               <Route path="/invite" element={<InvitePage />} />
               <Route path="/update-password" element={<UpdatePassword />} />
+              {/* Pages légales — publiques, sans authentification */}
+              <Route path="/privacy" element={<PrivacyPage />} />
+              <Route path="/terms" element={<TermsPage />} />
+              <Route path="/privacy-policy" element={<PrivacyPage />} />
+              <Route path="/terms-of-use" element={<TermsPage />} />
               <Route path="*" element={<Auth onAuthStateChange={handleAuthStateChange} />} />
             </Routes>
           </BrowserRouter>

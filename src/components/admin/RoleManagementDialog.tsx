@@ -411,14 +411,14 @@ export const RoleManagementDialog: React.FC<RoleManagementDialogProps> = ({
 
         {/* Dialog pour éditer les permissions de rôle */}
         <Dialog open={!!editingRolePermissions} onOpenChange={() => setEditingRolePermissions('')}>
-          <DialogContent className="max-h-[80vh] max-w-4xl overflow-hidden">
-            <DialogHeader>
+          <DialogContent className="flex max-h-[80vh] max-w-4xl flex-col overflow-hidden">
+            <DialogHeader className="shrink-0">
               <DialogTitle>
                 Permissions - {roles.find(r => r.id === editingRolePermissions)?.display_name}
               </DialogTitle>
             </DialogHeader>
 
-            <ScrollArea className="flex-1">
+            <ScrollArea className="min-h-0 flex-1">
               <div className="space-y-4">
                 {Object.entries(permissionsByResource).map(([resource, perms]) => (
                   <Card key={resource}>

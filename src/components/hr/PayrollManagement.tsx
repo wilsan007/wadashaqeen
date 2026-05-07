@@ -28,9 +28,11 @@ import { SingleEmployeeGenerationDialog } from './SingleEmployeeGenerationDialog
 import { useTenant } from '@/hooks/useTenant';
 import { SeniorityBonusConfigPage } from './SeniorityBonusConfig';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { useToast } from '@/hooks/use-toast';
 
 export const PayrollManagement = () => {
   const { tenantId, loading: tenantLoading } = useTenant();
+  const { toast } = useToast();
 
   const [activeView, setActiveView] = useState('periods');
   const [periodes, setPeriodes] = useState<PaiePeriode[]>([]);
@@ -63,7 +65,6 @@ export const PayrollManagement = () => {
 
   const fetchPeriodes = async () => {
     if (!tenantId) return;
-    console.log('Fetching periodes for tenant:', tenantId);
 
     const { data, error } = await supabase
       .from('paie_periodes')
@@ -77,7 +78,6 @@ export const PayrollManagement = () => {
       return;
     }
 
-    console.log('Periodes loaded:', data?.length || 0);
 
     if (data) {
       setPeriodes(data);
@@ -89,7 +89,6 @@ export const PayrollManagement = () => {
 
   const fetchBulletins = async (periodeId: string) => {
     setLoading(true);
-    console.log('Fetching bulletins for period:', periodeId);
 
     const { data, error } = await supabase
       .from('paie_bulletins')
@@ -100,8 +99,6 @@ export const PayrollManagement = () => {
     if (error) {
       console.error('Error fetching bulletins:', error);
     } else {
-      console.log('Bulletins loaded:', data?.length || 0);
-      console.log('Sample bulletin:', data?.[0]); // Debug: voir le contenu
       const typedData = data as any as PaieBulletin[]; // Cast temporaire
       setBulletins(typedData);
       calculateStats(typedData);
@@ -125,16 +122,15 @@ export const PayrollManagement = () => {
 
   const handleGeneratePayroll = async () => {
     if (!selectedPeriodeId) {
-      alert('Veuillez sélectionner une période');
+      toast({ title: 'Période manquante', description: 'Veuillez sélectionner une période.', variant: 'destructive' });
       return;
     }
 
     setLoading(true);
-    console.log('Generating payroll for period:', selectedPeriodeId);
 
     try {
       if (!tenantId) {
-        alert('Erreur: Contexte tenant non disponible');
+        toast({ title: 'Erreur', description: 'Contexte tenant non disponible.', variant: 'destructive' });
         setLoading(false);
         return;
       }
@@ -143,10 +139,10 @@ export const PayrollManagement = () => {
       const result = await payrollService.genererPaieLot(tenantId, selectedPeriodeId);
 
       await fetchBulletins(selectedPeriodeId);
-      alert(`Paie générée avec succès pour ${result.count} employés !`);
+      toast({ title: 'Paie générée', description: `Bulletins générés pour ${result.count} employés.` });
     } catch (error) {
       console.error('Error generating payroll:', error);
-      alert('Erreur lors de la génération: ' + (error as Error).message);
+      toast({ title: 'Erreur de génération', description: (error as Error).message, variant: 'destructive' });
     } finally {
       setLoading(false);
     }
@@ -169,7 +165,7 @@ export const PayrollManagement = () => {
 
   const handleSyncEmployees = async () => {
     if (!tenantId) {
-      alert('Erreur: Tenant non identifié');
+      toast({ title: 'Erreur', description: 'Tenant non identifié.', variant: 'destructive' });
       return;
     }
     setLoading(true);
@@ -218,10 +214,10 @@ export const PayrollManagement = () => {
         }
       }
 
-      alert(`Synchronisation terminée. ${addedCount} employés ajoutés.`);
+      toast({ title: 'Synchronisation terminée', description: `${addedCount} employé(s) ajouté(s) à la paie.` });
     } catch (error) {
       console.error('Error syncing employees:', error);
-      alert('Erreur lors de la synchronisation: ' + (error as Error).message);
+      toast({ title: 'Erreur de synchronisation', description: (error as Error).message, variant: 'destructive' });
     } finally {
       setLoading(false);
     }
@@ -281,7 +277,6 @@ export const PayrollManagement = () => {
               <select
                 value={selectedPeriodeId || ''}
                 onChange={e => {
-                  console.log('Period selected:', e.target.value);
                   setSelectedPeriodeId(e.target.value);
                 }}
                 className="border-input bg-background focus:ring-ring h-10 w-[200px] rounded-md border px-3 py-2 text-sm focus:ring-2 focus:ring-offset-2 focus:outline-none"
@@ -366,7 +361,15 @@ export const PayrollManagement = () => {
                   <CardHeader className="py-4">
                     <CardTitle className="flex justify-between text-base capitalize">
                       {getPeriodLabel(p)}
-                      <Button variant="ghost" size="sm">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={e => {
+                          e.stopPropagation();
+                          setSelectedPeriodeId(p.id);
+                          setActiveView('employees');
+                        }}
+                      >
                         Voir
                       </Button>
                     </CardTitle>
@@ -432,7 +435,14 @@ export const PayrollManagement = () => {
                               </p>
                               <p className="text-sm text-gray-500">{bulletin.employe?.fonction}</p>
                             </div>
-                            <Button variant="ghost" size="sm">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={e => {
+                                e.stopPropagation();
+                                setSelectedBulletin(bulletin);
+                              }}
+                            >
                               Voir Bulletin
                             </Button>
                           </CardContent>
@@ -507,7 +517,32 @@ export const PayrollManagement = () => {
                   Générer les écritures comptables pour intégration
                 </p>
                 <div className="flex gap-2">
-                  <Button className="flex-1" variant="outline">
+                  <Button
+                    className="flex-1"
+                    variant="outline"
+                    disabled={bulletins.length === 0}
+                    onClick={() => {
+                      const rows = [
+                        ['Employé', 'Fonction', 'Salaire brut', 'CNSS salariale', 'CNSS patronale', 'ITS', 'Net à payer'],
+                        ...bulletins.map(b => [
+                          b.employe?.nom_complet || '',
+                          b.employe?.fonction || '',
+                          String(b.salaire_brut || 0),
+                          String(b.cnss_salariale || 0),
+                          String(b.cnss_patronale || 0),
+                          String(b.montant_its || 0),
+                          String(b.net_a_payer || 0),
+                        ]),
+                      ];
+                      const csv = rows.map(r => r.map(v => `"${v}"`).join(',')).join('\n');
+                      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                      const url = URL.createObjectURL(blob);
+                      const a = Object.assign(document.createElement('a'), { href: url, download: `paie-export-${selectedPeriodeId || 'periode'}.csv` });
+                      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+                      URL.revokeObjectURL(url);
+                      toast({ title: 'Export réussi', description: 'Fichier comptabilité exporté en CSV.' });
+                    }}
+                  >
                     <Download className="mr-2 h-4 w-4" />
                     Export Excel
                   </Button>
@@ -524,7 +559,28 @@ export const PayrollManagement = () => {
               <CardContent className="space-y-4">
                 <p className="text-muted-foreground text-sm">Fichier de virement SEPA/Local</p>
                 <div className="flex gap-2">
-                  <Button className="flex-1" variant="outline">
+                  <Button
+                    className="flex-1"
+                    variant="outline"
+                    disabled={bulletins.length === 0}
+                    onClick={() => {
+                      const rows = [
+                        ['Employé', 'Net à payer', 'Devise'],
+                        ...bulletins.map(b => [
+                          b.employe?.nom_complet || '',
+                          String(b.net_a_payer || 0),
+                          'DJF',
+                        ]),
+                      ];
+                      const csv = rows.map(r => r.map(v => `"${v}"`).join(',')).join('\n');
+                      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+                      const url = URL.createObjectURL(blob);
+                      const a = Object.assign(document.createElement('a'), { href: url, download: `virements-${selectedPeriodeId || 'periode'}.csv` });
+                      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+                      URL.revokeObjectURL(url);
+                      toast({ title: 'Export réussi', description: 'Fichier de virements exporté en CSV.' });
+                    }}
+                  >
                     <Download className="mr-2 h-4 w-4" />
                     Fichier Virement
                   </Button>

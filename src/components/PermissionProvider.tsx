@@ -41,7 +41,6 @@ export const PermissionProvider: React.FC<PermissionProviderProps> = ({ children
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('🔐 Auth state changed:', event);
 
       if (event === 'SIGNED_IN' && session) {
         // Utilisateur connecté - initialiser les permissions

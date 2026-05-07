@@ -23,7 +23,6 @@ export const Payslip: React.FC<PayslipProps> = ({
     const fetchMissingDetails = async () => {
       // Check if we need more info (missing date_embauche)
       if (!bulletin.employe?.date_embauche && bulletin.employe_id) {
-        console.log('Payslip: Fetching missing employee details for', bulletin.employe_id);
         try {
           // 1. Try paie_employes first
           let { data: rawEmp, error } = await supabase
@@ -37,7 +36,6 @@ export const Payslip: React.FC<PayslipProps> = ({
 
           // 2. If not found or null, try employees table via user_id
           if (!emp?.date_embauche && emp?.user_id) {
-            console.log('Payslip: Checking employees table for hire_date');
             const { data: userEmp } = await supabase
               .from('employees')
               .select('hire_date')
@@ -51,7 +49,6 @@ export const Payslip: React.FC<PayslipProps> = ({
           }
 
           if (emp && emp.date_embauche) {
-            console.log('Payslip: Found date_embauche', emp.date_embauche);
             setBulletin(prev => ({
               ...prev,
               employe: {

@@ -308,7 +308,6 @@ class SecureCacheManager {
     this.cleanupInterval = setInterval(() => {
       const removed = this.cleanupExpired();
       if (removed > 0 && import.meta.env.DEV) {
-        console.log(`🧹 Cache: ${removed} entrées expirées supprimées`);
       }
     }, this.CLEANUP_INTERVAL);
   }
@@ -395,7 +394,6 @@ class SecureCacheManager {
       this.stats.totalEntries = this.cache.size;
 
       if (import.meta.env.DEV && this.cache.size > 0) {
-        console.log(`💾 Cache: ${this.cache.size} entrées restaurées depuis localStorage`);
       }
     } catch (error) {
       // Ignorer erreurs
@@ -413,7 +411,6 @@ class SecureCacheManager {
     window.addEventListener('auth:logout', () => {
       this.clear();
       if (import.meta.env.DEV) {
-        console.log('🔒 Cache: Nettoyé suite à la déconnexion');
       }
     });
 
@@ -424,7 +421,6 @@ class SecureCacheManager {
         this.invalidateByTenant(oldTenantId);
       }
       if (import.meta.env.DEV) {
-        console.log(`🔄 Cache: Invalidé pour le tenant ${oldTenantId}`);
       }
     }) as EventListener);
 
@@ -432,7 +428,6 @@ class SecureCacheManager {
     window.addEventListener('role:updated', () => {
       this.invalidateByPattern(/^roles_|^permissions_|^access_/);
       if (import.meta.env.DEV) {
-        console.log('🔐 Cache: Rôles/permissions invalidés');
       }
     });
   }
@@ -470,13 +465,6 @@ class SecureCacheManager {
     const stats = this.getStats();
 
     console.group('📊 Rapport Cache');
-    console.log(`✅ Hits: ${stats.hits}`);
-    console.log(`❌ Misses: ${stats.misses}`);
-    console.log(`⏱️ Expirés: ${stats.expired}`);
-    console.log(`🗑️ Invalidés: ${stats.invalidated}`);
-    console.log(`📦 Entrées actuelles: ${stats.totalEntries}`);
-    console.log(`💾 Mémoire utilisée: ${(stats.memoryUsage / 1024).toFixed(2)} KB`);
-    console.log(`🎯 Taux de succès: ${stats.hitRate}`);
     console.groupEnd();
   }
 

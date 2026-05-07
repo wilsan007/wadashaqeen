@@ -47,7 +47,6 @@ export const EditableProjectManagerCell: React.FC<EditableProjectManagerCellProp
 
     const filtered = employees.filter(emp => emp.tenant_id === projectTenantId);
 
-    console.log(
       `🔒 Filtrage sécurité: ${filtered.length}/${employees.length} employés du tenant ${projectTenantId}`
     );
 

@@ -214,16 +214,14 @@ export function useProjectEditPermissions({
       return;
     }
 
-    // 👤 Employee / Collaborator - Voir seulement ses projets
+    // 👤 Employee / Collaborator - Voir les projets du tenant (lecture seule)
     if (['employee', 'collaborator'].includes(userRole)) {
-      const isMember = true; // TODO: Vérifier si membre du projet
-
       setPermissions({
         canCreate: false,
         canEdit: false,
         canDelete: false,
         canArchive: false,
-        canView: isMember,
+        canView: true,
         canManageTeam: false,
         canEditName: false,
         canEditDescription: false,

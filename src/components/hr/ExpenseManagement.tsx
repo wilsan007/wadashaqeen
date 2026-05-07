@@ -17,9 +17,11 @@ import {
 import { formatCurrency } from '@/components/common/CurrencySelect';
 import { useExpenseManagement } from '@/hooks/useExpenseManagement';
 import { CreateExpenseReportDialog } from './HRActionDialogs';
+import { useToast } from '@/hooks/use-toast';
 
 export const ExpenseManagement = () => {
   const [activeView, setActiveView] = useState('reports');
+  const { toast } = useToast();
   const {
     expenseReports,
     expenseItems,
@@ -30,6 +32,24 @@ export const ExpenseManagement = () => {
     getTotalByStatus,
     getReportItems,
   } = useExpenseManagement();
+
+  const handleExportReport = (report: typeof expenseReports[0]) => {
+    const items = getReportItems(report.id);
+    const rows = [
+      ['Titre', 'Employé', 'Statut', 'Montant total', 'Devise'],
+      [report.title, report.employee_name || '', report.status, String(report.total_amount), report.currency || 'DJF'],
+      [''],
+      ['Catégorie', 'Description', 'Montant', 'Date'],
+      ...items.map(i => [i.category_name || '', i.description, String(i.amount), new Date(i.expense_date).toLocaleDateString()]),
+    ];
+    const csv = rows.map(r => r.map(v => `"${v}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = Object.assign(document.createElement('a'), { href: url, download: `note-frais-${report.id}.csv` });
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast({ title: 'Export réussi', description: 'Note de frais exportée en CSV.' });
+  };
 
   if (loading) return <div className="p-6 text-center">Chargement...</div>;
   if (error) return <div className="text-destructive p-6 text-center">Erreur: {error}</div>;
@@ -78,7 +98,15 @@ export const ExpenseManagement = () => {
           <p className="text-muted-foreground">Gestion des frais et remboursements</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline">
+          <Button
+            variant="outline"
+            onClick={() =>
+              toast({
+                title: 'Scanner de reçu',
+                description: 'Fonctionnalité disponible depuis l\'application mobile Wadashaqayn.',
+              })
+            }
+          >
             <Camera className="mr-2 h-4 w-4" />
             Scanner reçu
           </Button>
@@ -252,7 +280,12 @@ export const ExpenseManagement = () => {
                                 {formatCurrency(expense.amount, expense.currency || 'DJF')}
                               </span>
                               {expense.receipt_url && (
-                                <Button variant="ghost" size="sm">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  title="Voir le justificatif"
+                                  onClick={() => window.open(expense.receipt_url!, '_blank')}
+                                >
                                   <Receipt className="h-4 w-4" />
                                 </Button>
                               )}
@@ -298,7 +331,7 @@ export const ExpenseManagement = () => {
                             </Button>
                           )}
                         </div>
-                        <Button variant="ghost" size="sm">
+                        <Button variant="ghost" size="sm" onClick={() => handleExportReport(report)}>
                           <Upload className="mr-2 h-4 w-4" />
                           Exporter
                         </Button>

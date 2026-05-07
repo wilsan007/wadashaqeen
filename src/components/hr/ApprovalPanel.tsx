@@ -22,6 +22,7 @@ import { CheckCircle2, XCircle, Clock, Receipt, AlertCircle, Home, FileText } fr
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 type ApprovalType = 'expense' | 'timesheet' | 'absence' | 'remote_work' | 'admin_request';
 
@@ -119,6 +120,8 @@ export function ApprovalPanel() {
     remoteWorkRequests,
     administrativeRequests,
     loading,
+    refresh,
+    approveExpenseReport,
   } = useHRSelfService();
 
   const { toast } = useToast();
@@ -153,15 +156,70 @@ export function ApprovalPanel() {
     if (!dialogData) return;
 
     const { item, type, action } = dialogData;
+    const status = action === 'approve' ? 'approved' : 'rejected';
+    const now = new Date().toISOString();
 
-    // TODO: Implémenter les appels API pour approuver/rejeter
-    // Pour l'instant, juste un toast
-    toast({
-      title: action === 'approve' ? 'Approuvé' : 'Rejeté',
-      description: `La demande a été ${action === 'approve' ? 'approuvée' : 'rejetée'} avec succès.`,
-    });
+    try {
+      // Récupérer l'ID de l'utilisateur courant
+      const { data: { user } } = await supabase.auth.getUser();
+      const userId = user?.id;
 
-    setDialogData(null);
+      if (type === 'expense') {
+        // Les notes de frais ont un statut spécial 'approved_manager'
+        await approveExpenseReport(item.id, userId ?? '', 'manager');
+        if (action === 'reject') {
+          await supabase
+            .from('expense_reports')
+            .update({ status: 'rejected', rejection_reason: reason ?? null })
+            .eq('id', item.id);
+        }
+      } else if (type === 'timesheet') {
+        const updates: Record<string, unknown> = { status };
+        if (action === 'approve') {
+          updates.approved_by = userId;
+          updates.approved_at = now;
+        } else {
+          updates.rejection_reason = reason ?? null;
+        }
+        const { error } = await supabase.from('timesheets').update(updates).eq('id', item.id);
+        if (error) throw error;
+      } else if (type === 'absence') {
+        const updates: Record<string, unknown> = { status };
+        if (action === 'reject') updates.rejection_reason = reason ?? null;
+        const { error } = await supabase.from('absence_justifications').update(updates).eq('id', item.id);
+        if (error) throw error;
+      } else if (type === 'remote_work') {
+        const updates: Record<string, unknown> = { status };
+        if (action === 'approve') {
+          updates.approved_by = userId;
+          updates.approved_at = now;
+        } else {
+          updates.rejection_reason = reason ?? null;
+        }
+        const { error } = await supabase.from('remote_work_requests').update(updates).eq('id', item.id);
+        if (error) throw error;
+      } else if (type === 'admin_request') {
+        const updates: Record<string, unknown> = { status };
+        if (action === 'reject') updates.rejection_reason = reason ?? null;
+        const { error } = await supabase.from('administrative_requests').update(updates).eq('id', item.id);
+        if (error) throw error;
+      }
+
+      toast({
+        title: action === 'approve' ? 'Approuvé ✅' : 'Rejeté',
+        description: `La demande a été ${action === 'approve' ? 'approuvée' : 'rejetée'} avec succès.`,
+      });
+
+      refresh();
+    } catch (err: any) {
+      toast({
+        title: 'Erreur',
+        description: err.message ?? "Impossible de traiter la demande.",
+        variant: 'destructive',
+      });
+    } finally {
+      setDialogData(null);
+    }
   };
 
   const renderExpenseCard = (expense: any) => (

@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react-swc';
 import path from 'path';
+import { VitePWA } from 'vite-plugin-pwa';
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
@@ -34,7 +35,40 @@ export default defineConfig(({ mode }) => ({
       'Permissions-Policy': 'geolocation=(), microphone=(), camera=()',
     },
   },
-  plugins: [react()],
+  plugins: [
+    react(),
+    VitePWA({
+      registerType: 'autoUpdate',
+      includeAssets: ['favicon.ico', 'logo-w.svg'],
+      manifest: {
+        name: 'Wadashaqayn',
+        short_name: 'Wadashaqayn',
+        description: 'Plateforme de gestion de projets et RH tout-en-un',
+        theme_color: '#0f172a',
+        background_color: '#0f172a',
+        display: 'standalone',
+        start_url: '/',
+        icons: [
+          { src: '/logo-w.svg', sizes: '192x192', type: 'image/svg+xml' },
+          { src: '/logo-w.svg', sizes: '512x512', type: 'image/svg+xml', purpose: 'any maskable' },
+        ],
+        categories: ['productivity', 'business'],
+      },
+      workbox: {
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        runtimeCaching: [
+          {
+            urlPattern: /^https:\/\/qliinxtanjdnwxlvnxji\.supabase\.co\/rest\/.*/i,
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'supabase-api-cache',
+              expiration: { maxEntries: 50, maxAgeSeconds: 5 * 60 },
+            },
+          },
+        ],
+      },
+    }),
+  ],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
@@ -62,12 +96,11 @@ export default defineConfig(({ mode }) => ({
             '@radix-ui/react-slot',
           ],
 
-          // DnD - Drag and Drop
+          // DnD - dnd-kit uniquement (référence canonique)
           'vendor-dnd': [
             '@dnd-kit/core',
             '@dnd-kit/sortable',
             '@dnd-kit/utilities',
-            '@hello-pangea/dnd',
           ],
 
           // Charts et visualisation

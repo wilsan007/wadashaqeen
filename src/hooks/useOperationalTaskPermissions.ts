@@ -197,28 +197,28 @@ export function useOperationalTaskPermissions({
       return;
     }
 
-    // 👥 Team Lead - Accès sur son équipe (plus flexible que pour projets)
+    // 👥 Team Lead - Même département, ou créateur/assigné
     if (userRole === 'team_lead') {
-      const isTeamTask = true; // TODO: Vérifier si tâche de l'équipe
+      const isTeamTask = sameDepartment || isCreator || isAssignee;
 
       setPermissions({
         canCreate: true,
-        canEdit: isTeamTask || isCreator || isAssignee,
-        canDelete: isTeamTask || isCreator, // TL peut supprimer tâches de l'équipe
+        canEdit: isTeamTask,
+        canDelete: isTeamTask,
         canAssign: isTeamTask,
         canView: true,
         canComment: true,
-        canEditTitle: isTeamTask || isCreator,
-        canEditDescription: isTeamTask || isCreator || isAssignee,
-        canEditDates: isTeamTask || isCreator,
+        canEditTitle: isTeamTask,
+        canEditDescription: isTeamTask,
+        canEditDates: isTeamTask,
         canEditPriority: isTeamTask, // TL peut changer priorité opérationnelle
-        canEditStatus: isTeamTask || isCreator || isAssignee,
+        canEditStatus: isTeamTask,
         canEditAssignee: isTeamTask,
         canEditDepartment: false, // Seul PM+ peut changer département
-        canEditRecurrence: isTeamTask || isCreator,
-        canEditCategory: isTeamTask || isCreator,
+        canEditRecurrence: isTeamTask,
+        canEditCategory: isTeamTask,
         role: 'team_lead',
-        reason: !isTeamTask && !isCreator && !isAssignee ? 'Pas votre équipe' : undefined,
+        reason: !isTeamTask ? 'Pas votre département / équipe' : undefined,
       });
       return;
     }

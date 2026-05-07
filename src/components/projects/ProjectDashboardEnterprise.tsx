@@ -90,6 +90,7 @@ export const ProjectDashboardEnterprise: React.FC<ProjectDashboardEnterpriseProp
     isSuperAdmin,
     accessInfo,
     refresh,
+    createProject,
     loadMore,
     goToPage,
     setFilters: updateFilters,
@@ -674,15 +675,29 @@ export const ProjectDashboardEnterprise: React.FC<ProjectDashboardEnterpriseProp
       <ProjectCreationDialog
         open={isCreateDialogOpen}
         onOpenChange={setIsCreateDialogOpen}
-        onCreateProject={projectData => {
-          console.log('🎯 Création projet:', projectData);
-          // TODO: Implémenter la création via hook
-          toast({
-            title: '✅ Projet créé',
-            description: `Le projet "${projectData.name}" a été créé avec succès.`,
-          });
-          setIsCreateDialogOpen(false);
-          refresh(); // Recharge la liste
+        onCreateProject={async projectData => {
+          try {
+            await createProject({
+              name: projectData.name,
+              description: projectData.description,
+              manager: projectData.manager,
+              status: projectData.status,
+              priority: projectData.priority,
+              skills_required: projectData.skills_required,
+              budget: projectData.budget,
+            });
+            toast({
+              title: '✅ Projet créé',
+              description: `Le projet "${projectData.name}" a été créé avec succès.`,
+            });
+            setIsCreateDialogOpen(false);
+          } catch (err: any) {
+            toast({
+              title: 'Erreur',
+              description: err.message ?? 'Impossible de créer le projet.',
+              variant: 'destructive',
+            });
+          }
         }}
       />
 

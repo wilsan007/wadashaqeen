@@ -45,18 +45,15 @@ const SetupAccount: React.FC = () => {
         data: { session },
       } = await supabase.auth.getSession();
       if (!session) {
-        console.log('❌ Aucune session, redirection connexion...');
         navigate('/tenant-login');
         return;
       }
 
-      console.log('✅ Session trouvée pour:', session.user.email);
 
       // Récupérer les métadonnées utilisateur pour le mot de passe temporaire
       const tempPassword = session.user.user_metadata?.temp_password;
       if (tempPassword) {
         setCurrentPassword(tempPassword);
-        console.log('🔑 Mot de passe temporaire pré-rempli');
       }
 
       // Récupérer les informations du tenant
@@ -68,7 +65,6 @@ const SetupAccount: React.FC = () => {
           .single();
 
         if (tenant) {
-          console.log('🏢 Nom entreprise actuel:', tenant.name);
           // Ne pas pré-remplir le nom d'entreprise selon la demande
         }
       }
@@ -96,7 +92,6 @@ const SetupAccount: React.FC = () => {
     setPasswordError('');
 
     try {
-      console.log('🔄 Changement mot de passe...');
 
       const { error } = await supabase.auth.updateUser({
         password: newPassword,
@@ -106,7 +101,6 @@ const SetupAccount: React.FC = () => {
         console.error('❌ Erreur changement mot de passe:', error);
         setPasswordError(error.message);
       } else {
-        console.log('✅ Mot de passe changé avec succès');
         setSuccess('Mot de passe mis à jour avec succès !');
         setCurrentPassword('');
         setNewPassword('');
@@ -137,7 +131,6 @@ const SetupAccount: React.FC = () => {
     setCompanyError('');
 
     try {
-      console.log('🔄 Mise à jour nom entreprise...');
 
       const { error } = await supabase
         .from('tenants')
@@ -148,7 +141,6 @@ const SetupAccount: React.FC = () => {
         console.error('❌ Erreur mise à jour entreprise:', error);
         setCompanyError(error.message);
       } else {
-        console.log('✅ Nom entreprise mis à jour avec succès');
         setSuccess("Nom de l'entreprise mis à jour avec succès !");
 
         // Redirection vers le dashboard après 2 secondes
@@ -165,7 +157,6 @@ const SetupAccount: React.FC = () => {
   };
 
   const handleSkipToLater = () => {
-    console.log('⏭️ Configuration reportée, redirection dashboard...');
     navigate('/dashboard');
   };
 

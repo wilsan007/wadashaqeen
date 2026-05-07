@@ -168,14 +168,22 @@ export default function Help() {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <Button variant="outline" className="h-auto justify-start py-4">
+              <Button
+                variant="outline"
+                className="h-auto justify-start py-4"
+                onClick={() => { window.location.href = 'mailto:support@wadashaqayn.com'; }}
+              >
                 <Mail className="mr-3 h-5 w-5" />
                 <div className="text-left">
                   <p className="font-medium">Email</p>
                   <p className="text-muted-foreground text-xs">Réponse sous 24h</p>
                 </div>
               </Button>
-              <Button variant="outline" className="h-auto justify-start py-4">
+              <Button
+                variant="outline"
+                className="h-auto justify-start py-4"
+                onClick={() => { window.open('https://wadashaqayn.com/chat', '_blank'); }}
+              >
                 <MessageCircle className="mr-3 h-5 w-5" />
                 <div className="text-left">
                   <p className="font-medium">Chat en direct</p>

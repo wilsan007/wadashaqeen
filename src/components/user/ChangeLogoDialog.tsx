@@ -113,7 +113,6 @@ export const ChangeLogoDialog: React.FC<ChangeLogoDialogProps> = ({
       if (existingFiles && existingFiles.length > 0) {
         const filesToRemove = existingFiles.map(f => `${currentTenant.id}/${f.name}`);
         await supabase.storage.from('company-logos').remove(filesToRemove);
-        console.log('🧹 Anciens logos supprimés:', filesToRemove);
       }
 
       // Déterminer le type MIME manuellement pour éviter application/json
@@ -132,8 +131,6 @@ export const ChangeLogoDialog: React.FC<ChangeLogoDialogProps> = ({
         else contentType = 'image/jpeg'; // Fallback par défaut
       }
 
-      console.log('🔍 [DEBUG] Original File Type:', selectedFile.type);
-      console.log('🔍 [DEBUG] Calculated Content-Type:', contentType);
 
       // 🚨 CRITIQUE: Convertir en Blob pour forcer le type MIME
       // Cela écrase toute métadonnée incorrecte du fichier original

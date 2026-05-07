@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { payrollService } from '../../services/payrollService';
 import { Loader2 } from 'lucide-react';
+import { toast } from '@/hooks/use-toast';
 
 interface SingleEmployeeGenerationDialogProps {
   isOpen: boolean;
@@ -64,7 +65,7 @@ export const SingleEmployeeGenerationDialog = ({
       onClose();
     } catch (error) {
       console.error('Error generating bulletin:', error);
-      alert('Erreur lors de la génération: ' + (error as Error).message);
+      toast({ title: 'Erreur de génération', description: (error as Error).message, variant: 'destructive' });
     } finally {
       setLoading(false);
     }

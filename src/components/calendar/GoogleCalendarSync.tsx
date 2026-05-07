@@ -91,7 +91,6 @@ export const GoogleCalendarSync: React.FC = () => {
 
       // 2. Ici, on pourrait sauvegarder ces événements dans notre DB ou les merger dans l'état local
       // Pour l'instant, on simule une synchro réussie
-      console.log('Google Events fetched:', events);
 
       setLastSync(new Date());
       toast({

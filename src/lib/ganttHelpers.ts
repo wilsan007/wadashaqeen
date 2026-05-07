@@ -1,4 +1,4 @@
-export type ViewMode = 'week' | 'month' | 'quarter';
+export type ViewMode = 'day' | 'week' | 'month' | 'quarter';
 
 export interface GanttTask {
   id: string;
@@ -31,6 +31,16 @@ export const statusColors = {
 
 export const getViewConfig = (viewMode: ViewMode): ViewConfig => {
   switch (viewMode) {
+    case 'day':
+      return {
+        unitWidth: 40,
+        headerHeight: 80,
+        getUnit: (date: Date) =>
+          date.toLocaleDateString('fr-FR', { day: 'numeric' }),
+        getSubUnit: (date: Date) =>
+          date.toLocaleDateString('fr-FR', { weekday: 'short' }),
+        unitDuration: 1,
+      };
     case 'week':
       return {
         unitWidth: 120,

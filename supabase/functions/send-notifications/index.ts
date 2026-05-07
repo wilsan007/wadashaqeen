@@ -4,11 +4,7 @@ import { createClient } from 'jsr:@supabase/supabase-js@2';
 import { TaskNotificationEmail } from './_templates/task-notification.tsx';
 import { HRNotificationEmail } from './_templates/hr-notification.tsx';
 import { sendEmail } from '../_shared/smtpClient.ts';
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { validateWebhookSecret, corsHeaders } from '../_shared/validateWebhook.ts';
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL');
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
@@ -140,10 +136,13 @@ async function sendSlackNotification(notification, webhookUrl) {
 Deno.serve(async req => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, {
-      headers: corsHeaders,
-    });
+    return new Response(null, { headers: corsHeaders });
   }
+
+  // Valider le secret webhook (protection sans JWT)
+  const authError = validateWebhookSecret(req);
+  if (authError) return authError;
+
   try {
     const { notificationIds, type, webhookUrl } = await req.json();
     console.log(`Processing ${type} for ${notificationIds.length} notifications`);

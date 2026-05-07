@@ -170,7 +170,6 @@ export const usePermissionStore = create<PermissionState>()(
         // Invalider le cache des permissions
         get().invalidateCache();
 
-        console.log('✅ Permissions chargées:', {
           roles: roles?.length || 0,
           permissions: permissions.length,
         });

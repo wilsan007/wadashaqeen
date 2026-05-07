@@ -75,6 +75,7 @@ export function ResponsiveModalContent({
   const isMobile = useIsMobile();
 
   if (isMobile) {
+    // Le DrawerContent de base gère déjà max-h-[96vh] et flex-1 overflow-y-auto sur ses children
     return (
       <DrawerContent className={cn(className)} {...props}>
         {children}
@@ -83,7 +84,8 @@ export function ResponsiveModalContent({
   }
 
   return (
-    <DialogContent className={cn('max-h-[90vh]', className)} {...props}>
+    // max-h-[90vh] + overflow-y-auto (hérité du DialogContent de base)
+    <DialogContent className={cn('max-h-[90vh] overflow-y-auto', className)} {...props}>
       {children}
     </DialogContent>
   );

@@ -200,7 +200,6 @@ export const AuthErrorList: React.FC<AuthErrorListProps> = ({
             className="text-muted-foreground text-xs"
             onClick={() => {
               // Afficher toutes les erreurs ou implémenter une pagination
-              console.log(`${hiddenCount} erreurs supplémentaires masquées`);
             }}
           >
             +{hiddenCount} erreur{hiddenCount > 1 ? 's' : ''} supplémentaire

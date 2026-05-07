@@ -4,6 +4,7 @@ import { PaiePeriode, PaieBulletin } from '../../types/payroll';
 import { payrollService } from '../../services/payrollService';
 import { PayrollDetails } from './PayrollDetails';
 import { EmployeePayrollForm } from './EmployeePayrollForm';
+import { toast } from '@/hooks/use-toast';
 
 export const PayrollList: React.FC = () => {
   const [periodes, setPeriodes] = useState<PaiePeriode[]>([]);
@@ -64,10 +65,10 @@ export const PayrollList: React.FC = () => {
       }
 
       await fetchBulletins(selectedPeriode);
-      alert('Paie générée avec succès !');
+      toast({ title: 'Paie générée', description: 'Les bulletins ont été générés avec succès.' });
     } catch (error) {
       console.error(error);
-      alert('Erreur lors de la génération');
+      toast({ title: 'Erreur', description: 'Erreur lors de la génération de la paie.', variant: 'destructive' });
     } finally {
       setLoading(false);
     }

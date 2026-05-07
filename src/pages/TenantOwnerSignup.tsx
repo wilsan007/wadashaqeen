@@ -107,11 +107,9 @@ export const TenantOwnerSignup: React.FC = () => {
 
       if (validatedType === 'signup') {
         // Token Supabase Auth - essayer d'abord la vérification Supabase
-        console.log('🔗 Token Supabase Auth détecté');
         verifySupabaseToken(validatedToken);
       } else {
         // Token d'invitation classique - validation directe
-        console.log("🎫 Token d'invitation classique détecté");
         validateInvitationToken(validatedToken);
       }
     } else {
@@ -122,7 +120,6 @@ export const TenantOwnerSignup: React.FC = () => {
 
   const verifySupabaseToken = async (token: string) => {
     try {
-      console.log('🔗 Redirection vers la page de connexion après validation email');
 
       // Rediriger de façon sécurisée vers la page de connexion avec le token
       secureRedirect('/tenant-login', { token, type: 'signup' });
@@ -135,7 +132,6 @@ export const TenantOwnerSignup: React.FC = () => {
 
   const validateInvitationToken = async (token: string) => {
     try {
-      console.log('🔍 Validation token:', token);
 
       // Récupérer directement les données d'invitation (le token est stocké tel quel)
       const { data, error } = await supabase
@@ -148,7 +144,6 @@ export const TenantOwnerSignup: React.FC = () => {
         .gt('expires_at', new Date().toISOString())
         .single();
 
-      console.log('📊 Résultat invitation:', { data, error });
 
       if (error) {
         console.error('❌ Erreur validation invitation:', error);
@@ -243,7 +238,6 @@ export const TenantOwnerSignup: React.FC = () => {
 
     setIsLoading(true);
     try {
-      console.log("🚀 Démarrage du processus d'inscription...");
 
       // Récupérer le mot de passe temporaire depuis les métadonnées
       let tempPassword = null;
@@ -268,12 +262,8 @@ export const TenantOwnerSignup: React.FC = () => {
         throw new Error("Mot de passe temporaire non trouvé dans l'invitation");
       }
 
-      console.log('🔐 ÉTAPE 1: Connexion avec le mot de passe temporaire...');
-      console.log('📧 Email utilisé:', form.email.toLowerCase().trim());
-      console.log('🔑 Mot de passe temporaire: ***masqué***');
 
       // Vérifier d'abord l'état de l'utilisateur avant la connexion
-      console.log("🔍 Vérification de l'utilisateur avant connexion...");
       const { data: existingUser, error: userCheckError } = await supabase.auth.admin.getUserById(
         (invitationData as any).metadata?.supabase_user_id
       );
@@ -281,17 +271,9 @@ export const TenantOwnerSignup: React.FC = () => {
       if (userCheckError) {
         console.error('❌ Erreur vérification utilisateur:', userCheckError);
       } else {
-        console.log('👤 État utilisateur existant:');
-        console.log('   - ID:', existingUser.user?.id);
-        console.log('   - Email:', existingUser.user?.email);
-        console.log('   - Email confirmé:', existingUser.user?.email_confirmed_at ? 'OUI' : 'NON');
-        console.log('   - Date confirmation:', existingUser.user?.email_confirmed_at);
-        console.log('   - Créé le:', existingUser.user?.created_at);
-        console.log('   - Dernière connexion:', existingUser.user?.last_sign_in_at);
       }
 
       // Étape 1: Se connecter avec le mot de passe temporaire pour confirmer l'email
-      console.log('🚀 Tentative de connexion...');
       const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
         email: form.email.toLowerCase().trim(),
         password: tempPassword,
@@ -307,19 +289,12 @@ export const TenantOwnerSignup: React.FC = () => {
           signInError.message.includes('Email not confirmed') ||
           signInError.message.includes('email_not_confirmed')
         ) {
-          console.log("🔧 SOLUTION: Confirmer l'email manuellement dans Supabase Dashboard");
-          console.log('   1. Aller dans Authentication > Users');
-          console.log(`   2. Chercher ${form.email}`);
-          console.log('   3. Cliquer sur "Confirm email"');
           throw new Error(
             "Email non confirmé. L'utilisateur existe mais son email n'est pas confirmé. Veuillez confirmer l'email dans Supabase Dashboard."
           );
         }
 
         if (signInError.message.includes('Invalid login credentials')) {
-          console.log('🔧 SOLUTION: Vérifier le mot de passe temporaire');
-          console.log('   - Mot de passe fourni:', tempPassword);
-          console.log('   - Métadonnées invitation:', (invitationData as any).metadata);
           throw new Error(
             'Identifiants de connexion invalides. Le mot de passe temporaire ne correspond pas.'
           );
@@ -328,23 +303,15 @@ export const TenantOwnerSignup: React.FC = () => {
         throw new Error('Erreur de connexion: ' + signInError.message);
       }
 
-      console.log('✅ CONNEXION RÉUSSIE:');
-      console.log('   - User ID:', signInData.user?.id);
-      console.log('   - Email:', signInData.user?.email);
-      console.log('   - Email confirmé:', signInData.user?.email_confirmed_at ? 'OUI' : 'NON');
 
-      console.log(
         '✅ ÉTAPE 1 terminée: Connexion temporaire réussie, email confirmé automatiquement'
       );
 
       // Étape 3: Le trigger auto_create_tenant_owner devrait s'être exécuté automatiquement
       // Attendre un peu pour laisser le trigger se terminer
-      console.log("⏳ ÉTAPE 3: Attente de l'exécution du trigger auto_create_tenant_owner...");
       await new Promise(resolve => setTimeout(resolve, 3000));
 
       // Étape 4: Vérifier que le tenant owner a été créé
-      console.log('🔍 ÉTAPE 4: Vérification de la création du tenant owner...');
-      console.log('   - User ID à vérifier:', signInData.user.id);
 
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
@@ -352,18 +319,8 @@ export const TenantOwnerSignup: React.FC = () => {
         .eq('user_id', signInData.user.id)
         .single();
 
-      console.log('📊 RÉSULTAT VÉRIFICATION PROFIL:');
-      console.log('   - Erreur:', profileError);
-      console.log('   - Profil trouvé:', profile ? 'OUI' : 'NON');
 
       if (profile) {
-        console.log('✅ PROFIL DÉTAILLÉ:');
-        console.log('   - ID:', profile.id);
-        console.log('   - Nom complet:', profile.full_name);
-        console.log('   - Email:', (profile as any).email);
-        console.log('   - Tenant ID:', profile.tenant_id);
-        console.log('   - Rôle:', profile.role);
-        console.log('   - Tenant info:', profile.tenants);
       }
 
       if (profileError || !profile) {
@@ -372,27 +329,23 @@ export const TenantOwnerSignup: React.FC = () => {
         console.warn('   - Ou il y a eu une erreur dans le trigger');
 
         // Vérifier si l'utilisateur existe dans user_roles
-        console.log('🔍 Vérification user_roles...');
         const { data: userRoles, error: rolesError } = await supabase
           .from('user_roles')
           .select('*, roles(name)')
           .eq('user_id', signInData.user.id);
 
-        console.log('📊 USER_ROLES:', {
           error: rolesError,
           count: userRoles?.length || 0,
           data: userRoles,
         });
 
         // Vérifier si un tenant a été créé
-        console.log('🔍 Vérification tenants récents...');
         const { data: recentTenants, error: tenantsError } = await supabase
           .from('tenants')
           .select('*')
           .order('created_at', { ascending: false })
           .limit(3);
 
-        console.log('📊 TENANTS RÉCENTS:', {
           error: tenantsError,
           count: recentTenants?.length || 0,
           data: recentTenants,
@@ -403,10 +356,8 @@ export const TenantOwnerSignup: React.FC = () => {
         );
       }
 
-      console.log('✅ ÉTAPE 4 terminée: Tenant owner créé avec succès');
 
       // Étape 5: Marquer l'invitation comme acceptée
-      console.log("✅ ÉTAPE 5: Marquage de l'invitation comme acceptée...");
       const { error: invitationUpdateError } = await supabase
         .from('invitations' as any)
         .update({
@@ -419,7 +370,6 @@ export const TenantOwnerSignup: React.FC = () => {
         console.warn('⚠️ Erreur mise à jour invitation:', invitationUpdateError);
       }
 
-      console.log('✅ ÉTAPE 5 terminée: Invitation marquée comme acceptée');
 
       // Maintenant proposer l'étape 2: Changement de mot de passe
       toast({
@@ -430,7 +380,6 @@ export const TenantOwnerSignup: React.FC = () => {
       });
 
       // Étape 2: Proposer la mise à jour du mot de passe
-      console.log('🔐 ÉTAPE 2: Proposition de mise à jour du mot de passe...');
 
       const shouldUpdatePassword = window.confirm(
         'Votre compte a été créé avec succès !\n\n' +
@@ -440,7 +389,6 @@ export const TenantOwnerSignup: React.FC = () => {
       );
 
       if (shouldUpdatePassword) {
-        console.log('🔐 Mise à jour du mot de passe utilisateur...');
         const { data: updateData, error: updateError } = await supabase.auth.updateUser({
           password: form.password,
           data: {
@@ -458,7 +406,6 @@ export const TenantOwnerSignup: React.FC = () => {
             variant: 'default',
           });
         } else {
-          console.log('✅ ÉTAPE 2 terminée: Mot de passe mis à jour avec succès');
           toast({
             title: '🔐 Mot de passe mis à jour !',
             description: 'Votre nouveau mot de passe a été enregistré avec succès.',
@@ -466,7 +413,6 @@ export const TenantOwnerSignup: React.FC = () => {
           });
         }
       } else {
-        console.log(
           "⏭️ ÉTAPE 2 ignorée: L'utilisateur a choisi de garder le mot de passe temporaire"
         );
       }

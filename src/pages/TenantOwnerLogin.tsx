@@ -44,7 +44,6 @@ export const TenantOwnerLogin: React.FC = () => {
       setInvitationProcessing(true);
       clearErrors();
 
-      console.log("🎫 Traitement du token d'invitation:", {
         token: token.substring(0, 20) + '...',
         type,
         email,
@@ -63,7 +62,6 @@ export const TenantOwnerLogin: React.FC = () => {
               title: '✅ Email confirmé avec succès',
               description: 'Votre invitation a été validée. Vous pouvez maintenant vous connecter.',
             });
-            console.log('✅ Token validé pour:', data.user.email);
           }
         })
         .catch(error => {
@@ -85,7 +83,6 @@ export const TenantOwnerLogin: React.FC = () => {
 
   const triggerEdgeFunction = async (user: any) => {
     try {
-      console.log('🚀 Déclenchement Edge Function pour:', user.email);
 
       // Récupérer le token de session de l'utilisateur connecté
       const { data: sessionData } = await supabase.auth.getSession();
@@ -131,10 +128,8 @@ export const TenantOwnerLogin: React.FC = () => {
       }
 
       const result = await response.json();
-      console.log('📊 Résultat Edge Function:', result);
 
       if (result.success) {
-        console.log('✅ Configuration tenant terminée');
         toast({
           title: '🎉 Configuration terminée',
           description: 'Votre entreprise a été configurée avec succès!',
@@ -146,7 +141,6 @@ export const TenantOwnerLogin: React.FC = () => {
         }, 2000);
         return true;
       } else {
-        console.log('⚠️ Edge Function - résultat:', result);
         if (result.error) {
           const authError = handleAuthError(new Error(result.error));
 
@@ -179,7 +173,6 @@ export const TenantOwnerLogin: React.FC = () => {
     clearErrors();
 
     try {
-      console.log('🔐 Tentative de connexion pour:', form.email);
 
       // Validation côté client
       if (!form.email || !form.password) {
@@ -338,7 +331,6 @@ export const TenantOwnerLogin: React.FC = () => {
                     className="text-blue-600 hover:underline"
                     onClick={() => {
                       // Implémenter la réinitialisation de mot de passe
-                      console.log('Réinitialisation mot de passe');
                     }}
                   >
                     Mot de passe oublié ?

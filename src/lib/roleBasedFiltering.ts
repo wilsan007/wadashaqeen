@@ -80,7 +80,6 @@ export function applyRoleFilters<T>(
 
   // 🔓 SUPER ADMIN : Aucun filtre (voit TOUT, cross-tenant)
   if (role === 'super_admin') {
-    console.log('🔓 Super Admin - Aucun filtre appliqué');
     return query;
   }
 

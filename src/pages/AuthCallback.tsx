@@ -20,14 +20,12 @@ export default function AuthCallback() {
   // FONCTION: Attendre création profil (COLLABORATEUR)
   // ============================================================================
   const waitForProfileCreation = async (userId: string, userType: string) => {
-    console.log('⏳ Attente création profil par le webhook...');
 
     let attempts = 0;
     const maxAttempts = 15; // 30 secondes max (15 x 2s)
 
     const checkProfile = async (): Promise<void> => {
       attempts++;
-      console.log(`🔍 Vérification profil (${attempts}/${maxAttempts})...`);
 
       const { data: profile, error } = await supabase
         .from('profiles')
@@ -36,20 +34,10 @@ export default function AuthCallback() {
         .single();
 
       if (profile?.tenant_id) {
-        console.log('');
-        console.log('✅ ═══════════════════════════════════════════');
-        console.log('✅ PROFIL CRÉÉ PAR LE WEBHOOK !');
-        console.log('✅ ═══════════════════════════════════════════');
-        console.log('📋 Détails:');
-        console.log('   - Tenant ID:', profile.tenant_id);
-        console.log('   - Nom:', profile.full_name);
-        console.log('   - Rôle:', profile.role);
-        console.log('');
 
         setStatus('✅ Configuration terminée ! Redirection...');
 
         setTimeout(() => {
-          console.log('→ Redirection vers /dashboard');
           navigate('/dashboard');
         }, 1500);
 
@@ -57,7 +45,6 @@ export default function AuthCallback() {
       }
 
       if (error) {
-        console.log('⚠️ Erreur vérification profil:', error.message);
       }
 
       if (attempts >= maxAttempts) {
@@ -88,7 +75,6 @@ export default function AuthCallback() {
   // ============================================================================
   const handleTenantOwnerOnboarding = async (session: any, email: string | null) => {
     try {
-      console.log("🔄 Recherche de l'invitation tenant_owner...");
 
       // Récupérer l'invitation pour avoir le code
       const { data: invitation, error: invitationError } = await supabase
@@ -104,10 +90,6 @@ export default function AuthCallback() {
         throw new Error('Invitation non trouvée ou expirée');
       }
 
-      console.log('✅ Invitation trouvée:', invitation.id);
-      console.log('🏢 Tenant à créer:', invitation.tenant_name);
-      console.log('');
-      console.log('📞 Appel Edge Function onboard-tenant-owner...');
 
       // Appeler la fonction Edge Function
       const resp = await fetch(
@@ -132,26 +114,14 @@ export default function AuthCallback() {
 
       const data = await resp.json();
 
-      console.log('');
-      console.log('✅ ═══════════════════════════════════════════');
-      console.log('✅ TENANT CRÉÉ AVEC SUCCÈS !');
-      console.log('✅ ═══════════════════════════════════════════');
-      console.log('📋 Résultat:');
-      console.log('   - Tenant ID:', data.tenant_id);
-      console.log('   - User ID:', data.user_id);
-      console.log('   - Employee ID:', data.employee_id);
-      console.log('   - Rôle:', data.role_name);
-      console.log('');
 
       // 🔄 FORCE REFRESH SESSION to update claims/roles
-      console.log('🔄 Rafraîchissement de la session pour mettre à jour les droits...');
       const { error: refreshError } = await supabase.auth.refreshSession();
       if (refreshError) console.warn('⚠️ Refresh session warning:', refreshError);
 
       setStatus('✅ Organisation créée ! Configuration du mot de passe...');
 
       setTimeout(() => {
-        console.log('→ Redirection vers /update-password');
         // Rediriger vers la définition du mot de passe car c'est un magic link sans password
         navigate('/update-password?welcome=true');
       }, 1500);
@@ -175,7 +145,6 @@ export default function AuthCallback() {
   // FONCTION: Traiter session utilisateur (FLUX ANCIEN)
   // ============================================================================
   const processUserSession = async session => {
-    console.log('📋 Session récupérée:', session?.user?.email);
 
     if (session?.user) {
       setStatus('✅ Email confirmé ! Configuration en cours...');
@@ -188,20 +157,17 @@ export default function AuthCallback() {
         .single();
 
       if (profile?.tenant_id) {
-        console.log('✅ Profil trouvé, redirection dashboard...');
         setStatus('Configuration terminée ! Redirection...');
         setTimeout(() => {
           navigate('/dashboard');
         }, 1500);
       } else {
-        console.log('⏳ Profil non trouvé, attente webhook...');
         setStatus('Configuration en cours, veuillez patienter...');
 
         // Attendre que le webhook/trigger s'exécute
         let attempts = 0;
         const checkProfile = setInterval(async () => {
           attempts++;
-          console.log(`🔍 Vérification profil (tentative ${attempts})...`);
 
           const { data: newProfile } = await supabase
             .from('profiles')
@@ -213,13 +179,11 @@ export default function AuthCallback() {
             clearInterval(checkProfile);
 
             if (newProfile?.tenant_id) {
-              console.log('✅ Profil créé, redirection dashboard...');
               setStatus('Configuration terminée ! Redirection...');
               setTimeout(() => {
                 navigate('/dashboard');
               }, 1000);
             } else {
-              console.log('⚠️ Timeout, redirection connexion...');
               setStatus('Configuration incomplète, redirection connexion...');
               setTimeout(() => {
                 navigate('/');
@@ -229,7 +193,6 @@ export default function AuthCallback() {
         }, 2000);
       }
     } else {
-      console.log('❌ Aucune session trouvée');
       setStatus('Session non trouvée, redirection vers connexion...');
       setTimeout(() => {
         navigate('/');
@@ -240,7 +203,6 @@ export default function AuthCallback() {
   useEffect(() => {
     const handleAuthCallback = async () => {
       try {
-        console.log('🔄 AuthCallback: Début du traitement...');
 
         // Vérifier les paramètres d'URL pour les erreurs
         const urlParams = new URLSearchParams(window.location.search);
@@ -252,8 +214,6 @@ export default function AuthCallback() {
         const error_code = hashParams.get('error_code');
         const error_description = hashParams.get('error_description');
 
-        console.log('📋 Paramètres URL:', { email, type, invitation, error_code });
-        console.log('🔍 Type invitation détecté:', invitation);
 
         if (invitation) {
           setInvitationType(invitation);
@@ -263,7 +223,6 @@ export default function AuthCallback() {
         // GESTION RÉCUPÉRATION MOT DE PASSE
         // ============================================================================
         if (type === 'recovery') {
-          console.log('🔐 Mode récupération de mot de passe détecté');
           setStatus('Vérification du lien de récupération...');
 
           // Établir la session avec les tokens de l'URL
@@ -277,7 +236,6 @@ export default function AuthCallback() {
             });
 
             if (!error) {
-              console.log('✅ Session de récupération établie');
               setStatus('Redirection vers la page de modification...');
               setTimeout(() => {
                 navigate('/update-password');
@@ -297,15 +255,12 @@ export default function AuthCallback() {
         // ============================================================================
 
         if (invitation && (type === 'magiclink' || type === 'invite')) {
-          console.log('🔧 Traitement invitation Magic Link...');
-          console.log('📌 Type détecté:', invitation);
 
           // Établir la session d'abord
           const access_token = hashParams.get('access_token');
           const refresh_token = hashParams.get('refresh_token');
 
           if (access_token && refresh_token) {
-            console.log('🔑 Tokens trouvés, établissement de la session...');
 
             const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
               access_token,
@@ -313,7 +268,6 @@ export default function AuthCallback() {
             });
 
             if (sessionData?.session?.user) {
-              console.log('✅ Session Magic Link établie');
               const session = sessionData.session;
 
               // ========================================
@@ -321,18 +275,11 @@ export default function AuthCallback() {
               // ========================================
 
               if (invitation === 'collaborator') {
-                console.log('');
-                console.log('👥 ════════════════════════════════════════');
-                console.log('👥 TYPE: COLLABORATEUR');
-                console.log('👥 ════════════════════════════════════════');
-                console.log('🔄 Appel manuel de handle-collaborator-confirmation');
-                console.log('');
 
                 setStatus('Bienvenue ! Configuration de votre compte collaborateur...');
 
                 try {
                   // Appeler manuellement la fonction Edge
-                  console.log('📞 Appel Edge Function handle-collaborator-confirmation...');
 
                   const resp = await fetch(
                     `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/handle-collaborator-confirmation`,
@@ -357,15 +304,6 @@ export default function AuthCallback() {
 
                   const data = await resp.json();
 
-                  console.log('');
-                  console.log('✅ ═══════════════════════════════════════════');
-                  console.log('✅ PROFIL COLLABORATEUR CRÉÉ !');
-                  console.log('✅ ═══════════════════════════════════════════');
-                  console.log('📋 Détails:');
-                  console.log('   - User ID:', data.user_id);
-                  console.log('   - Tenant ID:', data.tenant_id);
-                  console.log('   - Profile créé:', data.profile_created);
-                  console.log('');
 
                   // 🔄 FORCE REFRESH SESSION
                   await supabase.auth.refreshSession();
@@ -373,7 +311,6 @@ export default function AuthCallback() {
                   setStatus('✅ Configuration terminée ! Redirection...');
 
                   setTimeout(() => {
-                    console.log('→ Redirection vers /dashboard');
                     navigate('/dashboard');
                   }, 1500);
                 } catch (error: any) {
@@ -393,12 +330,6 @@ export default function AuthCallback() {
 
                 return;
               } else if (invitation === 'tenant_owner') {
-                console.log('');
-                console.log('👑 ════════════════════════════════════════');
-                console.log('👑 TYPE: TENANT OWNER');
-                console.log('👑 ════════════════════════════════════════');
-                console.log('🔄 Appel de la fonction onboard-tenant-owner');
-                console.log('');
 
                 setStatus('Création de votre organisation...');
 
@@ -406,12 +337,6 @@ export default function AuthCallback() {
                 await handleTenantOwnerOnboarding(session, email);
                 return;
               } else if (invitation === 'true') {
-                console.log('');
-                console.log('🔍 ════════════════════════════════════════');
-                console.log('🔍 ANCIEN FORMAT: invitation=true');
-                console.log('🔍 ════════════════════════════════════════');
-                console.log("🔄 Vérification du type d'invitation en base...");
-                console.log('');
 
                 // Vérifier le type d'invitation en base de données
                 const { data: invitationRecord, error: invitationError } = await supabase
@@ -424,25 +349,13 @@ export default function AuthCallback() {
                   .single();
 
                 if (!invitationError && invitationRecord) {
-                  console.log('✅ Type détecté en base:', invitationRecord.invitation_type);
 
                   if (invitationRecord.invitation_type === 'tenant_owner') {
-                    console.log('');
-                    console.log('👑 ════════════════════════════════════════');
-                    console.log('👑 DÉTECTÉ: TENANT OWNER (ancien format)');
-                    console.log('👑 ════════════════════════════════════════');
-                    console.log('🔄 Appel de la fonction onboard-tenant-owner');
-                    console.log('');
 
                     setStatus('Création de votre organisation...');
                     await handleTenantOwnerOnboarding(session, email);
                     return;
                   } else if (invitationRecord.invitation_type === 'collaborator') {
-                    console.log('');
-                    console.log('👥 ════════════════════════════════════════');
-                    console.log('👥 DÉTECTÉ: COLLABORATEUR (ancien format)');
-                    console.log('👥 ════════════════════════════════════════');
-                    console.log('');
 
                     setStatus('Bienvenue ! Configuration de votre compte collaborateur...');
 
@@ -469,11 +382,9 @@ export default function AuthCallback() {
                       }
 
                       const data = await resp.json();
-                      console.log('✅ PROFIL COLLABORATEUR CRÉÉ !');
                       setStatus('✅ Configuration terminée ! Redirection...');
 
                       setTimeout(() => {
-                        console.log('→ Redirection vers /dashboard');
                         navigate('/dashboard');
                       }, 1500);
 
@@ -489,7 +400,6 @@ export default function AuthCallback() {
                   }
                 }
 
-                console.log('⚠️ Type invitation non détecté, flux standard...');
                 setStatus('✅ Invitation traitée ! Configuration en cours...');
                 await processUserSession(session);
                 return;
@@ -500,13 +410,11 @@ export default function AuthCallback() {
                 return;
               }
             } else {
-              console.log('⚠️ Erreur établissement session:', sessionError);
             }
           }
 
           // Si erreur de confirmation mais c'est une invitation, rediriger vers connexion
           if (error_code === 'unexpected_failure') {
-            console.log('⚠️ Erreur confirmation, redirection connexion avec email...');
             if (error_description) {
               console.error('❌ Description erreur Supabase:', error_description);
             }
@@ -532,7 +440,6 @@ export default function AuthCallback() {
           return;
         }
 
-        console.log('📋 Session récupérée:', session?.user?.email);
 
         if (session?.user) {
           setStatus('✅ Email confirmé ! Configuration en cours...');
@@ -545,11 +452,9 @@ export default function AuthCallback() {
             .single();
 
           if (profile?.tenant_id) {
-            console.log('✅ Profil trouvé, vérification si setup requis...');
 
             // Vérifier si c'est une nouvelle invitation qui nécessite un setup
             if (invitation === 'true') {
-              console.log('🔧 Nouvelle invitation détectée, redirection vers setup...');
               setStatus('Configuration de votre compte...');
               setTimeout(() => {
                 navigate(
@@ -557,21 +462,18 @@ export default function AuthCallback() {
                 );
               }, 1500);
             } else {
-              console.log('✅ Utilisateur existant, redirection dashboard...');
               setStatus('Configuration terminée ! Redirection...');
               setTimeout(() => {
                 navigate('/dashboard');
               }, 1500);
             }
           } else {
-            console.log('⏳ Profil non trouvé, attente webhook...');
             setStatus('Configuration en cours, veuillez patienter...');
 
             // Attendre que le webhook/trigger s'exécute
             let attempts = 0;
             const checkProfile = setInterval(async () => {
               attempts++;
-              console.log(`🔍 Vérification profil (tentative ${attempts})...`);
 
               const { data: newProfile } = await supabase
                 .from('profiles')
@@ -583,7 +485,6 @@ export default function AuthCallback() {
                 clearInterval(checkProfile);
 
                 if (newProfile?.tenant_id) {
-                  console.log('✅ Profil créé, redirection vers setup...');
                   setStatus('Configuration de votre compte...');
                   setTimeout(() => {
                     if (invitation === 'true') {
@@ -595,7 +496,6 @@ export default function AuthCallback() {
                     }
                   }, 1000);
                 } else {
-                  console.log('⚠️ Timeout, redirection connexion...');
                   setStatus('Configuration incomplète, redirection connexion...');
                   setTimeout(() => {
                     navigate('/');
@@ -605,7 +505,6 @@ export default function AuthCallback() {
             }, 2000);
           }
         } else {
-          console.log('❌ Aucune session trouvée');
           setStatus('Session non trouvée, redirection vers connexion...');
           setTimeout(() => {
             navigate('/');

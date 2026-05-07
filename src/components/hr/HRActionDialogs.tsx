@@ -25,6 +25,7 @@ import { useSkillsTraining } from '@/hooks/useSkillsTraining';
 import { useHealthSafety } from '@/hooks/useHealthSafety';
 import { usePerformance } from '@/hooks/usePerformance';
 import { useUserAuth } from '@/hooks/useUserAuth';
+import { useEmployees } from '@/hooks/useEmployees';
 import { supabase } from '@/integrations/supabase/client';
 import { Plus, Upload, Lock, FileSpreadsheet } from 'lucide-react';
 import { CurrencySelect } from '@/components/common/CurrencySelect';
@@ -56,7 +57,7 @@ export const CreateOnboardingDialog = ({ children }: { children: React.ReactNode
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="glass-panel sm:max-w-[425px]">
+      <DialogContent className="glass-panel max-h-[90vh] overflow-y-auto sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Nouveau processus d'onboarding</DialogTitle>
         </DialogHeader>
@@ -150,7 +151,7 @@ export const CreateExpenseReportDialog = ({ children }: { children: React.ReactN
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="glass-panel sm:max-w-[425px]">
+      <DialogContent className="glass-panel max-h-[90vh] overflow-y-auto sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Nouvelle note de frais</DialogTitle>
         </DialogHeader>
@@ -247,7 +248,7 @@ export const CreatePayrollPeriodDialog = ({ children }: { children: React.ReactN
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="glass-panel sm:max-w-[425px]">
+      <DialogContent className="glass-panel max-h-[90vh] overflow-y-auto sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Nouvelle période de paie</DialogTitle>
         </DialogHeader>
@@ -321,7 +322,7 @@ export const CreateSkillDialog = ({ children }: { children: React.ReactNode }) =
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="glass-panel sm:max-w-[425px]">
+      <DialogContent className="glass-panel max-h-[90vh] overflow-y-auto sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Nouvelle compétence</DialogTitle>
         </DialogHeader>
@@ -374,6 +375,8 @@ export const CreateSkillDialog = ({ children }: { children: React.ReactNode }) =
 export const CreateSkillAssessmentDialog = ({ children }: { children: React.ReactNode }) => {
   const [open, setOpen] = useState(false);
   const { createEvaluation } = usePerformance();
+  const { employees } = useEmployees();
+  const { profile } = useUserAuth({ level: 1 });
   const [formData, setFormData] = useState({
     employee_id: '',
     period: '',
@@ -388,7 +391,7 @@ export const CreateSkillAssessmentDialog = ({ children }: { children: React.Reac
     e.preventDefault();
     await createEvaluation({
       ...formData,
-      evaluator_id: 'current_user_id', // Should be fetched from auth context
+      evaluator_id: profile?.id ?? 'unknown',
     });
     setOpen(false);
   };
@@ -396,7 +399,7 @@ export const CreateSkillAssessmentDialog = ({ children }: { children: React.Reac
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="glass-panel sm:max-w-[425px]">
+      <DialogContent className="glass-panel max-h-[90vh] overflow-y-auto sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Nouvelle évaluation</DialogTitle>
         </DialogHeader>
@@ -412,9 +415,14 @@ export const CreateSkillAssessmentDialog = ({ children }: { children: React.Reac
                   <SelectValue placeholder="Sélectionner..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {/* TODO: Use real employees list */}
-                  <SelectItem value="emp_1">Employé 1</SelectItem>
-                  <SelectItem value="emp_2">Employé 2</SelectItem>
+                  {employees.length === 0 && (
+                    <SelectItem value="_none" disabled>Aucun employé disponible</SelectItem>
+                  )}
+                  {employees.map(emp => (
+                    <SelectItem key={emp.id} value={emp.id}>
+                      {emp.full_name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -512,7 +520,7 @@ export const CreateIncidentDialog = ({ children }: { children: React.ReactNode }
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="glass-panel sm:max-w-[425px]">
+      <DialogContent className="glass-panel max-h-[90vh] overflow-y-auto sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Déclarer un incident</DialogTitle>
         </DialogHeader>
@@ -665,7 +673,7 @@ export const CreateSafetyDocumentDialog = ({ children }: { children: React.React
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>{children}</DialogTrigger>
-      <DialogContent className="glass-panel sm:max-w-[425px]">
+      <DialogContent className="glass-panel max-h-[90vh] overflow-y-auto sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>Nouveau document sécurité</DialogTitle>
         </DialogHeader>
@@ -762,12 +770,4 @@ export const CreateSafetyDocumentDialog = ({ children }: { children: React.React
             <Input id="file" type="file" onChange={handleFileChange} required />
           </div>
           <DialogFooter>
-            <Button type="submit" disabled={uploading}>
-              {uploading ? 'Upload en cours...' : 'Uploader'}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
-};
+            <Button type="submit"

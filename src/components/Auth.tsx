@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -395,6 +395,17 @@ export const Auth = ({ onAuthStateChange }: AuthProps) => {
           )}
         </CardContent>
       </Card>
+
+      {/* Liens légaux */}
+      <p className="mt-4 text-center text-xs text-zinc-500">
+        <Link to="/privacy" className="underline underline-offset-2 hover:text-zinc-300 transition-colors">
+          Politique de confidentialité
+        </Link>
+        {' · '}
+        <Link to="/terms" className="underline underline-offset-2 hover:text-zinc-300 transition-colors">
+          CGU
+        </Link>
+      </p>
     </div>
   );
 };

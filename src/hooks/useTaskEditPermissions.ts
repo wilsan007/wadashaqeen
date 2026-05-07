@@ -163,48 +163,48 @@ export function useTaskEditPermissions({ task, taskId }: UseTaskEditPermissionsP
     }
 
     // 📁 Project Manager - Accès sur ses projets
+    // Fallback conservateur : créateur de la tâche ou assigné (project_members non encore implémenté)
     if (userRole === 'project_manager') {
-      // TODO: Vérifier si la tâche appartient à un projet géré par l'utilisateur
-      const isProjectManager = true; // À implémenter avec la vraie logique
+      const canManage = isCreator || isAssignee;
 
       setPermissions({
         canCreate: true,
-        canEdit: isProjectManager,
-        canDelete: isProjectManager,
-        canAssign: isProjectManager,
+        canEdit: canManage,
+        canDelete: canManage,
+        canAssign: canManage,
         canView: true,
-        canEditTitle: isProjectManager,
-        canEditDates: isProjectManager,
-        canEditPriority: isProjectManager,
-        canEditStatus: isProjectManager,
-        canEditAssignee: isProjectManager,
-        canEditEffort: isProjectManager,
-        canEditDescription: isProjectManager,
+        canEditTitle: canManage,
+        canEditDates: canManage,
+        canEditPriority: canManage,
+        canEditStatus: canManage,
+        canEditAssignee: canManage,
+        canEditEffort: canManage,
+        canEditDescription: canManage,
         role: 'project_manager',
-        reason: !isProjectManager ? 'Pas le chef de ce projet' : undefined,
+        reason: !canManage ? 'Pas créateur ni assigné à cette tâche' : undefined,
       });
       return;
     }
 
-    // 👥 Team Lead - Accès sur son équipe
+    // 👥 Team Lead - Créateur ou assigné à la tâche
     if (userRole === 'team_lead') {
-      const isTeamTask = true; // TODO: Vérifier si assignee est dans l'équipe
+      const isTeamTask = isCreator || isAssignee;
 
       setPermissions({
         canCreate: true,
-        canEdit: isTeamTask || isCreator,
+        canEdit: isTeamTask,
         canDelete: false, // Team Lead ne peut pas supprimer
         canAssign: isTeamTask,
         canView: true,
-        canEditTitle: isTeamTask || isCreator,
-        canEditDates: isTeamTask || isCreator,
+        canEditTitle: isTeamTask,
+        canEditDates: isTeamTask,
         canEditPriority: false, // Seul PM+ peut changer priorité
-        canEditStatus: isTeamTask || isCreator,
+        canEditStatus: isTeamTask,
         canEditAssignee: isTeamTask,
-        canEditEffort: isTeamTask || isCreator,
-        canEditDescription: isTeamTask || isCreator,
+        canEditEffort: isTeamTask,
+        canEditDescription: isTeamTask,
         role: 'team_lead',
-        reason: !isTeamTask && !isCreator ? 'Pas dans votre équipe' : undefined,
+        reason: !isTeamTask ? 'Pas créateur ni assigné à cette tâche' : undefined,
       });
       return;
     }

@@ -127,15 +127,12 @@ export const SkillsTraining = () => {
                   <p className="text-muted-foreground">
                     Aucune évaluation de compétence disponible
                   </p>
-                  <Button
-                    className="mt-4"
-                    onClick={() => {
-                      /* TODO: Open create dialog */
-                    }}
-                  >
-                    <TrendingUp className="mr-2 h-4 w-4" />
-                    Créer une évaluation
-                  </Button>
+                  <CreateSkillAssessmentDialog>
+                    <Button className="mt-4">
+                      <TrendingUp className="mr-2 h-4 w-4" />
+                      Créer une évaluation
+                    </Button>
+                  </CreateSkillAssessmentDialog>
                 </CardContent>
               </Card>
             ) : (
@@ -204,15 +201,12 @@ export const SkillsTraining = () => {
                 <CardContent className="p-8 text-center">
                   <Target className="text-muted-foreground mx-auto mb-4 h-12 w-12" />
                   <p className="text-muted-foreground">Aucune compétence définie</p>
-                  <Button
-                    className="mt-4"
-                    onClick={() => {
-                      /* TODO: Open create dialog */
-                    }}
-                  >
-                    <Target className="mr-2 h-4 w-4" />
-                    Ajouter une compétence
-                  </Button>
+                  <CreateSkillDialog>
+                    <Button className="mt-4">
+                      <Target className="mr-2 h-4 w-4" />
+                      Ajouter une compétence
+                    </Button>
+                  </CreateSkillDialog>
                 </CardContent>
               </Card>
             ) : (

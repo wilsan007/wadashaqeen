@@ -5,7 +5,20 @@
  */
 
 import React, { useState } from 'react';
-import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
+import {
+  DndContext,
+  DragEndEvent,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy,
+  arrayMove,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import {
   GripVertical,
   Plus,
@@ -16,14 +29,11 @@ import {
   Calendar,
   Clock,
   UserCheck,
-  ChevronRight,
   Paperclip,
-  FileText,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -47,16 +57,169 @@ interface ActionTemplateListEnhancedProps {
   onUpdate: (id: string, data: Partial<ActionTemplateData>) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
   onReorder: (templates: OperationalActionTemplate[]) => Promise<void>;
-  mainTaskAssignee?: {
-    id: string;
-    name: string;
-  };
+  mainTaskAssignee?: { id: string; name: string };
   mainTaskDate?: Date;
   activityKind?: 'recurring' | 'one_off';
-  rrule?: string | null; // Règle de récurrence (RRULE)
+  rrule?: string | null;
   readonly?: boolean;
   loading?: boolean;
 }
+
+interface SortableTemplateItemProps {
+  template: OperationalActionTemplate;
+  index: number;
+  readonly: boolean;
+  loading: boolean;
+  attachmentCount: number;
+  onEdit: (t: OperationalActionTemplate) => void;
+  onDeleteClick: (id: string) => void;
+  onAttachmentClick: (t: OperationalActionTemplate) => void;
+  getOffsetLabel: (offset: number) => string;
+  getOffsetBadgeVariant: (offset: number) => 'default' | 'secondary' | 'outline';
+}
+
+const SortableTemplateItem: React.FC<SortableTemplateItemProps> = ({
+  template,
+  index,
+  readonly,
+  loading,
+  attachmentCount,
+  onEdit,
+  onDeleteClick,
+  onAttachmentClick,
+  getOffsetLabel,
+  getOffsetBadgeVariant,
+}) => {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: template.id,
+    disabled: readonly || loading,
+  });
+
+  const style = { transform: CSS.Transform.toString(transform), transition };
+
+  return (
+    <Card
+      ref={setNodeRef}
+      style={style}
+      className={`transition-all ${isDragging ? 'ring-primary shadow-lg ring-2' : ''}`}
+    >
+      <CardContent className="p-4">
+        <div className="flex gap-3">
+          {!readonly && (
+            <div
+              {...attributes}
+              {...listeners}
+              className="flex cursor-grab items-center active:cursor-grabbing"
+            >
+              <GripVertical className="text-muted-foreground h-5 w-5" />
+            </div>
+          )}
+
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary" className="text-xs">
+              #{index + 1}
+            </Badge>
+
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    onClick={() => onAttachmentClick(template)}
+                    size="sm"
+                    variant="ghost"
+                    className="hover:bg-primary/10 relative h-6 w-6 p-0"
+                  >
+                    <Paperclip className="h-3.5 w-3.5" />
+                    <Plus className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 text-green-600" />
+                    {attachmentCount > 0 && (
+                      <Badge
+                        variant="destructive"
+                        className="absolute -top-2 -right-2 flex h-4 w-4 items-center justify-center p-0 text-[9px]"
+                      >
+                        {attachmentCount}
+                      </Badge>
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p className="text-xs">
+                    {attachmentCount > 0
+                      ? `${attachmentCount} fichier(s) • Cliquez pour ajouter`
+                      : 'Ajouter des preuves de réalisation'}
+                  </p>
+                  <p className="text-muted-foreground mt-1 text-[10px]">⚠️ Requis pour validation</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+
+          <div className="flex-1 space-y-2">
+            <h4 className="font-medium">{template.title}</h4>
+            {template.description && (
+              <p className="text-muted-foreground line-clamp-2 text-sm">{template.description}</p>
+            )}
+            <div className="text-muted-foreground flex flex-wrap items-center gap-3 text-xs">
+              <div className="flex items-center gap-1.5">
+                {template.inherit_assignee ? (
+                  <>
+                    <UserCheck className="h-3.5 w-3.5" />
+                    <span>Hérite de la tâche</span>
+                  </>
+                ) : template.assigned_name ? (
+                  <>
+                    <User className="h-3.5 w-3.5" />
+                    <span>{template.assigned_name}</span>
+                  </>
+                ) : (
+                  <>
+                    <User className="h-3.5 w-3.5" />
+                    <span className="text-orange-500">Non assigné</span>
+                  </>
+                )}
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Calendar className="h-3.5 w-3.5" />
+                <Badge
+                  variant={getOffsetBadgeVariant(template.offset_days)}
+                  className="px-1.5 py-0 text-[10px]"
+                >
+                  {getOffsetLabel(template.offset_days)}
+                </Badge>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Clock className="h-3.5 w-3.5" />
+                <span>{template.estimated_hours}h</span>
+              </div>
+            </div>
+          </div>
+
+          {!readonly && (
+            <div className="flex items-center gap-1">
+              <Button
+                onClick={() => onEdit(template)}
+                size="sm"
+                variant="ghost"
+                className="h-8 w-8 p-0"
+                disabled={loading}
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                onClick={() => onDeleteClick(template.id)}
+                size="sm"
+                variant="ghost"
+                className="hover:bg-destructive/10 hover:text-destructive h-8 w-8 p-0"
+                disabled={loading}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
 
 export const ActionTemplateListEnhanced: React.FC<ActionTemplateListEnhancedProps> = ({
   templates,
@@ -81,13 +244,12 @@ export const ActionTemplateListEnhanced: React.FC<ActionTemplateListEnhancedProp
   const [attachmentCounts, setAttachmentCounts] = useState<Record<string, number>>({});
   const { currentTenant } = useTenant();
 
-  // Charger les compteurs de fichiers pour chaque template
+  const sensors = useSensors(useSensor(PointerSensor));
+
   React.useEffect(() => {
     const loadAttachmentCounts = async () => {
       if (!currentTenant) return;
-
       const counts: Record<string, number> = {};
-
       for (const template of templates) {
         try {
           const { count, error } = await supabase
@@ -95,15 +257,11 @@ export const ActionTemplateListEnhanced: React.FC<ActionTemplateListEnhancedProp
             .select('*', { count: 'exact', head: true })
             .eq('tenant_id', currentTenant.id)
             .eq('action_template_id', template.id);
-
-          if (!error && count !== null) {
-            counts[template.id] = count;
-          }
+          if (!error && count !== null) counts[template.id] = count;
         } catch (err) {
           console.error(`Erreur chargement compteur pour ${template.id}:`, err);
         }
       }
-
       setAttachmentCounts(counts);
     };
 
@@ -111,11 +269,6 @@ export const ActionTemplateListEnhanced: React.FC<ActionTemplateListEnhancedProp
       loadAttachmentCounts();
     }
   }, [templates, readonly, currentTenant]);
-
-  const handleAdd = () => {
-    setEditingTemplate(null);
-    setFormOpen(true);
-  };
 
   const handleEdit = (template: OperationalActionTemplate) => {
     setEditingTemplate(template);
@@ -145,19 +298,16 @@ export const ActionTemplateListEnhanced: React.FC<ActionTemplateListEnhancedProp
     setDeleteDialogOpen(false);
   };
 
-  const handleDragEnd = (result: DropResult) => {
-    if (!result.destination || readonly) return;
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id || readonly) return;
 
-    const items = Array.from(templates);
-    const [reorderedItem] = items.splice(result.source.index, 1);
-    items.splice(result.destination.index, 0, reorderedItem);
-
-    // Réorganiser les positions
-    const reindexed = items.map((item, index) => ({
+    const oldIndex = templates.findIndex(t => t.id === active.id);
+    const newIndex = templates.findIndex(t => t.id === over.id);
+    const reindexed = arrayMove(templates, oldIndex, newIndex).map((item, i) => ({
       ...item,
-      position: index,
+      position: i,
     }));
-
     onReorder(reindexed);
   };
 
@@ -167,12 +317,10 @@ export const ActionTemplateListEnhanced: React.FC<ActionTemplateListEnhancedProp
   };
 
   const handleUploadSuccess = () => {
-    // Rafraîchir les compteurs
     if (selectedTemplateForUpload) {
-      const newCount = (attachmentCounts[selectedTemplateForUpload.id] || 0) + 1;
       setAttachmentCounts(prev => ({
         ...prev,
-        [selectedTemplateForUpload.id]: newCount,
+        [selectedTemplateForUpload.id]: (prev[selectedTemplateForUpload.id] || 0) + 1,
       }));
     }
   };
@@ -201,21 +349,19 @@ export const ActionTemplateListEnhanced: React.FC<ActionTemplateListEnhancedProp
   return (
     <>
       <div className="space-y-4">
-        {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <CheckSquare className="text-muted-foreground h-5 w-5" />
             <h3 className="text-base font-semibold">Actions ({templates.length})</h3>
           </div>
           {!readonly && (
-            <Button onClick={handleAdd} size="sm" variant="outline" className="gap-2">
+            <Button onClick={() => { setEditingTemplate(null); setFormOpen(true); }} size="sm" variant="outline" className="gap-2">
               <Plus className="h-4 w-4" />
               Ajouter
             </Button>
           )}
         </div>
 
-        {/* Info */}
         {!readonly && templates.length === 0 && (
           <Card className="border-dashed">
             <CardContent className="pt-6 text-center">
@@ -229,176 +375,32 @@ export const ActionTemplateListEnhanced: React.FC<ActionTemplateListEnhancedProp
           </Card>
         )}
 
-        {/* Liste Drag & Drop */}
-        <DragDropContext onDragEnd={handleDragEnd}>
-          <Droppable droppableId="actions-list">
-            {(provided, snapshot) => (
-              <div
-                {...provided.droppableProps}
-                ref={provided.innerRef}
-                className={`space-y-2 ${snapshot.isDraggingOver ? 'bg-muted/50 rounded-lg p-2' : ''}`}
-              >
-                {templates.map((template, index) => (
-                  <Draggable
-                    key={template.id}
-                    draggableId={template.id}
-                    index={index}
-                    isDragDisabled={readonly || loading}
-                  >
-                    {(provided, snapshot) => (
-                      <Card
-                        ref={provided.innerRef}
-                        {...provided.draggableProps}
-                        className={`transition-all ${
-                          snapshot.isDragging ? 'ring-primary shadow-lg ring-2' : ''
-                        }`}
-                      >
-                        <CardContent className="p-4">
-                          <div className="flex gap-3">
-                            {/* Drag Handle */}
-                            {!readonly && (
-                              <div
-                                {...provided.dragHandleProps}
-                                className="flex cursor-grab items-center active:cursor-grabbing"
-                              >
-                                <GripVertical className="text-muted-foreground h-5 w-5" />
-                              </div>
-                            )}
-
-                            {/* Position Badge + Bouton Fichiers */}
-                            <div className="flex items-center gap-2">
-                              <Badge variant="secondary" className="text-xs">
-                                #{index + 1}
-                              </Badge>
-
-                              {/* Bouton + pour ajouter des fichiers */}
-                              <TooltipProvider>
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <Button
-                                      onClick={() => handleAttachmentClick(template)}
-                                      size="sm"
-                                      variant="ghost"
-                                      className="hover:bg-primary/10 relative h-6 w-6 p-0"
-                                    >
-                                      <Paperclip className="h-3.5 w-3.5" />
-                                      <Plus className="absolute -top-0.5 -right-0.5 h-2.5 w-2.5 text-green-600" />
-
-                                      {/* Compteur de fichiers */}
-                                      {attachmentCounts[template.id] > 0 && (
-                                        <Badge
-                                          variant="destructive"
-                                          className="absolute -top-2 -right-2 flex h-4 w-4 items-center justify-center p-0 text-[9px]"
-                                        >
-                                          {attachmentCounts[template.id]}
-                                        </Badge>
-                                      )}
-                                    </Button>
-                                  </TooltipTrigger>
-                                  <TooltipContent>
-                                    <p className="text-xs">
-                                      {attachmentCounts[template.id] > 0
-                                        ? `${attachmentCounts[template.id]} fichier(s) • Cliquez pour ajouter`
-                                        : 'Ajouter des preuves de réalisation'}
-                                    </p>
-                                    <p className="text-muted-foreground mt-1 text-[10px]">
-                                      ⚠️ Requis pour validation
-                                    </p>
-                                  </TooltipContent>
-                                </Tooltip>
-                              </TooltipProvider>
-                            </div>
-
-                            {/* Content */}
-                            <div className="flex-1 space-y-2">
-                              {/* Titre */}
-                              <h4 className="font-medium">{template.title}</h4>
-
-                              {/* Description */}
-                              {template.description && (
-                                <p className="text-muted-foreground line-clamp-2 text-sm">
-                                  {template.description}
-                                </p>
-                              )}
-
-                              {/* Métadonnées */}
-                              <div className="text-muted-foreground flex flex-wrap items-center gap-3 text-xs">
-                                {/* Assignation */}
-                                <div className="flex items-center gap-1.5">
-                                  {template.inherit_assignee ? (
-                                    <>
-                                      <UserCheck className="h-3.5 w-3.5" />
-                                      <span>Hérite de la tâche</span>
-                                    </>
-                                  ) : template.assigned_name ? (
-                                    <>
-                                      <User className="h-3.5 w-3.5" />
-                                      <span>{template.assigned_name}</span>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <User className="h-3.5 w-3.5" />
-                                      <span className="text-orange-500">Non assigné</span>
-                                    </>
-                                  )}
-                                </div>
-
-                                {/* Timeline */}
-                                <div className="flex items-center gap-1.5">
-                                  <Calendar className="h-3.5 w-3.5" />
-                                  <Badge
-                                    variant={getOffsetBadgeVariant(template.offset_days)}
-                                    className="px-1.5 py-0 text-[10px]"
-                                  >
-                                    {getOffsetLabel(template.offset_days)}
-                                  </Badge>
-                                </div>
-
-                                {/* Durée */}
-                                <div className="flex items-center gap-1.5">
-                                  <Clock className="h-3.5 w-3.5" />
-                                  <span>{template.estimated_hours}h</span>
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Actions */}
-                            {!readonly && (
-                              <div className="flex items-center gap-1">
-                                <Button
-                                  onClick={() => handleEdit(template)}
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-8 w-8 p-0"
-                                  disabled={loading}
-                                >
-                                  <Pencil className="h-3.5 w-3.5" />
-                                </Button>
-                                <Button
-                                  onClick={() => handleDeleteClick(template.id)}
-                                  size="sm"
-                                  variant="ghost"
-                                  className="hover:bg-destructive/10 hover:text-destructive h-8 w-8 p-0"
-                                  disabled={loading}
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </Button>
-                              </div>
-                            )}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    )}
-                  </Draggable>
-                ))}
-                {provided.placeholder}
-              </div>
-            )}
-          </Droppable>
-        </DragDropContext>
+        <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+          <SortableContext
+            items={templates.map(t => t.id)}
+            strategy={verticalListSortingStrategy}
+          >
+            <div className="space-y-2">
+              {templates.map((template, index) => (
+                <SortableTemplateItem
+                  key={template.id}
+                  template={template}
+                  index={index}
+                  readonly={readonly}
+                  loading={loading}
+                  attachmentCount={attachmentCounts[template.id] ?? 0}
+                  onEdit={handleEdit}
+                  onDeleteClick={handleDeleteClick}
+                  onAttachmentClick={handleAttachmentClick}
+                  getOffsetLabel={getOffsetLabel}
+                  getOffsetBadgeVariant={getOffsetBadgeVariant}
+                />
+              ))}
+            </div>
+          </SortableContext>
+        </DndContext>
       </div>
 
-      {/* Formulaire Action */}
       <ActionTemplateForm
         open={formOpen}
         onOpenChange={setFormOpen}
@@ -410,7 +412,6 @@ export const ActionTemplateListEnhanced: React.FC<ActionTemplateListEnhancedProp
         rrule={rrule}
       />
 
-      {/* Dialog Suppression */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -435,7 +436,6 @@ export const ActionTemplateListEnhanced: React.FC<ActionTemplateListEnhancedProp
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Dialog Upload Fichiers */}
       {selectedTemplateForUpload && (
         <ActionAttachmentUpload
           open={uploadDialogOpen}

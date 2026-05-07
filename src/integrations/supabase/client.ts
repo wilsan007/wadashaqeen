@@ -13,7 +13,6 @@ if (!import.meta.env.VITE_SUPABASE_URL) {
 if (!import.meta.env.VITE_SUPABASE_ANON_KEY) {
   console.error('🚨 VITE_SUPABASE_ANON_KEY is missing in .env! Authentication will fail.');
 } else {
-  console.log('✅ Supabase Key loaded (length: ' + SUPABASE_PUBLISHABLE_KEY.length + ')');
 }
 
 // Import the supabase client like this:
@@ -40,12 +39,10 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
 // Gérer les erreurs de refresh token globalement
 supabase.auth.onAuthStateChange((event, session) => {
   if (event === 'TOKEN_REFRESHED') {
-    console.log('✅ Token rafraîchi avec succès');
   }
 
   if (event === 'SIGNED_OUT') {
     // Nettoyer complètement le localStorage en cas de déconnexion
-    console.log('🔒 Utilisateur déconnecté - Nettoyage du localStorage');
     localStorage.removeItem('lastActivity');
     localStorage.removeItem('manualLogout');
   }
