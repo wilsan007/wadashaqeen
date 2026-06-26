@@ -37,7 +37,8 @@ import { EditableTaskTitle } from './inline/EditableTaskTitle';
 import { EditableTaskStatus } from './inline/EditableTaskStatus';
 import { EditableTaskPriority } from './inline/EditableTaskPriority';
 import { EditableTaskAssignee } from './inline/EditableTaskAssignee';
-import { useUserProfile } from '@/hooks/useUserAuth';
+import { useAuth } from '@/contexts/AuthContext';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface MyTasksViewProps {
   limit?: number;
@@ -57,7 +58,8 @@ export const MyTasksView: React.FC<MyTasksViewProps> = ({
   compact = false,
   showAllTasks = false,
 }) => {
-  const { profile } = useUserProfile();
+  const { profile } = useAuth();
+  const { t } = useTranslation();
 
   const filters = useMemo(() => {
     if (showAllTasks) return undefined;
@@ -185,10 +187,10 @@ export const MyTasksView: React.FC<MyTasksViewProps> = ({
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
           <h2 className="bg-gradient-to-r from-violet-600 to-fuchsia-600 bg-clip-text text-3xl font-bold text-transparent dark:from-violet-400 dark:to-fuchsia-400">
-            Mes Tâches
+            {t('taskManagement.myTasksView.title')}
           </h2>
           <p className="text-muted-foreground mt-1">
-            {filteredTasks.length} tâche{filteredTasks.length > 1 ? 's' : ''} à traiter
+            {filteredTasks.length} {t('taskManagement.myTasksView.toProcess')}
           </p>
         </div>
 
@@ -199,19 +201,18 @@ export const MyTasksView: React.FC<MyTasksViewProps> = ({
               <button
                 key={f}
                 onClick={() => setFilter(f)}
-                className={`rounded-full px-4 py-1.5 text-sm font-medium transition-all duration-300 ${
-                  filter === f
-                    ? 'bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white shadow-lg shadow-violet-500/25'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-white/10'
-                }`}
+                className={`rounded-full px-4 py-1.5 text-sm font-medium transition-all duration-300 ${filter === f
+                  ? 'bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white shadow-lg shadow-violet-500/25'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-white/10'
+                  }`}
               >
                 {f === 'all'
-                  ? 'Tout'
+                  ? t('taskManagement.myTasksView.filterAll')
                   : f === 'todo'
-                    ? 'À faire'
+                    ? t('taskManagement.myTasksView.filterTodo')
                     : f === 'doing'
-                      ? 'En cours'
-                      : 'Fait'}
+                      ? t('taskManagement.myTasksView.filterDoing')
+                      : t('taskManagement.myTasksView.filterDone')}
               </button>
             ))}
           </div>
@@ -228,13 +229,13 @@ export const MyTasksView: React.FC<MyTasksViewProps> = ({
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
               <DropdownMenuItem onClick={() => setSort('date')}>
-                <Calendar className="mr-2 h-4 w-4" /> Date d'échéance
+                <Calendar className="mr-2 h-4 w-4" /> {t('taskManagement.myTasksView.sortDate')}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setSort('priority')}>
-                <AlertCircle className="mr-2 h-4 w-4" /> Priorité
+                <AlertCircle className="mr-2 h-4 w-4" /> {t('taskManagement.myTasksView.sortPriority')}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => setSort('project')}>
-                <Briefcase className="mr-2 h-4 w-4" /> Projet
+                <Briefcase className="mr-2 h-4 w-4" /> {t('taskManagement.myTasksView.sortProject')}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -246,7 +247,7 @@ export const MyTasksView: React.FC<MyTasksViewProps> = ({
         {/* 🚨 Urgent & En Retard */}
         {groupedTasks.urgent.length > 0 && (
           <TaskSection
-            title="Urgent & En Retard"
+            title={t('taskManagement.myTasksView.urgentOverdue')}
             icon={<Zap className="h-5 w-5 text-rose-500" />}
             tasks={groupedTasks.urgent}
             onUpdate={updateTask}
@@ -260,7 +261,7 @@ export const MyTasksView: React.FC<MyTasksViewProps> = ({
         {/* 📅 Aujourd'hui */}
         {groupedTasks.today.length > 0 && (
           <TaskSection
-            title="Aujourd'hui"
+            title={t('taskManagement.myTasksView.today')}
             icon={<Target className="h-5 w-5 text-blue-500" />}
             tasks={groupedTasks.today}
             onUpdate={updateTask}
@@ -274,7 +275,7 @@ export const MyTasksView: React.FC<MyTasksViewProps> = ({
         {/* 🗓️ Cette Semaine */}
         {groupedTasks.week.length > 0 && (
           <TaskSection
-            title="Cette Semaine"
+            title={t('taskManagement.myTasksView.thisWeek')}
             icon={<Calendar className="h-5 w-5 text-violet-500" />}
             tasks={groupedTasks.week}
             onUpdate={updateTask}
@@ -288,7 +289,7 @@ export const MyTasksView: React.FC<MyTasksViewProps> = ({
         {/* 🔮 À Venir */}
         {groupedTasks.upcoming.length > 0 && (
           <TaskSection
-            title="À Venir"
+            title={t('taskManagement.myTasksView.upcoming')}
             icon={<Sparkles className="h-5 w-5 text-emerald-500" />}
             tasks={groupedTasks.upcoming}
             onUpdate={updateTask}
@@ -302,7 +303,7 @@ export const MyTasksView: React.FC<MyTasksViewProps> = ({
         {/* ✅ Terminées (si affichées ou filtre 'done') */}
         {(showCompleted || filter === 'done') && groupedTasks.completed.length > 0 && (
           <TaskSection
-            title="Terminées Récemment"
+            title={t('taskManagement.myTasksView.recentlyCompleted')}
             icon={<CheckCircle2 className="h-5 w-5 text-slate-500" />}
             tasks={groupedTasks.completed}
             onUpdate={updateTask}
@@ -322,9 +323,9 @@ export const MyTasksView: React.FC<MyTasksViewProps> = ({
                 <Sparkles className="text-primary h-8 w-8" />
               </div>
             </div>
-            <h3 className="text-xl font-bold">Tout est calme...</h3>
+            <h3 className="text-xl font-bold">{t('taskManagement.myTasksView.emptyTitle')}</h3>
             <p className="text-muted-foreground mt-2 max-w-sm">
-              Aucune tâche ne correspond à vos filtres. Profitez-en pour prendre une pause ! ☕
+              {t('taskManagement.myTasksView.emptyDesc')}
             </p>
           </div>
         )}
@@ -362,31 +363,31 @@ const TaskSection: React.FC<{
   borderColor,
   isCompleted,
 }) => (
-  <div className="space-y-4">
-    <div className="flex items-center gap-2 px-1">
-      {icon}
-      <h3 className="text-lg font-bold tracking-tight">{title}</h3>
-      <Badge variant="secondary" className="bg-muted/50 ml-2 rounded-full px-2.5">
-        {tasks.length}
-      </Badge>
-    </div>
+    <div className="space-y-4">
+      <div className="flex items-center gap-2 px-1">
+        {icon}
+        <h3 className="text-lg font-bold tracking-tight">{title}</h3>
+        <Badge variant="secondary" className="bg-muted/50 ml-2 rounded-full px-2.5">
+          {tasks.length}
+        </Badge>
+      </div>
 
-    <div className="grid gap-3">
-      {tasks.map(task => (
-        <TaskItem
-          key={task.id}
-          task={task}
-          onUpdate={onUpdate}
-          onComplete={onComplete}
-          onClick={() => onTaskClick(task)}
-          gradient={gradient}
-          borderColor={borderColor}
-          isCompleted={isCompleted}
-        />
-      ))}
+      <div className="grid gap-3">
+        {tasks.map(task => (
+          <TaskItem
+            key={task.id}
+            task={task}
+            onUpdate={onUpdate}
+            onComplete={onComplete}
+            onClick={() => onTaskClick(task)}
+            gradient={gradient}
+            borderColor={borderColor}
+            isCompleted={isCompleted}
+          />
+        ))}
+      </div>
     </div>
-  </div>
-);
+  );
 
 // Composant Item de Tâche Futuriste
 const TaskItem: React.FC<{
@@ -399,6 +400,7 @@ const TaskItem: React.FC<{
   isCompleted?: boolean;
 }> = ({ task, onUpdate, onComplete, onClick, gradient, borderColor, isCompleted }) => {
   const permissions = useTaskEditPermissions({ task });
+  const { t } = useTranslation();
   const isOverdue =
     task.due_date && isPast(parseISO(task.due_date)) && !isToday(parseISO(task.due_date));
 
@@ -422,11 +424,10 @@ const TaskItem: React.FC<{
             e.stopPropagation();
             onComplete(task.id);
           }}
-          className={`mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-all duration-300 ${
-            isCompleted
-              ? 'border-primary bg-primary text-primary-foreground'
-              : 'border-muted-foreground/30 hover:border-primary hover:bg-primary/10 hover:text-primary'
-          }`}
+          className={`mt-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 transition-all duration-300 ${isCompleted
+            ? 'border-primary bg-primary text-primary-foreground'
+            : 'border-muted-foreground/30 hover:border-primary hover:bg-primary/10 hover:text-primary'
+            }`}
         >
           {isCompleted && <CheckCircle2 className="h-3.5 w-3.5" />}
         </button>
@@ -448,7 +449,7 @@ const TaskItem: React.FC<{
                     variant="destructive"
                     className="animate-pulse px-1.5 py-0 text-[10px] tracking-wider uppercase"
                   >
-                    En retard
+                    {t('taskManagement.myTasksView.overdueBadge')}
                   </Badge>
                 )}
               </div>
@@ -464,11 +465,10 @@ const TaskItem: React.FC<{
             {/* Date */}
             {task.due_date && (
               <div
-                className={`flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium backdrop-blur-sm ${
-                  isOverdue && !isCompleted
-                    ? 'border-red-200 bg-red-50/50 text-red-700 dark:bg-red-900/20 dark:text-red-300'
-                    : 'border-slate-200 bg-slate-50/50 text-slate-600 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-300'
-                }`}
+                className={`flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-medium backdrop-blur-sm ${isOverdue && !isCompleted
+                  ? 'border-red-200 bg-red-50/50 text-red-700 dark:bg-red-900/20 dark:text-red-300'
+                  : 'border-slate-200 bg-slate-50/50 text-slate-600 dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-300'
+                  }`}
               >
                 <Calendar className="h-3 w-3" />
                 {format(parseISO(task.due_date), 'dd MMM', { locale: fr })}
@@ -497,7 +497,7 @@ const TaskItem: React.FC<{
             {(task.projects?.name || task.project_id) && (
               <div className="flex items-center gap-1.5 rounded-full border border-indigo-200/50 bg-indigo-50/50 px-2.5 py-0.5 text-xs font-medium text-indigo-700 backdrop-blur-sm dark:bg-indigo-900/20 dark:text-indigo-300">
                 <Briefcase className="h-3 w-3" />
-                <span className="max-w-[100px] truncate">{task.projects?.name || 'Projet'}</span>
+                <span className="max-w-[100px] truncate">{task.projects?.name || t('taskManagement.myTasksView.sortProject')}</span>
               </div>
             )}
 

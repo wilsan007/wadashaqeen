@@ -3,7 +3,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useIsMobileLayout } from '@/hooks/use-mobile';
 import { useScrollDirection } from '@/hooks/use-scroll-direction';
 import { LandscapeWrapper } from '@/components/layout/LandscapeWrapper';
-import { BrandedLoadingScreen } from '@/components/layout/BrandedLoadingScreen';
+
 // 🎨 Utilisation des vues ORIGINALES avec design complet + performance Enterprise
 import { TaskTableWithOnboarding } from '@/components/onboarding/TaskTableWithOnboarding';
 
@@ -11,7 +11,15 @@ import { TaskTableWithOnboarding } from '@/components/onboarding/TaskTableWithOn
 const GanttChart = lazy(() => import('@/components/vues/gantt/GanttChart'));
 
 // Composant de chargement professionnel
-const ViewLoading = () => <BrandedLoadingScreen appName="Wadashaqayn" logoSrc="/logo-w.svg" />;
+// Spinner inline — ne masque pas les onglets lors du chargement
+const ViewLoading = () => (
+  <div className="flex min-h-[200px] items-center justify-center py-12" role="status" aria-label="Chargement de la vue">
+    <div className="flex flex-col items-center gap-3">
+      <div className="border-primary h-8 w-8 animate-spin rounded-full border-2 border-t-transparent" aria-hidden="true" />
+      <p className="text-muted-foreground text-sm">Chargement...</p>
+    </div>
+  </div>
+);
 
 // import { HRDashboard } from "@/components/hr/HRDashboard"; // Temporarily commented out
 
@@ -42,23 +50,23 @@ const Index = () => {
         className="flex h-full w-full flex-col overflow-hidden"
       >
         <TabsList
-          className={`modern-card glow-primary from-primary/10 via-accent/10 to-tech-purple/10 grid w-full flex-shrink-0 border bg-gradient-to-r transition-all duration-300 ease-in-out ${
-            isMobile && isScrollingDown
-              ? 'h-0 overflow-hidden p-0 opacity-0'
-              : isMobile
-                ? 'grid-cols-2 gap-0 p-0'
-                : 'grid-cols-2 gap-2 p-2'
-          }`}
+          aria-label="Vues disponibles"
+          className={`modern-card glow-primary from-primary/10 via-accent/10 to-tech-purple/10 grid w-full flex-shrink-0 border bg-gradient-to-r transition-all duration-300 ease-in-out ${isMobile && isScrollingDown
+            ? 'h-0 overflow-hidden p-0 opacity-0'
+            : isMobile
+              ? 'grid-cols-2 gap-0 p-0'
+              : 'grid-cols-2 gap-2 p-2'
+            }`}
         >
           <TabsTrigger
             value="gantt"
-            className={`transition-smooth hover-glow data-[state=active]:from-primary data-[state=active]:to-accent font-semibold data-[state=active]:bg-gradient-to-r data-[state=active]:text-white ${isMobile ? 'min-h-[28px] py-1 text-xs' : 'text-sm'}`}
+            className={`transition-smooth data-[state=active]:from-primary data-[state=active]:to-violet-600 font-semibold data-[state=active]:bg-gradient-to-r data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground ${isMobile ? 'min-h-[28px] py-1 text-xs' : 'text-sm'}`}
           >
             {isMobile ? 'Gantt' : 'Diagramme de Gantt'}
           </TabsTrigger>
           <TabsTrigger
             value="table"
-            className={`transition-smooth hover-glow data-[state=active]:from-tech-purple data-[state=active]:to-primary font-semibold data-[state=active]:bg-gradient-to-r data-[state=active]:text-white ${isMobile ? 'min-h-[28px] py-1 text-xs' : 'text-sm'}`}
+            className={`transition-smooth data-[state=active]:from-violet-600 data-[state=active]:to-primary font-semibold data-[state=active]:bg-gradient-to-r data-[state=active]:text-white data-[state=inactive]:text-muted-foreground data-[state=inactive]:hover:text-foreground ${isMobile ? 'min-h-[28px] py-1 text-xs' : 'text-sm'}`}
           >
             {isMobile ? 'Tableau' : 'Tableau Dynamique'}
           </TabsTrigger>

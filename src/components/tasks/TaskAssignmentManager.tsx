@@ -16,6 +16,7 @@ import { Users, UserPlus, UserMinus, TrendingUp } from '@/lib/icons';
 import type { Task } from '@/types/tasks';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 interface TaskAssignmentManagerProps {
   tasks: Task[];
@@ -28,7 +29,7 @@ export const TaskAssignmentManager: React.FC<TaskAssignmentManagerProps> = ({
 }) => {
   const { employees } = useEmployees();
   const { toast } = useToast();
-  const [loading, setLoading] = useState(false);
+  const queryClient = useQueryClient();
   const [selectedTask, setSelectedTask] = useState<string>('');
   const [selectedEmployee, setSelectedEmployee] = useState<string>('');
   const [showSmartAssignee, setShowSmartAssignee] = useState(false);
@@ -36,62 +37,51 @@ export const TaskAssignmentManager: React.FC<TaskAssignmentManagerProps> = ({
   const unassignedTasks = tasks.filter(task => !task.assignee);
   const assignedTasks = tasks.filter(task => task.assignee);
 
-  const handleAssignTask = async () => {
-    if (!selectedTask || !selectedEmployee) return;
-
-    setLoading(true);
-    try {
+  const assignMutation = useMutation({
+    mutationFn: async ({ taskId, employeeId }: { taskId: string; employeeId: string }) => {
       const { error } = await supabase
         .from('tasks')
-        .update({ assignee_id: selectedEmployee })
-        .eq('id', selectedTask);
-
+        .update({ assignee_id: employeeId })
+        .eq('id', taskId);
       if (error) throw error;
-
-      toast({
-        title: 'Tâche assignée',
-        description: 'La tâche a été assignée avec succès',
-      });
-
+    },
+    onSuccess: () => {
+      toast({ title: 'Tâche assignée', description: 'La tâche a été assignée avec succès' });
       setSelectedTask('');
       setSelectedEmployee('');
       onTaskUpdate();
-    } catch (error) {
+    },
+    onError: (error) => {
       console.error('Error assigning task:', error);
-      toast({
-        title: 'Erreur',
-        description: "Impossible d'assigner la tâche",
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+      toast({ title: 'Erreur', description: "Impossible d'assigner la tâche", variant: 'destructive' });
+    },
+  });
 
-  const handleUnassignTask = async (taskId: string) => {
-    setLoading(true);
-    try {
+  const unassignMutation = useMutation({
+    mutationFn: async (taskId: string) => {
       const { error } = await supabase.from('tasks').update({ assignee_id: null }).eq('id', taskId);
-
       if (error) throw error;
-
-      toast({
-        title: 'Tâche désassignée',
-        description: 'La tâche a été désassignée avec succès',
-      });
-
+    },
+    onSuccess: () => {
+      toast({ title: 'Tâche désassignée', description: 'La tâche a été désassignée avec succès' });
       onTaskUpdate();
-    } catch (error) {
+    },
+    onError: (error) => {
       console.error('Error unassigning task:', error);
-      toast({
-        title: 'Erreur',
-        description: 'Impossible de désassigner la tâche',
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(false);
-    }
+      toast({ title: 'Erreur', description: 'Impossible de désassigner la tâche', variant: 'destructive' });
+    },
+  });
+
+  const handleAssignTask = () => {
+    if (!selectedTask || !selectedEmployee) return;
+    assignMutation.mutate({ taskId: selectedTask, employeeId: selectedEmployee });
   };
+
+  const handleUnassignTask = (taskId: string) => {
+    unassignMutation.mutate(taskId);
+  };
+
+  const isLoading = assignMutation.isPending || unassignMutation.isPending;
 
   const getEmployeeById = (id: string) => {
     return employees.find(emp => emp.id === id);
@@ -182,7 +172,7 @@ export const TaskAssignmentManager: React.FC<TaskAssignmentManagerProps> = ({
             <div className="flex gap-2">
               <Button
                 onClick={handleAssignTask}
-                disabled={!selectedTask || !selectedEmployee || loading}
+                disabled={!selectedTask || !selectedEmployee || isLoading}
               >
                 Assigner
               </Button>
@@ -293,6 +283,7 @@ export const TaskAssignmentManager: React.FC<TaskAssignmentManagerProps> = ({
                           variant="ghost"
                           className="h-6 w-6 p-0"
                           onClick={() => handleUnassignTask(task.id)}
+                          disabled={isLoading}
                         >
                           ×
                         </Button>

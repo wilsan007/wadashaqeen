@@ -36,21 +36,23 @@ export default tseslint.config(
       "no-implied-eval": "error",
       "no-new-func": "error",
       
-      // ⚠️ Règles DÉSACTIVÉES pour permettre le push (non critiques)
-      "@typescript-eslint/no-explicit-any": "off", // Trop d'erreurs (800+)
-      "@typescript-eslint/no-require-imports": "off", // Scripts legacy
-      "@typescript-eslint/no-unused-vars": "off", // Déjà désactivé
-      "@typescript-eslint/no-empty-object-type": "off", // Interfaces vides pour typage
-      "react-hooks/exhaustive-deps": "off", // Warnings non bloquants
-      "react-hooks/rules-of-hooks": "off", // Hooks conditionnels dans certains contextes
-      "react-refresh/only-export-components": "off", // Fast refresh non critique
-      "no-case-declarations": "off", // Switch statements
-      
-      // ℹ️ Autres règles communes désactivées
+      // ⚠️ Règles en WARNING — visibles mais non bloquantes
+      "@typescript-eslint/no-explicit-any": "warn",   // Surface la dette `any`
+      "no-console": ["warn", { allow: ["warn", "error"] }], // Autorise warn/error, bloque log/info/debug
+
+      // ⚠️ Règles DÉSACTIVÉES — à activer progressivement
+      "@typescript-eslint/no-require-imports": "off",
+      "@typescript-eslint/no-unused-vars": "off",
+      "@typescript-eslint/no-empty-object-type": "off",
+      "react-hooks/exhaustive-deps": "warn",          // Passer en warn pour détecter les dépendances manquantes
+      "react-hooks/rules-of-hooks": "error",          // Toujours enforcer les règles des hooks
+      "react-refresh/only-export-components": "off",
+      "no-case-declarations": "off",
+
+      // ℹ️ Autres règles
       "@typescript-eslint/ban-ts-comment": "off",
       "@typescript-eslint/no-non-null-assertion": "off",
-      "no-console": "off", // Logs utiles en dev
-      "prefer-const": "off", // Non critique
+      "prefer-const": "warn"
     },
   },
 );

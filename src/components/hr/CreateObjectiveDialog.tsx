@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { z } from 'zod';
+import { zodResolver } from '@hookform/resolvers/zod';
 import {
   ResponsiveModal,
   ResponsiveModalContent,
@@ -51,6 +53,17 @@ interface ObjectiveFormData {
   status: 'draft' | 'active';
 }
 
+const objectiveSchema = z.object({
+  title: z.string().min(1, 'Le titre est obligatoire'),
+  description: z.string().optional(),
+  employee_name: z.string().min(1, "L'employé est obligatoire"),
+  department: z.string().optional(),
+  type: z.enum(['individual', 'team', 'okr']),
+  due_date: z.string().min(1, "La date d'échéance est obligatoire"),
+  progress: z.coerce.number().min(0).max(100),
+  status: z.enum(['draft', 'active']),
+});
+
 export const CreateObjectiveDialog = ({
   onCreateObjective,
   trigger,
@@ -73,6 +86,7 @@ export const CreateObjectiveDialog = ({
     reset,
     formState: { errors },
   } = useForm<ObjectiveFormData>({
+    resolver: zodResolver(objectiveSchema),
     defaultValues: {
       progress: 0,
       status: 'draft',
@@ -245,7 +259,7 @@ export const CreateObjectiveDialog = ({
                 <Label htmlFor="title">Titre de l'objectif *</Label>
                 <Input
                   id="title"
-                  {...register('title', { required: 'Le titre est obligatoire' })}
+                  {...register('title')}
                   placeholder="Ex: Améliorer la satisfaction client"
                 />
                 {errors.title && <p className="text-sm text-red-500">{errors.title.message}</p>}
@@ -316,7 +330,7 @@ export const CreateObjectiveDialog = ({
                 <Input
                   id="due_date"
                   type="date"
-                  {...register('due_date', { required: "La date d'échéance est obligatoire" })}
+                  {...register('due_date')}
                 />
                 {errors.due_date && (
                   <p className="text-sm text-red-500">{errors.due_date.message}</p>

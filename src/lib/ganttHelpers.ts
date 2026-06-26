@@ -1,4 +1,4 @@
-export type ViewMode = 'day' | 'week' | 'month' | 'quarter';
+export type ViewMode = 'day' | 'week' | 'month' | 'quarter' | 'year';
 
 export interface GanttTask {
   id: string;
@@ -12,6 +12,7 @@ export interface GanttTask {
   status: string;
   project_id?: string; // ✅ UNIQUEMENT project_id pour lier au projet (pas de projectName)
   parent_id?: string; // ✅ ID de la tâche parente (si sous-tâche)
+  isOverloaded?: boolean; // ✅ Flag de surcharge
 }
 
 export interface ViewConfig {
@@ -82,6 +83,14 @@ export const getViewConfig = (viewMode: ViewMode): ViewConfig => {
         },
         unitDuration: 90, // Approx 3 mois
       };
+    case 'year':
+      return {
+        unitWidth: 300,
+        headerHeight: 80,
+        getUnit: (date: Date) => date.getFullYear().toString(),
+        getSubUnit: (date: Date) => 'Année entière',
+        unitDuration: 365,
+      };
     default:
       return {
         unitWidth: 120,
@@ -107,6 +116,11 @@ export const getTaskWidth = (task: GanttTask, config: ViewConfig) => {
 };
 
 export const getTotalUnits = (startDate: Date, endDate: Date, config: ViewConfig) => {
+  // Pour le mode année
+  if (config.unitDuration === 365) {
+    return Math.max(1, endDate.getFullYear() - startDate.getFullYear() + 1);
+  }
+
   // Pour le mode trimestre (3 mois)
   if (config.unitDuration === 90) {
     const monthsDiff =

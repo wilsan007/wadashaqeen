@@ -1,0 +1,2 @@
+- [Awaleh — Fondateur Wadashaqayn](user_awaleh_profile.md) — Fondateur présentant en direct aux décideurs djiboutiens, email zdouce.zz@gmail.com
+- [Wadashaqayn — Fiche produit complète](project_wadashaqayn_product.md) — Fonctionnalités, tarifs, différenciateurs, douleurs prospects du SaaS tout-en-un Djibouti/Afrique

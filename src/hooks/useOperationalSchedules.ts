@@ -3,9 +3,10 @@
  * Gestion des planifications (RRULE) pour activités récurrentes
  */
 
-import { useState, useCallback } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useTenant } from '@/contexts/TenantContext';
+import { CACHE_TTL } from '@/lib/queryConfig';
 
 export interface OperationalSchedule {
   id: string;
@@ -20,94 +21,136 @@ export interface OperationalSchedule {
   updated_at: string;
 }
 
-export function useOperationalSchedules() {
+export function useOperationalSchedules(activityId?: string) {
   const { currentTenant } = useTenant();
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
-  // Récupérer la planification d'une activité
-  const getSchedule = useCallback(async (activityId: string) => {
-    setLoading(true);
-    setError(null);
+  // =====================================================
+  // Query Key
+  // =====================================================
 
-    try {
+  const queryKey = ['operational-schedules', activityId];
+
+  // =====================================================
+  // Fetch Schedule via useQuery (une seule planification par activité)
+  // =====================================================
+
+  const {
+    isLoading: queryLoading,
+    error: queryError,
+  } = useQuery<OperationalSchedule | null>({
+    queryKey,
+    queryFn: async () => {
       const { data, error: fetchError } = await supabase
         .from('operational_schedules')
         .select('*')
-        .eq('activity_id', activityId)
+        .eq('activity_id', activityId!)
         .single();
 
       if (fetchError && fetchError.code !== 'PGRST116') {
         throw fetchError;
       }
 
+      return data ?? null;
+    },
+    enabled: !!activityId,
+    ...CACHE_TTL.semiStatic,
+  });
+
+  const loading = queryLoading;
+  const error = queryError ? (queryError as Error).message : null;
+
+  // =====================================================
+  // Mutations
+  // =====================================================
+
+  const upsertMutation = useMutation({
+    mutationFn: async (schedule: Partial<OperationalSchedule>) => {
+      if (!currentTenant?.id) {
+        throw new Error('Aucun tenant actif');
+      }
+
+      // Injecter tenant_id automatiquement
+      const scheduleWithTenant = {
+        ...schedule,
+        tenant_id: currentTenant.id,
+      };
+
+      const { data, error: upsertError } = await supabase
+        .from('operational_schedules')
+        .upsert(scheduleWithTenant as any)
+        .select()
+        .single();
+
+      if (upsertError) throw upsertError;
+
       return data;
-    } catch (err: any) {
-      console.error('❌ Erreur getSchedule:', err);
-      setError(err.message);
-      return null;
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  // Créer ou mettre à jour une planification
-  const upsertSchedule = useCallback(
-    async (schedule: Partial<OperationalSchedule>) => {
-      setLoading(true);
-      setError(null);
-
-      try {
-        if (!currentTenant?.id) {
-          throw new Error('Aucun tenant actif');
-        }
-
-        // Injecter tenant_id automatiquement
-        const scheduleWithTenant = {
-          ...schedule,
-          tenant_id: currentTenant.id,
-        };
-
-        const { data, error: upsertError } = await supabase
-          .from('operational_schedules')
-          .upsert(scheduleWithTenant as any)
-          .select()
-          .single();
-
-        if (upsertError) throw upsertError;
-
-        return data;
-      } catch (err: any) {
-        console.error('❌ Erreur upsertSchedule:', err);
-        setError(err.message);
-        throw err;
-      } finally {
-        setLoading(false);
+    },
+    onSuccess: (data) => {
+      const targetActivityId = data?.activity_id || activityId;
+      if (targetActivityId) {
+        queryClient.invalidateQueries({ queryKey: ['operational-schedules', targetActivityId] });
       }
     },
-    [currentTenant]
-  );
+    onError: (err: any) => {
+      console.error('❌ Erreur upsertSchedule:', err);
+    },
+  });
 
-  // Supprimer une planification
-  const deleteSchedule = useCallback(async (activityId: string) => {
-    setLoading(true);
-    setError(null);
-
-    try {
+  const deleteMutation = useMutation({
+    mutationFn: async (targetActivityId: string) => {
       const { error: deleteError } = await supabase
         .from('operational_schedules')
         .delete()
-        .eq('activity_id', activityId);
+        .eq('activity_id', targetActivityId);
 
       if (deleteError) throw deleteError;
-    } catch (err: any) {
+
+      return targetActivityId;
+    },
+    onSuccess: (targetActivityId) => {
+      queryClient.invalidateQueries({ queryKey: ['operational-schedules', targetActivityId] });
+    },
+    onError: (err: any) => {
       console.error('❌ Erreur deleteSchedule:', err);
-      setError(err.message);
-      throw err;
-    } finally {
-      setLoading(false);
+    },
+  });
+
+  // =====================================================
+  // Fonctions exposées (compatibilité interface publique)
+  // =====================================================
+
+  const getSchedule = async (targetActivityId: string): Promise<OperationalSchedule | null> => {
+    // Récupérer depuis le cache si disponible, sinon fetch direct
+    const cached = queryClient.getQueryData<OperationalSchedule | null>([
+      'operational-schedules',
+      targetActivityId,
+    ]);
+    if (cached !== undefined) {
+      return cached;
     }
-  }, []);
+
+    const { data, error: fetchError } = await supabase
+      .from('operational_schedules')
+      .select('*')
+      .eq('activity_id', targetActivityId)
+      .single();
+
+    if (fetchError && fetchError.code !== 'PGRST116') {
+      console.error('❌ Erreur getSchedule:', fetchError);
+      return null;
+    }
+
+    return data ?? null;
+  };
+
+  const upsertSchedule = async (schedule: Partial<OperationalSchedule>) => {
+    return upsertMutation.mutateAsync(schedule);
+  };
+
+  const deleteSchedule = async (targetActivityId: string) => {
+    return deleteMutation.mutateAsync(targetActivityId);
+  };
 
   return {
     loading,

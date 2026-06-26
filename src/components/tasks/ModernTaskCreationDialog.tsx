@@ -8,6 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useTenant } from '@/contexts/TenantContext';
 import { toast } from 'sonner';
 import { QuickInviteDialog } from './QuickInviteDialog';
+import { useProjectEditPermissions } from '@/hooks/useProjectEditPermissions';
 
 // Sub-components
 import { TaskBasicInfo } from './creation/TaskBasicInfo';
@@ -84,6 +85,10 @@ export const ModernTaskCreationDialog: React.FC<ModernTaskCreationDialogProps> =
   const [showActions, setShowActions] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showInviteDialog, setShowInviteDialog] = useState(false);
+
+  // 🔒 Seuls PM+, admins et tenant_admin peuvent inviter des collaborateurs
+  const projectPermissions = useProjectEditPermissions();
+  const canInviteCollaborator = projectPermissions.canManageTeam;
 
   // Données réelles depuis la base
   const { currentTenant } = useTenant();
@@ -314,11 +319,13 @@ export const ModernTaskCreationDialog: React.FC<ModernTaskCreationDialogProps> =
 
   return (
     <>
-      <QuickInviteDialog
-        open={showInviteDialog}
-        onOpenChange={setShowInviteDialog}
-        onInviteSuccess={handleInviteSuccess}
-      />
+      {canInviteCollaborator && (
+        <QuickInviteDialog
+          open={showInviteDialog}
+          onOpenChange={setShowInviteDialog}
+          onInviteSuccess={handleInviteSuccess}
+        />
+      )}
 
       <ResponsiveModal open={open} onOpenChange={onOpenChange}>
         <ResponsiveModalContent className="flex max-h-[95vh] flex-col p-0">
@@ -353,7 +360,7 @@ export const ModernTaskCreationDialog: React.FC<ModernTaskCreationDialogProps> =
                 availableDepartments={availableDepartments}
                 availableProjects={availableProjects}
                 loadingData={loadingData}
-                onInviteClick={() => setShowInviteDialog(true)}
+                onInviteClick={canInviteCollaborator ? () => setShowInviteDialog(true) : undefined}
                 parentTask={parentTask}
               />
 

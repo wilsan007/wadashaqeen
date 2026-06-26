@@ -17,7 +17,7 @@ export const CompanySettings = () => {
   const [uploading, setUploading] = useState(false);
   const [companyName, setCompanyName] = useState('');
   const [logoUrl, setLogoUrl] = useState('');
-  const { tenantId } = useTenant();
+  const { tenantId, refreshTenant } = useTenant();
   const { toast } = useToast();
 
   useEffect(() => {
@@ -85,17 +85,25 @@ export const CompanySettings = () => {
       }
 
       const file = event.target.files[0];
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${tenantId}-${Math.random()}.${fileExt}`;
-      const filePath = `company-logos/${fileName}`;
+      const fileExt = file.name.split('.').pop()?.toLowerCase() || 'png';
+      // Chemin correct : {tenantId}/logo-{timestamp}.{ext} dans le bucket tenant-logos
+      const filePath = `${tenantId}/logo-${Date.now()}.${fileExt}`;
+
+      // Supprimer les anciens logos du dossier tenant
+      const { data: existing } = await supabase.storage.from('tenant-logos').list(tenantId);
+      if (existing && existing.length > 0) {
+        await supabase.storage
+          .from('tenant-logos')
+          .remove(existing.map(f => `${tenantId}/${f.name}`));
+      }
 
       const { error: uploadError } = await supabase.storage
-        .from('company-logos')
-        .upload(filePath, file);
+        .from('tenant-logos')
+        .upload(filePath, file, { upsert: true });
 
       if (uploadError) throw uploadError;
 
-      const { data } = supabase.storage.from('company-logos').getPublicUrl(filePath);
+      const { data } = supabase.storage.from('tenant-logos').getPublicUrl(filePath);
 
       const { error: updateError } = await supabase
         .from('tenants')
@@ -106,9 +114,12 @@ export const CompanySettings = () => {
 
       setLogoUrl(data.publicUrl);
 
+      // Mettre à jour la sidebar immédiatement
+      await refreshTenant();
+
       toast({
         title: 'Logo mis à jour',
-        description: 'Le logo de votre entreprise a été modifié avec succès.',
+        description: 'Le logo est maintenant visible dans la sidebar.',
       });
     } catch (error: any) {
       toast({

@@ -10,13 +10,13 @@
  * - Gestion d'erreurs robuste
  */
 
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useTenant } from '@/hooks/useTenant';
 import { useRolesCompat as useUserRoles } from '@/contexts/RolesContext';
 import { cacheManager } from '@/lib/cacheManager';
-import { useRenderTracker } from '@/hooks/usePerformanceMonitor';
 import type {
   Employee,
   LeaveRequest,
@@ -57,7 +57,7 @@ export interface UseHRMinimalOptions {
 export const useHRMinimal = (options: UseHRMinimalOptions = {}) => {
   // Default options
   const {
-    enabled = {
+    enabled: enabledSections = {
       employees: true,
       leaveRequests: true,
       attendances: true,
@@ -66,33 +66,26 @@ export const useHRMinimal = (options: UseHRMinimalOptions = {}) => {
       absenceTypes: true,
     },
     limits = {
-      employees: 20, // Réduit de 50-100
-      leaveRequests: 10, // Réduit de 50-100
-      attendances: 10, // Réduit de 30-100
-      leaveBalances: 20, // Nouveau
+      employees: 20,
+      leaveRequests: 10,
+      attendances: 10,
+      leaveBalances: 20,
     },
     enablePagination = true,
   } = options;
-  // Performance monitoring - DISABLED temporairement car trop de bruit
-  // const performanceMonitor = useRenderTracker('useHRMinimal');
-  // États optimisés avec métriques
-  const [data, setData] = useState<HRData>({
-    leaveRequests: [],
-    absenceTypes: [],
-    attendances: [],
-    employees: [],
-    leaveBalances: [],
-    departments: [],
-  });
 
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [metrics, setMetrics] = useState<HRMetrics>({
-    fetchTime: 0,
-    cacheHit: false,
-    dataSize: 0,
-    lastUpdate: new Date(),
-  });
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const { tenantId } = useTenant();
+  const { isSuperAdmin, isLoading: rolesLoading, userRoles } = useUserRoles();
+
+  // Cache TTL (5 minutes comme Stripe)
+  const CACHE_TTL = 5 * 60 * 1000;
+
+  // ✅ CORRECTION BOUCLE INFINIE: Calculer directement depuis userRoles
+  const isSuperAdminValue = useMemo(() => {
+    return userRoles.some(role => role.roles?.name === 'super_admin');
+  }, [userRoles]);
 
   // Pagination state
   const [pagination, setPagination] = useState<PaginationConfig>({
@@ -102,263 +95,199 @@ export const useHRMinimal = (options: UseHRMinimalOptions = {}) => {
     hasMore: false,
   });
 
-  // Hooks externes
-  const { toast } = useToast();
-  const { tenantId } = useTenant();
-  const { isSuperAdmin, isLoading: rolesLoading, userRoles } = useUserRoles();
+  const [metrics, setMetrics] = useState<HRMetrics>({
+    fetchTime: 0,
+    cacheHit: false,
+    dataSize: 0,
+    lastUpdate: new Date(),
+  });
 
-  // ✅ CORRECTION BOUCLE INFINIE: Calculer directement depuis userRoles
-  // Éviter d'appeler isSuperAdmin() car c'est une fonction qui change
-  const isSuperAdminValue = useMemo(() => {
-    return userRoles.some(role => role.roles?.name === 'super_admin');
-  }, [userRoles]);
+  const getCacheKey = useCallback(
+    (tenant: string | null, isSuper: boolean) => {
+      if (isSuper) return 'hr_super_admin';
+      return tenant ? `hr_${tenant}` : 'hr_no_tenant';
+    },
+    []
+  );
 
-  // Refs pour éviter les boucles et optimisations
-  const fetchedRef = useRef(false);
-  const tenantIdRef = useRef<string | null>(null);
-  const cacheRef = useRef<Map<string, { data: HRData; timestamp: number }>>(new Map());
-  const abortControllerRef = useRef<AbortController | null>(null);
+  const isQueryEnabled = !rolesLoading && (!!tenantId || isSuperAdminValue);
 
-  // Cache TTL (5 minutes comme Stripe)
-  const CACHE_TTL = 5 * 60 * 1000;
+  // Single bundled useQuery for all 6 HR data sources
+  const {
+    data,
+    isLoading: queryLoading,
+    error: rawError,
+    refetch: refetchQuery,
+  } = useQuery<HRData>({
+    queryKey: ['hr-minimal', tenantId, isSuperAdminValue, enabledSections, limits],
+    queryFn: async () => {
+      const startTime = performance.now();
+      const isSuper = isSuperAdminValue;
+      const cacheKey = getCacheKey(tenantId, isSuper);
 
-  // Fonction pour générer une clé de cache unique - Contextuelle (Pattern Stripe)
-  // ✅ CORRECTION: Stabiliser avec useCallback
-  const getCacheKey = useCallback((tenant: string | null, isSuper: boolean) => {
-    if (isSuper) {
-      return 'hr_super_admin'; // Super Admin voit tout
-    }
-    return tenant ? `hr_${tenant}` : 'hr_no_tenant';
-  }, []); // Pas de dépendances, c'est une pure function
-
-  const getCachedData = useCallback((cacheKey: string): HRData | null => {
-    return cacheManager.get<HRData>(cacheKey);
-  }, []);
-
-  const setCachedData = useCallback((cacheKey: string, data: HRData) => {
-    cacheManager.set(cacheKey, data, 'hr_data');
-  }, []);
-
-  // Fonction de fetch stable
-  useEffect(() => {
-    // Conditions de sortie pour éviter les boucles
-    if (rolesLoading) {
-      // // console.log('⏳ Roles still loading...');
-      return;
-    }
-
-    // Super Admin peut accéder aux données même sans tenant_id
-    if (!tenantId && !isSuperAdminValue) {
-      // // console.log('⚠️ No tenant ID available and not Super Admin');
-      setLoading(false);
-      return;
-    }
-
-    // Protection STRICTE contre les refetch - hash stable
-    const currentTenantHash = `${tenantId || 'null'}-${isSuperAdminValue}`;
-    const lastTenantHash = tenantIdRef.current || '';
-
-    // ARRÊT COMPLET si mêmes paramètres et déjà fetché
-    if (fetchedRef.current && currentTenantHash === lastTenantHash) {
-      return;
-    }
-
-    // Vérifier le cache avant tout fetch
-    const cacheKey = getCacheKey(tenantId, isSuperAdminValue);
-    const cachedData = getCachedData(cacheKey);
-
-    if (cachedData && currentTenantHash === lastTenantHash) {
-      // Si on a du cache et que rien n'a changé, ne pas refetch
-      setData(cachedData);
-      setLoading(false);
-      return;
-    }
-
-    // Marquer comme en cours de fetch AVANT le fetch pour éviter les races
-    fetchedRef.current = true;
-    tenantIdRef.current = currentTenantHash;
-
-    const fetchData = async () => {
-      // Annuler la requête précédente si elle existe
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
+      // Check cacheManager first (Pattern Stripe)
+      const cachedData = cacheManager.get<HRData>(cacheKey);
+      if (cachedData) {
+        setMetrics(prev => ({ ...prev, cacheHit: true, lastUpdate: new Date() }));
+        return cachedData;
       }
 
-      const abortController = new AbortController();
-      abortControllerRef.current = abortController;
-
-      try {
-        const startTime = performance.now();
-        setLoading(true);
-        setError(null);
-
-        const isSuper = isSuperAdminValue; // ✅ Utiliser la valeur stable
-        const cacheKey = getCacheKey(tenantId, isSuper);
-
-        // Vérifier le cache d'abord (Pattern Stripe)
-        const cachedData = getCachedData(cacheKey);
-        if (cachedData) {
-          setData(cachedData);
-          setLoading(false);
-          return; // Pas de mise à jour des métriques si c'est du cache pour éviter re-renders
-        }
-
-        const [
-          leaveRequestsRes,
-          absenceTypesRes,
-          attendancesRes,
-          employeesRes,
-          leaveBalancesRes,
-          departmentsRes,
-        ] = await Promise.all([
-          // Leave Requests
-          enabled.leaveRequests
-            ? isSuper
+      const [
+        leaveRequestsRes,
+        absenceTypesRes,
+        attendancesRes,
+        employeesRes,
+        leaveBalancesRes,
+        departmentsRes,
+      ] = await Promise.all([
+        // Leave Requests
+        enabledSections.leaveRequests
+          ? isSuper
+            ? supabase
+                .from('leave_requests')
+                .select('*, profiles:employee_id(full_name, tenant_id)')
+                .order('created_at', { ascending: false })
+                .limit(limits.leaveRequests || 10)
+            : tenantId
               ? supabase
                   .from('leave_requests')
-                  .select('*, profiles:employee_id(full_name, tenant_id)')
+                  .select('*')
+                  .eq('tenant_id', tenantId)
                   .order('created_at', { ascending: false })
                   .limit(limits.leaveRequests || 10)
-              : tenantId
-                ? supabase
-                    .from('leave_requests')
-                    .select('*')
-                    .eq('tenant_id', tenantId)
-                    .order('created_at', { ascending: false })
-                    .limit(limits.leaveRequests || 10)
-                : supabase.from('leave_requests').select('*').limit(0)
-            : Promise.resolve({ data: [], error: null }),
+              : supabase.from('leave_requests').select('*').limit(0)
+          : Promise.resolve({ data: [], error: null }),
 
-          // Absence Types
-          enabled.absenceTypes
-            ? supabase.from('absence_types').select('*').order('name')
-            : Promise.resolve({ data: [], error: null }),
+        // Absence Types
+        enabledSections.absenceTypes
+          ? supabase.from('absence_types').select('*').order('name')
+          : Promise.resolve({ data: [], error: null }),
 
-          // Attendances
-          enabled.attendances
-            ? isSuper
+        // Attendances
+        enabledSections.attendances
+          ? isSuper
+            ? supabase
+                .from('attendances')
+                .select('*, profiles:employee_id(full_name, tenant_id)')
+                .order('date', { ascending: false })
+                .limit(limits.attendances || 10)
+            : tenantId
               ? supabase
                   .from('attendances')
-                  .select('*, profiles:employee_id(full_name, tenant_id)')
+                  .select('*')
+                  .eq('tenant_id', tenantId)
                   .order('date', { ascending: false })
                   .limit(limits.attendances || 10)
-              : tenantId
-                ? supabase
-                    .from('attendances')
-                    .select('*')
-                    .eq('tenant_id', tenantId)
-                    .order('date', { ascending: false })
-                    .limit(limits.attendances || 10)
-                : supabase.from('attendances').select('*').limit(0)
-            : Promise.resolve({ data: [], error: null }),
+              : supabase.from('attendances').select('*').limit(0)
+          : Promise.resolve({ data: [], error: null }),
 
-          // Employees
-          enabled.employees
-            ? isSuper
+        // Employees
+        enabledSections.employees
+          ? isSuper
+            ? supabase
+                .from('employees')
+                .select('*')
+                .order('full_name')
+                .limit(limits.employees || 20)
+            : tenantId
               ? supabase
                   .from('employees')
                   .select('*')
-                  .order('full_name')
+                  .eq('tenant_id', tenantId)
                   .limit(limits.employees || 20)
-              : tenantId
-                ? supabase
-                    .from('employees')
-                    .select('*')
-                    .eq('tenant_id', tenantId)
-                    .limit(limits.employees || 20)
-                : supabase.from('employees').select('*').limit(0)
-            : Promise.resolve({ data: [], error: null }),
+              : supabase.from('employees').select('*').limit(0)
+          : Promise.resolve({ data: [], error: null }),
 
-          // Leave Balances
-          enabled.leaveBalances
-            ? isSuper
+        // Leave Balances
+        enabledSections.leaveBalances
+          ? isSuper
+            ? supabase
+                .from('leave_balances')
+                .select('*, profiles:employee_id(full_name), absence_types:absence_type_id(name)')
+                .order('year', { ascending: false })
+                .limit(limits.leaveBalances || 20)
+            : tenantId
               ? supabase
                   .from('leave_balances')
-                  .select('*, profiles:employee_id(full_name), absence_types:absence_type_id(name)')
+                  .select(
+                    '*, profiles:employee_id(full_name), absence_types:absence_type_id(name)'
+                  )
+                  .eq('tenant_id', tenantId)
                   .order('year', { ascending: false })
                   .limit(limits.leaveBalances || 20)
-              : tenantId
-                ? supabase
-                    .from('leave_balances')
-                    .select(
-                      '*, profiles:employee_id(full_name), absence_types:absence_type_id(name)'
-                    )
-                    .eq('tenant_id', tenantId)
-                    .order('year', { ascending: false })
-                    .limit(limits.leaveBalances || 20)
-                : supabase.from('leave_balances').select('*').limit(0)
-            : Promise.resolve({ data: [], error: null }),
+              : supabase.from('leave_balances').select('*').limit(0)
+          : Promise.resolve({ data: [], error: null }),
 
-          // Departments
-          enabled.departments
-            ? isSuper
-              ? supabase.from('departments').select('*').order('name')
-              : tenantId
-                ? supabase.from('departments').select('*').eq('tenant_id', tenantId).order('name')
-                : supabase.from('departments').select('*').limit(0)
-            : Promise.resolve({ data: [], error: null }),
-        ]);
+        // Departments
+        enabledSections.departments
+          ? isSuper
+            ? supabase.from('departments').select('*').order('name')
+            : tenantId
+              ? supabase.from('departments').select('*').eq('tenant_id', tenantId).order('name')
+              : supabase.from('departments').select('*').limit(0)
+          : Promise.resolve({ data: [], error: null }),
+      ]);
 
-        const newData: HRData = {
-          leaveRequests: leaveRequestsRes.data || [],
-          absenceTypes: absenceTypesRes.data || [],
-          attendances: attendancesRes.data || [],
-          employees: employeesRes.data || [],
-          leaveBalances: leaveBalancesRes.data || [],
-          departments: departmentsRes.data || [],
-        };
+      const newData: HRData = {
+        leaveRequests: leaveRequestsRes.data || [],
+        absenceTypes: absenceTypesRes.data || [],
+        attendances: attendancesRes.data || [],
+        employees: employeesRes.data || [],
+        leaveBalances: leaveBalancesRes.data || [],
+        departments: departmentsRes.data || [],
+      };
 
-        const endTime = performance.now();
-        const fetchTime = endTime - startTime;
-        const dataSize = JSON.stringify(newData).length;
+      const endTime = performance.now();
+      const fetchTime = endTime - startTime;
+      const dataSize = JSON.stringify(newData).length;
 
-        setCachedData(cacheKey, newData);
+      cacheManager.set(cacheKey, newData, 'hr_data');
 
-        setData(newData);
-        setMetrics({
-          fetchTime,
-          cacheHit: false,
-          dataSize,
-          lastUpdate: new Date(),
-        });
-      } catch (error: any) {
-        console.error('❌ Error fetching HR data:', error);
-        setError(error.message || 'Erreur de chargement');
-      } finally {
-        setLoading(false);
-      }
-    };
+      setMetrics({ fetchTime, cacheHit: false, dataSize, lastUpdate: new Date() });
 
-    fetchData();
-  }, [tenantId, rolesLoading, isSuperAdminValue]);
+      return newData;
+    },
+    enabled: isQueryEnabled,
+    staleTime: CACHE_TTL,
+    gcTime: CACHE_TTL * 2,
+  });
+
+  const loading = queryLoading;
+  const error: string | null = rawError
+    ? rawError instanceof Error
+      ? rawError.message
+      : String(rawError)
+    : null;
+
+  const resolvedData: HRData = data ?? {
+    leaveRequests: [],
+    absenceTypes: [],
+    attendances: [],
+    employees: [],
+    leaveBalances: [],
+    departments: [],
+  };
 
   // Fonction de refresh optimisée
   const refresh = useCallback(() => {
     const cacheKey = getCacheKey(tenantId, isSuperAdminValue);
     cacheManager.invalidate(cacheKey);
-    fetchedRef.current = false;
-    tenantIdRef.current = null;
-    setLoading(true);
-  }, [tenantId, isSuperAdminValue, getCacheKey]);
+    queryClient.invalidateQueries({
+      queryKey: ['hr-minimal', tenantId, isSuperAdminValue],
+    });
+  }, [tenantId, isSuperAdminValue, getCacheKey, queryClient]);
 
   // Fonction pour charger plus de données
   const loadMore = useCallback(
     async (resource: keyof HRData) => {
       if (!enablePagination) return;
-      setLoading(true);
-      try {
-        const currentData = data[resource];
-        const currentLimit = limits[resource as keyof typeof limits] || 20;
-        const newLimit = currentLimit + 20;
-        const cacheKey = getCacheKey(tenantId, isSuperAdminValue);
-        cacheManager.invalidate(cacheKey);
-        fetchedRef.current = false;
-        setLoading(true);
-      } catch (error) {
-        console.error('Error loading more:', error);
-      }
+      const cacheKey = getCacheKey(tenantId, isSuperAdminValue);
+      cacheManager.invalidate(cacheKey);
+      queryClient.invalidateQueries({
+        queryKey: ['hr-minimal', tenantId, isSuperAdminValue],
+      });
     },
-    [enablePagination, data, limits, tenantId, isSuperAdminValue, getCacheKey]
+    [enablePagination, tenantId, isSuperAdminValue, getCacheKey, queryClient]
   );
 
   const clearCache = useCallback(() => {
@@ -369,25 +298,16 @@ export const useHRMinimal = (options: UseHRMinimalOptions = {}) => {
     return cacheManager.getStats();
   }, []);
 
-  // Cleanup
-  useEffect(() => {
-    return () => {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-    };
-  }, []);
-
   const currentUserRole = userRoles[0]?.roles?.name || 'Aucun rôle';
-  const requiredRole = 'manager_hr ou tenant_admin';
+  const requiredRole = 'hr_manager ou tenant_admin';
   const tenantIdFromRoles = userRoles[0]?.tenant_id;
   const effectiveTenantId = tenantId || tenantIdFromRoles;
   const hasRequiredRole =
-    isSuperAdminValue || currentUserRole === 'manager_hr' || currentUserRole === 'tenant_admin';
+    isSuperAdminValue || currentUserRole === 'hr_manager' || currentUserRole === 'tenant_admin';
   const hasAccess = hasRequiredRole && !!effectiveTenantId;
 
   return {
-    ...data,
+    ...resolvedData,
     loading,
     error,
     metrics,
@@ -408,7 +328,7 @@ export const useHRMinimal = (options: UseHRMinimalOptions = {}) => {
     refreshData: refresh,
     clearCache,
     getCacheStats,
-    loadMore, // Export loadMore
+    loadMore,
     isDataStale: metrics.lastUpdate && Date.now() - metrics.lastUpdate.getTime() > CACHE_TTL,
     cacheKey: getCacheKey(tenantId, isSuperAdminValue),
   };

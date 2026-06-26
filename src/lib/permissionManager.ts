@@ -34,14 +34,14 @@ export interface PermissionRule {
 export interface PermissionCondition {
   field: string;
   operator:
-    | 'equals'
-    | 'not_equals'
-    | 'in'
-    | 'not_in'
-    | 'contains'
-    | 'starts_with'
-    | 'greater_than'
-    | 'less_than';
+  | 'equals'
+  | 'not_equals'
+  | 'in'
+  | 'not_in'
+  | 'contains'
+  | 'starts_with'
+  | 'greater_than'
+  | 'less_than';
   value: any;
 }
 
@@ -506,6 +506,7 @@ class PermissionManager {
     expiredKeys.forEach(key => this.evaluationCache.delete(key));
 
     if (expiredKeys.length > 0) {
+      // Expired evaluation cache entries removed
     }
   }
 
@@ -534,7 +535,7 @@ class PermissionManager {
   removeCustomRule(ruleId: string): void {
     const index = this.customRules.findIndex(rule => rule.id === ruleId);
     if (index !== -1) {
-      const removedRule = this.customRules.splice(index, 1)[0];
+      this.customRules.splice(index, 1);
     }
   }
 
@@ -583,6 +584,7 @@ class PermissionManager {
 
     keysToDelete.forEach(key => this.evaluationCache.delete(key));
 
+    console.log(
       `🗑️ Cache d'évaluation invalidé pour l'utilisateur ${userId}: ${keysToDelete.length} entrées`
     );
   }

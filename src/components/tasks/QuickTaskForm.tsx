@@ -5,9 +5,13 @@
  */
 
 import React, { useState } from 'react';
+import { z } from 'zod';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Form, FormField, FormItem, FormControl, FormMessage } from '@/components/ui/form';
 import {
   Plus,
   Sparkles,
@@ -16,11 +20,16 @@ import {
   Briefcase,
   ArrowRight,
   Layout,
-  CheckCircle2,
 } from 'lucide-react';
 import { useTasks } from '@/hooks/optimized';
 import { useToast } from '@/hooks/use-toast';
 import { ModernTaskCreationDialog } from './ModernTaskCreationDialog';
+
+const quickTaskSchema = z.object({
+  title: z.string().min(1, 'Le titre est requis'),
+});
+
+type QuickTaskValues = z.infer<typeof quickTaskSchema>;
 
 const TASK_TEMPLATES = [
   {
@@ -69,17 +78,19 @@ export const QuickTaskForm: React.FC = () => {
   const { createTask, loading } = useTasks();
   const { toast } = useToast();
 
-  const [quickTitle, setQuickTitle] = useState('');
+  // UI-only states (not form field states)
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [initialValues, setInitialValues] = useState<any>(null);
 
-  const handleQuickAdd = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!quickTitle.trim()) return;
+  const form = useForm<QuickTaskValues>({
+    resolver: zodResolver(quickTaskSchema),
+    defaultValues: { title: '' },
+  });
 
+  const onSubmit = form.handleSubmit(async (data: QuickTaskValues) => {
     try {
       await createTask({
-        title: quickTitle,
+        title: data.title,
         status: 'todo',
         priority: 'medium',
       });
@@ -89,7 +100,7 @@ export const QuickTaskForm: React.FC = () => {
         description: 'Votre tâche a été ajoutée avec succès.',
       });
 
-      setQuickTitle('');
+      form.reset();
     } catch (error) {
       console.error('Erreur création tâche:', error);
       toast({
@@ -98,7 +109,7 @@ export const QuickTaskForm: React.FC = () => {
         variant: 'destructive',
       });
     }
-  };
+  });
 
   const openTemplateModal = (template: (typeof TASK_TEMPLATES)[0]) => {
     setInitialValues({
@@ -114,6 +125,8 @@ export const QuickTaskForm: React.FC = () => {
     setIsDialogOpen(true);
   };
 
+  const titleValue = form.watch('title');
+
   return (
     <div className="animate-in fade-in-50 space-y-8 pb-20 duration-700">
       {/* Section Création Inline */}
@@ -126,25 +139,37 @@ export const QuickTaskForm: React.FC = () => {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleQuickAdd} className="flex gap-4">
-            <div className="group relative flex-1">
-              <div className="absolute -inset-0.5 rounded-lg bg-gradient-to-r from-violet-500 to-fuchsia-500 opacity-20 blur transition duration-500 group-hover:opacity-50" />
-              <Input
-                placeholder="Ajouter une tâche rapidement + Entrée..."
-                value={quickTitle}
-                onChange={e => setQuickTitle(e.target.value)}
-                className="bg-background relative h-12 border-transparent text-lg shadow-sm focus:border-violet-500"
+          <Form {...form}>
+            <form onSubmit={onSubmit} className="flex gap-4">
+              <FormField
+                control={form.control}
+                name="title"
+                render={({ field }) => (
+                  <FormItem className="flex-1">
+                    <div className="group relative">
+                      <div className="absolute -inset-0.5 rounded-lg bg-gradient-to-r from-violet-500 to-fuchsia-500 opacity-20 blur transition duration-500 group-hover:opacity-50" />
+                      <FormControl>
+                        <Input
+                          placeholder="Ajouter une tâche rapidement + Entrée..."
+                          {...field}
+                          className="bg-background relative h-12 border-transparent text-lg shadow-sm focus:border-violet-500"
+                        />
+                      </FormControl>
+                    </div>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-            <Button
-              type="submit"
-              disabled={loading || !quickTitle.trim()}
-              className="h-12 bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white shadow-lg shadow-violet-500/25 transition-all hover:scale-105 hover:from-violet-700 hover:to-fuchsia-700"
-            >
-              <Plus className="mr-2 h-5 w-5" />
-              Ajouter
-            </Button>
-          </form>
+              <Button
+                type="submit"
+                disabled={loading || !titleValue?.trim()}
+                className="h-12 bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white shadow-lg shadow-violet-500/25 transition-all hover:scale-105 hover:from-violet-700 hover:to-fuchsia-700"
+              >
+                <Plus className="mr-2 h-5 w-5" />
+                Ajouter
+              </Button>
+            </form>
+          </Form>
         </CardContent>
       </Card>
 

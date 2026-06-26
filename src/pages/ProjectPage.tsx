@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from '@/hooks/useTranslation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ProjectDashboardEnterprise } from '@/components/projects/ProjectDashboardEnterprise';
@@ -15,6 +16,7 @@ import {
 } from 'lucide-react';
 
 export default function ProjectPage() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const isMobile = useIsMobile();
 
@@ -41,7 +43,7 @@ export default function ProjectPage() {
               size="sm"
             >
               <CheckSquare className="mr-2 h-4 w-4" />
-              <span className="inline">Gestion des Tâches</span>
+              <span className="inline">{t('projectPage.tasksBtn')}</span>
             </Button>
             <Button
               variant="outline"

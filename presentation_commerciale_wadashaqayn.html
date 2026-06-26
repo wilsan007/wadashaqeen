@@ -1,0 +1,1215 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Présentation Commerciale — Wadashaqayn</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+  :root {
+    --primary: #1a56db;
+    --primary-dark: #1e40af;
+    --accent: #f59e0b;
+    --dark: #111827;
+    --gray: #6b7280;
+    --light-gray: #f9fafb;
+    --border: #e5e7eb;
+    --success: #059669;
+    --danger: #dc2626;
+    --warning: #d97706;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', 'Segoe UI', sans-serif;
+    color: var(--dark);
+    background: #fff;
+    font-size: 11pt;
+    line-height: 1.6;
+  }
+
+  /* ─── COUVERTURE ─────────────────────────────────────────────── */
+  .cover {
+    background: linear-gradient(135deg, #1a56db 0%, #1e3a8a 60%, #0f172a 100%);
+    color: white;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    padding: 60px 40px;
+    page-break-after: always;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .cover::before {
+    content: '';
+    position: absolute;
+    top: -100px; right: -100px;
+    width: 400px; height: 400px;
+    border-radius: 50%;
+    background: rgba(255,255,255,0.05);
+  }
+
+  .cover::after {
+    content: '';
+    position: absolute;
+    bottom: -80px; left: -80px;
+    width: 300px; height: 300px;
+    border-radius: 50%;
+    background: rgba(245,158,11,0.1);
+  }
+
+  .cover-logo {
+    font-size: 14pt;
+    font-weight: 800;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 24px;
+    position: relative; z-index: 1;
+  }
+
+  .cover h1 {
+    font-size: 32pt;
+    font-weight: 800;
+    line-height: 1.2;
+    margin-bottom: 20px;
+    position: relative; z-index: 1;
+  }
+
+  .cover h1 span { color: var(--accent); }
+
+  .cover-subtitle {
+    font-size: 13pt;
+    font-weight: 300;
+    color: rgba(255,255,255,0.8);
+    max-width: 520px;
+    margin-bottom: 48px;
+    position: relative; z-index: 1;
+  }
+
+  .cover-stats {
+    display: flex;
+    gap: 40px;
+    margin-bottom: 48px;
+    position: relative; z-index: 1;
+  }
+
+  .stat {
+    text-align: center;
+  }
+
+  .stat-number {
+    font-size: 24pt;
+    font-weight: 800;
+    color: var(--accent);
+    display: block;
+  }
+
+  .stat-label {
+    font-size: 9pt;
+    color: rgba(255,255,255,0.7);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .cover-badge {
+    background: rgba(245,158,11,0.2);
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    padding: 10px 28px;
+    border-radius: 30px;
+    font-size: 10pt;
+    font-weight: 600;
+    letter-spacing: 1px;
+    position: relative; z-index: 1;
+  }
+
+  /* ─── PAGE PRINCIPALE ────────────────────────────────────────── */
+  .page {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 48px 40px;
+  }
+
+  /* ─── SECTION HEADERS ─────────────────────────────────────────── */
+  .section {
+    margin-bottom: 48px;
+    page-break-inside: avoid;
+  }
+
+  .section-number {
+    display: inline-block;
+    background: var(--primary);
+    color: white;
+    font-size: 9pt;
+    font-weight: 700;
+    padding: 4px 12px;
+    border-radius: 4px;
+    margin-bottom: 12px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  .section-title {
+    font-size: 18pt;
+    font-weight: 800;
+    color: var(--dark);
+    margin-bottom: 6px;
+    line-height: 1.2;
+  }
+
+  .section-meta {
+    font-size: 9pt;
+    color: var(--gray);
+    font-weight: 500;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .section-meta::before {
+    content: '';
+    display: inline-block;
+    width: 24px;
+    height: 2px;
+    background: var(--primary);
+  }
+
+  /* ─── CARDS ───────────────────────────────────────────────────── */
+  .card {
+    background: var(--light-gray);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 16px;
+  }
+
+  .card-accent {
+    border-left: 4px solid var(--primary);
+  }
+
+  .card-warning {
+    border-left: 4px solid var(--accent);
+    background: #fffbeb;
+  }
+
+  .card-success {
+    border-left: 4px solid var(--success);
+    background: #f0fdf4;
+  }
+
+  .card-danger {
+    border-left: 4px solid var(--danger);
+    background: #fef2f2;
+  }
+
+  .card h3 {
+    font-size: 11pt;
+    font-weight: 700;
+    margin-bottom: 10px;
+    color: var(--dark);
+  }
+
+  .card-tag {
+    font-size: 8pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--primary);
+    margin-bottom: 8px;
+    display: block;
+  }
+
+  /* ─── SCRIPT BLOCKS ───────────────────────────────────────────── */
+  .script {
+    background: #0f172a;
+    color: #e2e8f0;
+    border-radius: 10px;
+    padding: 20px 24px;
+    margin: 16px 0;
+    font-style: italic;
+    font-size: 10.5pt;
+    line-height: 1.7;
+    position: relative;
+  }
+
+  .script::before {
+    content: '🗣';
+    position: absolute;
+    top: 16px; right: 16px;
+    font-style: normal;
+    font-size: 14pt;
+  }
+
+  .script strong { color: var(--accent); font-style: normal; }
+
+  /* ─── TABLEAU ─────────────────────────────────────────────────── */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0;
+    font-size: 10pt;
+  }
+
+  th {
+    background: var(--primary);
+    color: white;
+    padding: 10px 14px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 9pt;
+  }
+
+  th:first-child { border-radius: 8px 0 0 0; }
+  th:last-child { border-radius: 0 8px 0 0; }
+
+  td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+
+  tr:nth-child(even) td { background: var(--light-gray); }
+  tr:last-child td { border-bottom: none; }
+
+  /* ─── GRILLE 2 COLONNES ───────────────────────────────────────── */
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin: 16px 0;
+  }
+
+  /* ─── CHECKLIST ───────────────────────────────────────────────── */
+  .checklist { list-style: none; margin: 12px 0; }
+  .checklist li {
+    padding: 6px 0 6px 28px;
+    position: relative;
+    font-size: 10.5pt;
+    border-bottom: 1px solid var(--border);
+  }
+  .checklist li:last-child { border-bottom: none; }
+  .checklist li::before {
+    content: '→';
+    position: absolute;
+    left: 0;
+    color: var(--primary);
+    font-weight: 700;
+  }
+
+  /* ─── PRICING CARDS ───────────────────────────────────────────── */
+  .pricing-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 16px;
+    margin: 20px 0;
+  }
+
+  .pricing-card {
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+  }
+
+  .pricing-card.featured {
+    border-color: var(--primary);
+    background: #eff6ff;
+  }
+
+  .pricing-plan {
+    font-size: 9pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--gray);
+    margin-bottom: 8px;
+  }
+
+  .pricing-price {
+    font-size: 18pt;
+    font-weight: 800;
+    color: var(--primary);
+    line-height: 1.1;
+  }
+
+  .pricing-usd {
+    font-size: 9pt;
+    color: var(--gray);
+    margin-bottom: 12px;
+  }
+
+  .pricing-users {
+    font-size: 9pt;
+    background: var(--primary);
+    color: white;
+    border-radius: 20px;
+    padding: 3px 12px;
+    display: inline-block;
+    margin-bottom: 12px;
+  }
+
+  .pricing-features {
+    font-size: 9pt;
+    color: var(--gray);
+    text-align: left;
+  }
+
+  .pricing-features li {
+    padding: 3px 0 3px 16px;
+    position: relative;
+  }
+
+  .pricing-features li::before {
+    content: '✓';
+    position: absolute;
+    left: 0;
+    color: var(--success);
+    font-weight: 700;
+  }
+
+  /* ─── OBJECTION CARDS ─────────────────────────────────────────── */
+  .objection {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    margin-bottom: 20px;
+    page-break-inside: avoid;
+  }
+
+  .objection-header {
+    background: #fef2f2;
+    border-bottom: 1px solid #fecaca;
+    padding: 14px 20px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .objection-icon {
+    width: 28px; height: 28px;
+    background: var(--danger);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12pt;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  .objection-text {
+    font-weight: 700;
+    color: var(--danger);
+    font-size: 10.5pt;
+  }
+
+  .objection-body { padding: 16px 20px; }
+
+  .objection-step {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  .step-label {
+    font-size: 8pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--primary);
+    min-width: 80px;
+    padding-top: 2px;
+  }
+
+  .step-content { font-size: 10pt; color: var(--dark); }
+
+  /* ─── TIPS BOX ─────────────────────────────────────────────────── */
+  .tip-box {
+    background: #fffbeb;
+    border: 2px solid var(--accent);
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin: 20px 0;
+  }
+
+  .tip-title {
+    font-size: 10pt;
+    font-weight: 800;
+    color: var(--warning);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 12px;
+  }
+
+  /* ─── PROFILS ─────────────────────────────────────────────────── */
+  .profile-card {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px;
+    background: white;
+  }
+
+  .profile-role {
+    font-size: 8pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--primary);
+    margin-bottom: 6px;
+  }
+
+  .profile-card h4 {
+    font-size: 10.5pt;
+    font-weight: 700;
+    margin-bottom: 8px;
+  }
+
+  .profile-card p {
+    font-size: 9.5pt;
+    color: var(--gray);
+    margin-bottom: 10px;
+  }
+
+  .profile-key {
+    background: var(--light-gray);
+    border-left: 3px solid var(--accent);
+    padding: 8px 12px;
+    font-size: 9.5pt;
+    font-style: italic;
+    border-radius: 0 6px 6px 0;
+  }
+
+  /* ─── DIVIDER ─────────────────────────────────────────────────── */
+  .divider {
+    height: 1px;
+    background: var(--border);
+    margin: 40px 0;
+  }
+
+  /* ─── PAGE BREAK ──────────────────────────────────────────────── */
+  .page-break { page-break-after: always; }
+
+  /* ─── FOOTER ──────────────────────────────────────────────────── */
+  .footer {
+    text-align: center;
+    padding: 32px;
+    color: var(--gray);
+    font-size: 9pt;
+    border-top: 1px solid var(--border);
+    margin-top: 48px;
+  }
+
+  .footer strong { color: var(--primary); }
+
+  /* ─── HIGHLIGHTS ──────────────────────────────────────────────── */
+  .highlight { color: var(--primary); font-weight: 700; }
+  .highlight-orange { color: var(--warning); font-weight: 700; }
+
+  p { margin-bottom: 10px; }
+
+  .demo-step {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 20px;
+    align-items: flex-start;
+    page-break-inside: avoid;
+  }
+
+  .demo-number {
+    width: 36px; height: 36px;
+    background: var(--primary);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 12pt;
+    flex-shrink: 0;
+  }
+
+  .demo-content { flex: 1; }
+  .demo-content strong { font-size: 10.5pt; color: var(--dark); }
+  .demo-content p { font-size: 9.5pt; color: var(--gray); margin-top: 4px; }
+
+  .principle-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-top: 16px;
+  }
+
+  .principle {
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+    background: white;
+  }
+
+  .principle-number {
+    font-size: 20pt;
+    font-weight: 800;
+    color: var(--primary);
+    opacity: 0.3;
+    line-height: 1;
+    margin-bottom: 6px;
+  }
+
+  .principle h4 { font-size: 10pt; font-weight: 700; margin-bottom: 6px; }
+  .principle p { font-size: 9.5pt; color: var(--gray); margin: 0; }
+
+  @media print {
+    body { font-size: 10pt; }
+    .cover { page-break-after: always; }
+    .section { page-break-inside: avoid; }
+    .objection { page-break-inside: avoid; }
+    .grid-2 { grid-template-columns: 1fr 1fr; }
+    .pricing-grid { grid-template-columns: 1fr 1fr 1fr; }
+    .principle-grid { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- COUVERTURE -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="cover">
+  <div class="cover-logo">Wadashaqayn</div>
+  <h1>Script de Présentation<br><span>Commerciale</span></h1>
+  <p class="cover-subtitle">Guide complet pour maximiser les conversions — de la première phrase jusqu'à la signature</p>
+  <div class="cover-stats">
+    <div class="stat">
+      <span class="stat-number">200+</span>
+      <span class="stat-label">Organisations clientes</span>
+    </div>
+    <div class="stat">
+      <span class="stat-number">30min</span>
+      <span class="stat-label">Durée de présentation</span>
+    </div>
+    <div class="stat">
+      <span class="stat-number">14j</span>
+      <span class="stat-label">Essai gratuit</span>
+    </div>
+  </div>
+  <div class="cover-badge">CONFIDENTIEL — USAGE INTERNE</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<!-- PAGE PRINCIPALE -->
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<div class="page">
+
+  <!-- INTRO -->
+  <div class="tip-box" style="margin-bottom:40px;">
+    <div class="tip-title">⚡ Posture fondamentale avant d'entrer dans la salle</div>
+    <p>Vous n'êtes <strong>pas là pour vendre un logiciel</strong>. Vous êtes là pour diagnostiquer un problème organisationnel et proposer la solution la plus adaptée au marché local. Entrez comme un <strong>consultant</strong>, pas comme un vendeur. Cette posture change tout.</p>
+    <p style="margin:0"><strong>Durée totale :</strong> 20–30 min de présentation + 10–15 min de questions &nbsp;|&nbsp; <strong>Objectif de sortie :</strong> un essai activé ou une date de signature fixée avant de partir</p>
+  </div>
+
+  <!-- ─── SECTION 1 : HOOK ──────────────────────────────────────── -->
+  <div class="section">
+    <span class="section-number">Partie 1</span>
+    <h2 class="section-title">Hook d'Ouverture</h2>
+    <div class="section-meta">30 secondes · Ne commencez JAMAIS par "je vais vous présenter notre solution"</div>
+
+    <div class="grid-2">
+      <div class="card card-accent">
+        <span class="card-tag">Pour un PDG / Directeur des opérations</span>
+        <div class="script">
+          "Permettez-moi de vous poser une question directe. Si je vous demande aujourd'hui <strong>combien de projets sont en retard</strong> dans votre organisation, et pourquoi — pouvez-vous me répondre en moins de 30 secondes ?"
+          <br><br>
+          <em>→ Laissez le silence. Attendez leur réponse.</em>
+          <br><br>
+          "La plupart des dirigeants me disent la même chose : ils savent que des choses se perdent, mais ne savent pas exactement où. C'est exactement le problème que Wadashaqayn résout."
+        </div>
+      </div>
+
+      <div class="card card-accent">
+        <span class="card-tag">Pour un Directeur RH</span>
+        <div class="script">
+          "Une seule question : <strong>combien de temps votre équipe a-t-elle passé ce mois-ci</strong> à traiter des demandes de congés, consolider des feuilles de temps, répondre à des emails 'où en est mon dossier' ?"
+          <br><br>
+          <em>→ Laissez répondre. Acquiescez.</em>
+          <br><br>
+          "Ce temps-là — on peut vous le rendre. Totalement. C'est pour ça que je suis là."
+        </div>
+      </div>
+    </div>
+
+    <div class="card card-warning">
+      <span class="card-tag">Pour une réunion de groupe</span>
+      <div class="script">
+        "Je vais commencer par quelque chose d'inhabituel. Je voudrais que chacun pense — silencieusement — à <strong>l'outil qui vous cause le plus de frustration</strong> dans votre travail quotidien."
+        <br><br>
+        <em>→ Pause de 5 secondes.</em>
+        <br><br>
+        "Gardez cet outil en tête. On va en parler dans deux minutes."
+      </div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- ─── SECTION 2 : PROBLÈME ──────────────────────────────────── -->
+  <div class="section">
+    <span class="section-number">Partie 2</span>
+    <h2 class="section-title">Problem Statement</h2>
+    <div class="section-meta">2 minutes · Objectif : les faire hocher la tête · Framework SPIN</div>
+
+    <div class="script">
+      "Laissez-moi vous décrire une journée que vous connaissez probablement très bien."
+      <br><br>
+      "Le matin, vous arrivez. Vous avez des messages WhatsApp de membres d'équipe qui demandent où en est tel projet. Vous ouvrez Excel — votre tableau de suivi — mais <strong>la dernière mise à jour date d'il y a quatre jours</strong>. Vous ne savez pas si le livrable de vendredi est en bonne voie."
+      <br><br>
+      "Votre responsable RH, de son côté, jongle entre <strong>trois fichiers Excel différents</strong> : un pour les congés, un pour les présences, un pour les notes de frais. Quand un employé appelle pour savoir combien de jours il lui reste, elle doit chercher, calculer manuellement, et rappeler."
+      <br><br>
+      "Et vous, en tant que dirigeant, vous n'avez <strong>aucun tableau de bord global</strong>. Pour connaître l'état de vos projets, vous envoyez des emails, attendez des réponses, consolidez des informations éparpillées dans cinq endroits différents."
+    </div>
+
+    <div class="card card-accent" style="margin-top:16px;">
+      <h3>🎯 Question pivot — Dites-la après la description</h3>
+      <div class="script" style="margin:0">"Est-ce que je suis loin de votre réalité ?"<br><em>→ Attendez la confirmation avant de continuer.</em></div>
+    </div>
+
+    <div class="card">
+      <h3>Le coût invisible du statu quo</h3>
+      <p>Concluez la section problème avec cette formulation :</p>
+      <div class="script" style="margin:8px 0 0 0">
+        "Le vrai coût de cette situation n'est pas visible sur une facture. Il est dans les <strong>heures perdues chaque semaine</strong>, dans les erreurs de coordination, dans les talents épuisés sur des tâches administratives, et dans les opportunités que vous ne saisissez pas parce que votre organisation manque de visibilité sur elle-même."
+      </div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- ─── SECTION 3 : SOLUTION ──────────────────────────────────── -->
+  <div class="section">
+    <span class="section-number">Partie 3</span>
+    <h2 class="section-title">Révélation de la Solution</h2>
+    <div class="section-meta">3 minutes · Approche Challenger Sale — reframez leur vision avant de montrer le produit</div>
+
+    <div class="script">
+      "Le problème n'est pas le manque d'effort. Votre équipe travaille dur. Le problème, c'est <strong>la fragmentation</strong>. Vous gérez votre organisation avec des outils qui ne se parlent pas entre eux."
+      <br><br>
+      "Wadashaqayn, c'est la première — et actuellement la seule — <strong>plateforme tout-en-un conçue pour les organisations africaines</strong>."
+    </div>
+
+    <p style="font-weight:700; margin:20px 0 12px 0">Comptez sur vos doigts en énonçant chaque point :</p>
+
+    <div class="card card-success">
+      <div style="display:flex; gap:16px; align-items:flex-start;">
+        <div style="font-size:20pt; font-weight:800; color:var(--success); min-width:32px">1</div>
+        <div>
+          <strong>Tous vos projets, visibles en un coup d'œil</strong>
+          <p style="margin:4px 0 0 0; font-size:9.5pt; color:var(--gray)">Gantt pour la planification, Kanban pour l'avancement quotidien, Tableau pour les analyses — le tout synchronisé en temps réel. N'importe qui dans l'équipe ouvre la plateforme : il voit exactement où on en est.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card card-success">
+      <div style="display:flex; gap:16px; align-items:flex-start;">
+        <div style="font-size:20pt; font-weight:800; color:var(--success); min-width:32px">2</div>
+        <div>
+          <strong>Tous vos processus RH, automatisés</strong>
+          <p style="margin:4px 0 0 0; font-size:9.5pt; color:var(--gray)">Un employé demande un congé — vous recevez une notification, vous approuvez en un clic, le solde se met à jour automatiquement. Les feuilles de temps sont soumises en ligne, les notes de frais également. Plus de papier, plus d'email, plus de perte d'information.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="card card-success">
+      <div style="display:flex; gap:16px; align-items:flex-start;">
+        <div style="font-size:20pt; font-weight:800; color:var(--success); min-width:32px">3</div>
+        <div>
+          <strong>Un tableau de bord de direction, en temps réel</strong>
+          <p style="margin:4px 0 0 0; font-size:9.5pt; color:var(--gray)">Vous arrivez le matin, vous ouvrez Wadashaqayn — en 30 secondes vous avez une vue complète : projets en cours, retards, absences du jour, budget consommé. Vous n'attendez plus que l'information vienne à vous.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="script">
+      "Et tout ça, dans <strong>un seul outil</strong>. En français. Avec un support local. À un prix que vous n'aurez pas à justifier à votre comité financier."
+    </div>
+  </div>
+
+  <div class="divider page-break"></div>
+
+  <!-- ─── SECTION 4 : DÉMO ──────────────────────────────────────── -->
+  <div class="section">
+    <span class="section-number">Partie 4</span>
+    <h2 class="section-title">Flow de Démonstration</h2>
+    <div class="section-meta">5 à 10 minutes · Règle d'or : montrez la VALEUR, pas les fonctionnalités</div>
+
+    <div class="tip-box">
+      <div class="tip-title">⚡ Règle de la démo</div>
+      <p style="margin:0">Pour chaque écran que vous montrez, <strong>liez ce que vous voyez à une douleur qu'ils ont confirmée</strong> dans la partie 2. Ne dites jamais "voici la fonctionnalité X". Dites toujours "voici comment on résout le problème que vous m'avez décrit".</p>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th style="width:22%">Écran</th>
+          <th style="width:28%">Ce que vous faites</th>
+          <th>Ce que vous dites</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>Dashboard principal</strong><br><span style="font-size:8pt;color:var(--gray)">60 secondes</span></td>
+          <td>Ouvrez le tableau de bord de direction</td>
+          <td><em>"Voilà la première chose que vous voyez chaque matin. Statut de tous vos projets actifs, tâches en retard, absences du jour. Ce que certains clients cherchaient <strong>2 heures chaque lundi</strong> pour préparer leur réunion — maintenant en 10 secondes."</em></td>
+        </tr>
+        <tr>
+          <td><strong>Vue Gantt</strong><br><span style="font-size:8pt;color:var(--gray)">90 secondes</span></td>
+          <td>Ouvrez un projet avec des tâches et dépendances</td>
+          <td><em>"Voyez ici en rouge les tâches en retard. Ce qui est puissant : vous voyez immédiatement l'impact sur la suite du projet. Plus besoin d'attendre le rapport hebdomadaire pour découvrir un problème."</em></td>
+        </tr>
+        <tr>
+          <td><strong>Vue Kanban</strong><br><span style="font-size:8pt;color:var(--gray)">45 secondes</span></td>
+          <td>Basculez sur la vue Kanban du même projet</td>
+          <td><em>"Le même projet, les mêmes données — juste une autre façon de les visualiser. <strong>Le manager voit le Gantt, l'équipe terrain utilise le Kanban</strong>. Chacun travaille avec la vue qui lui convient."</em></td>
+        </tr>
+        <tr>
+          <td><strong>Gestion des congés</strong><br><span style="font-size:8pt;color:var(--gray)">90 secondes</span></td>
+          <td>Module RH → Congés</td>
+          <td><em>"L'employé sélectionne ses dates, soumet. Le responsable reçoit une notification, approuve en un clic, l'employé est notifié, le solde se met à jour. Ici, le planning d'absences du mois entier — vous détectez immédiatement les conflits."</em></td>
+        </tr>
+        <tr>
+          <td><strong>Timesheets + Dépenses</strong><br><span style="font-size:8pt;color:var(--gray)">60 secondes</span></td>
+          <td>Section timesheets et notes de frais</td>
+          <td><em>"Combien de temps votre équipe passe sur chaque projet — une information que la plupart des organisations n'ont pas, et qui est pourtant cruciale pour facturer correctement et allouer les ressources."</em></td>
+        </tr>
+        <tr>
+          <td><strong>Dashboard analytique RH</strong><br><span style="font-size:8pt;color:var(--gray)">45 secondes</span></td>
+          <td>Tableau de bord analytique RH</td>
+          <td><em>"Taux d'absentéisme, dépenses par département, heures par projet, performance globale. Des données qui prenaient plusieurs jours de consolidation — disponibles en permanence, automatiquement."</em></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="card card-warning" style="margin-top:20px;">
+      <h3>🎯 Question finale de la démo — Obligatoire</h3>
+      <div class="script" style="margin:8px 0 0 0">
+        "Quelle est la partie que vous avez le plus envie <strong>de montrer à votre équipe</strong> ?"
+        <br><em>→ Cette question fait imaginer la possession, pas l'évaluation. Le cerveau commence déjà à s'approprier l'outil.</em>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- ─── SECTION 5 : PREUVE SOCIALE ───────────────────────────── -->
+  <div class="section">
+    <span class="section-number">Partie 5</span>
+    <h2 class="section-title">Preuve Sociale</h2>
+    <div class="section-meta">1 minute · Ne dites pas juste "200 organisations" — rendez le chiffre réel et local</div>
+
+    <div class="script">
+      "Je veux être transparent avec vous. Wadashaqayn n'est <strong>pas une startup qui cherche ses premiers clients</strong>. Aujourd'hui, plus de 200 organisations — ici à Djibouti et en Afrique — utilisent déjà la plateforme au quotidien."
+      <br><br>
+      "Ce que j'entends le plus souvent : <strong>'On aurait dû le faire avant'</strong> — parce que la transition est bien plus simple qu'imaginée. Et : <strong>'On ne voit pas comment on pourrait revenir en arrière'</strong> — parce qu'une fois que vous avez la visibilité, vous ne voulez plus travailler sans."
+      <br><br>
+      "Disponibilité de 99,9%. Et si vous avez un problème, vous ne parlez pas à un chatbot à l'autre bout du monde — <strong>vous avez un interlocuteur local, qui comprend votre contexte</strong>."
+    </div>
+
+    <div class="card card-accent" style="margin-top:16px;">
+      <h3>Option témoignage — Si disponible</h3>
+      <p style="font-size:10pt; font-style:italic; margin:0">"Si vous le souhaitez, je peux vous mettre en contact avec des organisations djiboutiennes du même secteur que le vôtre — pour qu'ils vous parlent de leur expérience directement."</p>
+    </div>
+  </div>
+
+  <div class="divider page-break"></div>
+
+  <!-- ─── SECTION 6 : PRIX ──────────────────────────────────────── -->
+  <div class="section">
+    <span class="section-number">Partie 6</span>
+    <h2 class="section-title">Présentation du Prix</h2>
+    <div class="section-meta">2 minutes · Construisez la valeur AVANT d'annoncer le prix</div>
+
+    <div class="card card-warning">
+      <h3>Commencez par ce calcul avec eux</h3>
+      <div class="script" style="margin:8px 0 0 0">
+        "Avant de vous parler de tarification, faisons un calcul simple. Si votre responsable RH passe 10 heures par semaine sur des tâches automatisables — <strong>quel est le coût mensuel de ces 10 heures ?</strong> Et si on ajoute les abonnements à plusieurs outils séparés — vous êtes souvent à 200, 300, parfois 400 dollars par mois, pour des outils qui ne se parlent pas."
+      </div>
+    </div>
+
+    <div class="pricing-grid" style="margin-top:20px;">
+      <div class="pricing-card">
+        <div class="pricing-plan">Petite Équipe</div>
+        <div class="pricing-price">25 000 DJF</div>
+        <div class="pricing-usd">≈ 140 USD / mois</div>
+        <div class="pricing-users">1 – 20 utilisateurs</div>
+        <ul class="pricing-features">
+          <li>Tous les modules inclus</li>
+          <li>10 Go de stockage</li>
+          <li>Support par email</li>
+          <li>Essai gratuit 14 jours</li>
+        </ul>
+      </div>
+      <div class="pricing-card featured">
+        <div class="pricing-plan" style="color:var(--primary)">Moyenne Équipe ⭐</div>
+        <div class="pricing-price">60 000 DJF</div>
+        <div class="pricing-usd">≈ 338 USD / mois</div>
+        <div class="pricing-users">21 – 50 utilisateurs</div>
+        <ul class="pricing-features">
+          <li>Accès API complet</li>
+          <li>50 Go de stockage</li>
+          <li>Support prioritaire 24/7</li>
+          <li>Essai gratuit 14 jours</li>
+        </ul>
+      </div>
+      <div class="pricing-card">
+        <div class="pricing-plan">Grande Équipe</div>
+        <div class="pricing-price" style="font-size:14pt; padding-top:8px">Sur mesure</div>
+        <div class="pricing-usd">Contactez-nous</div>
+        <div class="pricing-users">50+ utilisateurs</div>
+        <ul class="pricing-features">
+          <li>SSO entreprise</li>
+          <li>Logs d'audit complets</li>
+          <li>Stockage illimité</li>
+          <li>Manager dédié</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="card card-success" style="margin-top:12px; text-align:center;">
+      <strong>20% de réduction</strong> sur l'abonnement annuel · Petite Équipe à <strong>20 000 DJF/mois</strong> effectif
+    </div>
+
+    <div class="script" style="margin-top:20px;">
+      "Ce n'est pas le prix d'un logiciel. C'est <strong>le prix de la visibilité sur votre organisation</strong>. C'est le prix du temps retrouvé. C'est le prix de ne plus gérer votre entreprise à l'aveugle."
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- ─── SECTION 7 : OBJECTIONS ────────────────────────────────── -->
+  <div class="section">
+    <span class="section-number">Partie 7</span>
+    <h2 class="section-title">Gestion des Objections</h2>
+    <div class="section-meta">Structure : Valider → Recadrer → Preuve → Avancer</div>
+
+    <!-- Objection 1 -->
+    <div class="objection">
+      <div class="objection-header">
+        <div class="objection-icon">!</div>
+        <div class="objection-text">"C'est trop cher pour nous."</div>
+      </div>
+      <div class="objection-body">
+        <div class="objection-step">
+          <span class="step-label">Valider</span>
+          <div class="step-content">"Je comprends. Le budget est une contrainte réelle et je respecte que vous gériez vos finances avec rigueur."</div>
+        </div>
+        <div class="objection-step">
+          <span class="step-label">Recadrer</span>
+          <div class="step-content">"Trop cher par rapport à quoi ? Le coût du statu quo — en temps humain perdu, erreurs, manque de visibilité — est souvent bien supérieur à 25 000 francs par mois. Vous le payez déjà, juste en temps humain au lieu d'en argent."</div>
+        </div>
+        <div class="objection-step">
+          <span class="step-label">Preuve</span>
+          <div class="step-content">"14 jours d'essai gratuit, sans carte bancaire. Vous utilisez, vous mesurez le gain, vous décidez en connaissance de cause."</div>
+        </div>
+        <div class="objection-step" style="margin-bottom:0">
+          <span class="step-label">Avancer</span>
+          <div class="step-content"><em>"Est-ce la question du budget mensuel qui freine, ou c'est plus un ROI à démontrer en interne ?"</em></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Objection 2 -->
+    <div class="objection">
+      <div class="objection-header">
+        <div class="objection-icon">!</div>
+        <div class="objection-text">"Nos employés ne sont pas à l'aise avec la technologie."</div>
+      </div>
+      <div class="objection-body">
+        <div class="objection-step">
+          <span class="step-label">Valider</span>
+          <div class="step-content">"C'est une préoccupation légitime — et honnêtement, c'est quelque chose qu'on entend souvent au début."</div>
+        </div>
+        <div class="objection-step">
+          <span class="step-label">Recadrer</span>
+          <div class="step-content">"La résistance vient rarement de l'incapacité — elle vient de l'inconfort avec le changement. Vos employés utilisent déjà WhatsApp et des apps mobiles. La vraie question : est-ce que l'outil est assez simple pour que l'adoption soit rapide ?"</div>
+        </div>
+        <div class="objection-step">
+          <span class="step-label">Preuve</span>
+          <div class="step-content">"Prise en main en moins d'une heure. Interface en français. Nos clients ont des équipes terrain très variées qui utilisent l'outil sans formation complexe."</div>
+        </div>
+        <div class="objection-step" style="margin-bottom:0">
+          <span class="step-label">Avancer</span>
+          <div class="step-content"><em>"Sur les 14 jours d'essai, je fais une session de prise en main de 30 minutes avec votre équipe. On fixe ça pour quand ?"</em></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Objection 3 -->
+    <div class="objection">
+      <div class="objection-header">
+        <div class="objection-icon">!</div>
+        <div class="objection-text">"On s'en sort bien avec Excel."</div>
+      </div>
+      <div class="objection-body">
+        <div class="objection-step">
+          <span class="step-label">Valider</span>
+          <div class="step-content">"Excel est un outil puissant. Ce n'est pas un mauvais outil — c'est un outil qui n'a pas été conçu pour gérer une organisation en temps réel."</div>
+        </div>
+        <div class="objection-step">
+          <span class="step-label">Recadrer</span>
+          <div class="step-content">"Avec Excel, si un membre modifie une donnée — combien de temps avant que vous le sachiez ? Combien de fois avez-vous eu des versions différentes du même fichier qui circulaient par email ? Excel est excellent pour analyser des données historiques, pas pour la collaboration en temps réel et les workflows d'approbation."</div>
+        </div>
+        <div class="objection-step">
+          <span class="step-label">Preuve</span>
+          <div class="step-content">"Tous nos clients actuels utilisaient Excel avant de venir chez nous. Aucun n'est revenu en arrière."</div>
+        </div>
+        <div class="objection-step" style="margin-bottom:0">
+          <span class="step-label">Avancer</span>
+          <div class="step-content"><em>"Quelle est la tâche que vous faites actuellement dans Excel qui vous prend le plus de temps ? Laissez-moi vous montrer comment Wadashaqayn la gère."</em></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Objection 4 -->
+    <div class="objection">
+      <div class="objection-header">
+        <div class="objection-icon">!</div>
+        <div class="objection-text">"On a peur de mettre nos données dans le cloud."</div>
+      </div>
+      <div class="objection-body">
+        <div class="objection-step">
+          <span class="step-label">Valider</span>
+          <div class="step-content">"C'est une question de gouvernance des données très sérieuse, et vous avez raison de la soulever. Un dirigeant qui ne pose pas cette question ne gère pas bien son organisation."</div>
+        </div>
+        <div class="objection-step">
+          <span class="step-label">Recadrer</span>
+          <div class="step-content">"Vos données actuelles — sur des Excel partagés par email, des clés USB — sont-elles plus sécurisées ? Si un ordinateur tombe en panne, si une clé USB est perdue — que se passe-t-il ?"</div>
+        </div>
+        <div class="objection-step">
+          <span class="step-label">Preuve</span>
+          <div class="step-content">"Wadashaqayn utilise un chiffrement des données, des sauvegardes automatiques, et un contrôle d'accès par rôles strict. Chaque utilisateur ne voit que ce qu'il est autorisé à voir. Sécurité bien supérieure à un dossier Excel partagé."</div>
+        </div>
+        <div class="objection-step" style="margin-bottom:0">
+          <span class="step-label">Avancer</span>
+          <div class="step-content"><em>"Je peux vous envoyer notre documentation technique sur la sécurité. Qu'est-ce qui vous préoccupe le plus — la confidentialité, la localisation des données, ou les droits d'accès ?"</em></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Objection 5 -->
+    <div class="objection">
+      <div class="objection-header">
+        <div class="objection-icon">!</div>
+        <div class="objection-text">"On va y réfléchir / On n'est pas pressé."</div>
+      </div>
+      <div class="objection-body">
+        <div class="objection-step">
+          <span class="step-label">Valider</span>
+          <div class="step-content">"Bien sûr — c'est une décision qui mérite réflexion et je ne vous demande pas de vous engager aujourd'hui sans être convaincus."</div>
+        </div>
+        <div class="objection-step">
+          <span class="step-label">Diagnostiquer</span>
+          <div class="step-content">"Ce que je voudrais juste comprendre : qu'est-ce qui, concrètement, nécessite du temps ? Est-ce un budget à valider en interne ? Un autre outil évalué en parallèle ? Un doute sur une fonctionnalité ?"</div>
+        </div>
+        <div class="objection-step" style="margin-bottom:0">
+          <span class="step-label">Avancer</span>
+          <div class="step-content"><em>"Ce que je suggère : lancez l'essai gratuit aujourd'hui. Pas d'engagement, pas de carte. Dans 14 jours, vous avez une opinion basée sur l'expérience réelle. Le seul coût : deux minutes pour créer votre compte."</em></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider page-break"></div>
+
+  <!-- ─── SECTION 8 : CLOSE ─────────────────────────────────────── -->
+  <div class="section">
+    <span class="section-number">Partie 8</span>
+    <h2 class="section-title">Le Close — Conclure la vente</h2>
+    <div class="section-meta">Le closing est la conclusion naturelle d'une conversation — pas une surprise</div>
+
+    <div class="grid-2">
+      <div class="card card-accent">
+        <span class="card-tag">Close doux — Pour l'essai gratuit</span>
+        <p style="font-size:9.5pt; color:var(--gray); margin-bottom:10px">Utilisez quand le prospect est intéressé mais pas encore prêt à acheter.</p>
+        <div class="script" style="margin:0">
+          "Basé sur ce qu'on vient de voir, et en particulier [<strong>nommez la fonctionnalité qui les a le plus intéressés</strong>], est-ce que vous voyez comment Wadashaqayn peut simplifier votre quotidien ?"
+          <br><br>
+          <em>→ Attendez le "oui".</em>
+          <br><br>
+          "Bien. On ouvre votre compte d'essai <strong>maintenant, pendant qu'on est ensemble</strong>. Deux minutes. 14 jours pour explorer — sans engagement, sans carte. Est-ce que ça vous convient ?"
+        </div>
+      </div>
+
+      <div class="card card-success">
+        <span class="card-tag">Close direct — Pour la signature</span>
+        <p style="font-size:9.5pt; color:var(--gray); margin-bottom:10px">Quand le prospect a exprimé un intérêt clair ou après l'essai.</p>
+        <div class="script" style="margin:0">
+          "Quelle formule correspond le mieux à votre équipe — <strong>la Petite Équipe pour commencer</strong>, ou la Moyenne Équipe qui vous donne plus de marge pour grandir ?"
+          <br><br>
+          <em>→ Closing par choix alternatif. Vous ne demandez pas "voulez-vous vous abonner ?" — vous demandez "quelle formule". Cette question présuppose l'achat.</em>
+        </div>
+      </div>
+    </div>
+
+    <div class="card card-warning" style="margin-top:16px;">
+      <h3>⚠️ Déclencheurs d'urgence — À utiliser uniquement si vrais</h3>
+      <ul class="checklist">
+        <li>"Les organisations qui s'inscrivent maintenant bénéficient des conditions de lancement à vie."</li>
+        <li>"On accueille un nombre limité de nouveaux clients ce trimestre pour garantir la qualité de l'onboarding."</li>
+      </ul>
+      <p style="font-size:9pt; color:var(--danger); margin:10px 0 0 0; font-weight:600">N'inventez jamais une fausse urgence. Djibouti est un marché petit et très connecté — une réputation se construit vite et dure longtemps.</p>
+    </div>
+
+    <div class="card card-accent" style="margin-top:16px;">
+      <h3>🎯 La phrase avant de partir — Toujours</h3>
+      <div class="script" style="margin:8px 0 0 0">
+        "Quelle est la prochaine étape concrète que vous voulez qu'on fasse ensemble ?"
+        <br><em>→ Transfère l'initiative à eux. Révèle leur niveau d'engagement réel.</em>
+      </div>
+    </div>
+
+    <div class="tip-box" style="margin-top:20px;">
+      <div class="tip-title">🚨 Règle absolue — Ouvrez le compte PENDANT la réunion</div>
+      <p style="margin:0">Ne repartez jamais sans avoir soit créé le compte d'essai ensemble, soit fixé une date et heure précises pour la prochaine étape. <strong>"Je vous envoie le lien" = 80% de taux d'abandon.</strong></p>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- ─── SECTION 9 : SUIVI ─────────────────────────────────────── -->
+  <div class="section">
+    <span class="section-number">Partie 9</span>
+    <h2 class="section-title">Message de Suivi</h2>
+    <div class="section-meta">À envoyer dans les 18 heures — jamais plus de 24h après la réunion</div>
+
+    <div class="card" style="background:#f8fafc; border:1px solid var(--border);">
+      <div style="background:var(--primary); color:white; margin:-24px -24px 16px -24px; padding:12px 24px; border-radius:10px 10px 0 0; font-size:9.5pt;">
+        <strong>Objet :</strong> Suite à notre échange — Wadashaqayn pour [Nom de l'organisation]
+      </div>
+      <p>Bonjour [Prénom],</p>
+      <p>Merci pour le temps que vous m'avez accordé aujourd'hui. J'ai apprécié notre échange, et en particulier votre remarque sur <em>[insérez un point spécifique qu'ils ont mentionné — montrez que vous écoutiez]</em>.</p>
+      <p>Pour faire suite à notre conversation, voici les trois points essentiels à retenir pour <em>[Nom de l'organisation]</em> :</p>
+      <ol style="margin:12px 0 12px 20px; font-size:10.5pt;">
+        <li style="margin-bottom:8px"><em>[Bénéfice le plus pertinent pour eux, lié à une douleur qu'ils ont exprimée]</em></li>
+        <li style="margin-bottom:8px"><em>[Deuxième point de valeur]</em></li>
+        <li>Essai gratuit de 14 jours — sans carte bancaire — pour que votre équipe se forge une opinion basée sur l'expérience réelle.</li>
+      </ol>
+      <div style="background:var(--primary); color:white; border-radius:8px; padding:12px 20px; margin:16px 0; text-align:center;">
+        <strong>Activer votre essai gratuit →</strong> [Lien d'inscription] · Moins de 2 minutes
+      </div>
+      <p>Je reste disponible pour répondre à toute question, ou pour faire la configuration ensemble si vous préférez — proposez-moi un créneau de 30 minutes.</p>
+      <p style="margin:0">À très bientôt,<br><br><strong>Awaleh</strong><br>Fondateur, Wadashaqayn<br>[Numéro · WhatsApp · LinkedIn]</p>
+    </div>
+
+    <div class="card card-accent" style="margin-top:16px;">
+      <span class="card-tag">Version courte — WhatsApp</span>
+      <div class="script" style="margin:8px 0 0 0">
+        "Bonjour [Prénom], merci pour notre échange de ce matin. Voilà le lien pour votre essai gratuit : [lien]. 14 jours, pas de carte, 2 minutes. Dites-moi si vous avez des questions. Bonne fin de journée."
+      </div>
+    </div>
+  </div>
+
+  <div class="divider page-break"></div>
+
+  <!-- ─── SECTION : ADAPTATIONS PAR PROFIL ─────────────────────── -->
+  <div class="section">
+    <span class="section-number">Annexe A</span>
+    <h2 class="section-title">Adaptations par Profil</h2>
+    <div class="section-meta">Personnalisez votre angle selon l'interlocuteur</div>
+
+    <div class="grid-2">
+      <div class="profile-card">
+        <div class="profile-role">PDG / Président</div>
+        <h4>Visibilité & Contrôle</h4>
+        <p>Insistez sur : vue globale en temps réel, prise de décision data-driven, image de modernité vis-à-vis des partenaires.</p>
+        <div class="profile-key">"Vous gérez votre organisation avec les mêmes informations que vos concurrents. Wadashaqayn vous donne une longueur d'avance."</div>
+      </div>
+
+      <div class="profile-card">
+        <div class="profile-role">Directeur RH</div>
+        <h4>Temps & Conformité</h4>
+        <p>Insistez sur : temps récupéré sur l'administratif, réduction des erreurs, satisfaction des employés, conformité des processus.</p>
+        <div class="profile-key">"Votre valeur ajoutée n'est pas dans le traitement des emails de congé — elle est dans la stratégie RH et la rétention des talents."</div>
+      </div>
+
+      <div class="profile-card">
+        <div class="profile-role">Directeur des Opérations</div>
+        <h4>Coordination & Fluidité</h4>
+        <p>Insistez sur : coordination inter-équipes, suivi en temps réel, élimination des points de friction opérationnels.</p>
+        <div class="profile-key">"Chaque heure passée à coordonner des outils qui ne se parlent pas est une heure de moins sur vos projets."</div>
+      </div>
+
+      <div class="profile-card">
+        <div class="profile-role">ONG / Institution / Bailleur</div>
+        <h4>Traçabilité & Reporting</h4>
+        <p>Insistez sur : traçabilité des dépenses par projet, reporting automatique pour les bailleurs, gouvernance et audit trail.</p>
+        <div class="profile-key">"Vos bailleurs demandent des rapports rigoureux. Avec Wadashaqayn, ces rapports se génèrent depuis les données réelles — pas des fichiers consolidés manuellement."</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- ─── SECTION : 5 PRINCIPES ─────────────────────────────────── -->
+  <div class="section">
+    <span class="section-number">Annexe B</span>
+    <h2 class="section-title">Les 5 Principes qui Font la Différence</h2>
+    <div class="section-meta">Maîtrisez ces principes — ils distinguent un bon pitch d'une vraie conversion</div>
+
+    <div class="principle-grid">
+      <div class="principle">
+        <div class="principle-number">01</div>
+        <h4>Silence Actif</h4>
+        <p>Posez une question, puis taisez-vous complètement. Le premier qui parle après une question importante se met en position de faiblesse. Laissez le silence travailler.</p>
+      </div>
+
+      <div class="principle">
+        <div class="principle-number">02</div>
+        <h4>Nommez Leur Douleur Exacte</h4>
+        <p>"Vous perdez du temps" est faible. "Votre DRH passe 3 heures le lundi à consolider les absences de la semaine précédente" est puissant. Plus vous êtes précis, plus ils croient que vous avez la solution.</p>
+      </div>
+
+      <div class="principle">
+        <div class="principle-number">03</div>
+        <h4>Faites-les Parler de l'Avenir</h4>
+        <p>"Imaginez qu'en ouvrant votre ordinateur lundi matin, vous voyez instantanément l'état de tout." Le cerveau ne fait pas la différence entre imaginer et expérimenter — vous créez l'envie de possession.</p>
+      </div>
+
+      <div class="principle">
+        <div class="principle-number">04</div>
+        <h4>Ouvrez le Compte Ensemble</h4>
+        <p>Ne repartez jamais sans avoir soit créé le compte d'essai avec eux, soit fixé une date et heure précises pour la suite. "Je vous envoie le lien" = 80% d'abandon.</p>
+      </div>
+
+      <div class="principle">
+        <div class="principle-number">05</div>
+        <h4>Le Marché Local est Votre Arme</h4>
+        <p>Aucun concurrent international ne peut vous battre ici. Vous connaissez les structures djiboutiennes, le contexte culturel. "Je suis à Djibouti, avec vous — pas dans un fuseau horaire à 10h de distance."</p>
+      </div>
+
+      <div class="principle" style="border-color:var(--accent); background:#fffbeb;">
+        <div class="principle-number" style="color:var(--warning)">⚡</div>
+        <h4>Le Script est un Guide, Pas un Texte</h4>
+        <p>Maîtrisez les structures, internalisez les arguments, adaptez-les naturellement. La meilleure présentation ressemble à une vraie conversation — pas à un pitch lu sur un écran.</p>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- FOOTER -->
+<div class="footer">
+  <strong>Wadashaqayn</strong> · La plateforme tout-en-un pour les organisations africaines<br>
+  Script de présentation commerciale — Confidentiel, usage interne<br>
+  <span style="color:var(--border)">———</span><br>
+  Essai gratuit 14 jours · Pas de carte bancaire · Configuration en 2 minutes
+</div>
+
+</body>
+</html>

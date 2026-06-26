@@ -1,0 +1,1 @@
+- [Wadashaqayn Design System](project_design_system.md) — Tailwind v4 + shadcn/ui token conventions, priority colors, animation, dark mode rules

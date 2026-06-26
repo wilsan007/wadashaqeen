@@ -21,6 +21,7 @@ import { Plus, Save, X, BookTemplate, Sparkles } from '@/lib/icons';
 import { useTaskTemplates } from '@/hooks/useTaskTemplates';
 import { TemplateManagementDialog } from '@/components/tasks/TemplateManagementDialog';
 import { Separator } from '@/components/ui/separator';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface TaskCreationDialogProps {
   open: boolean;
@@ -41,6 +42,7 @@ export const TaskCreationDialog: React.FC<TaskCreationDialogProps> = ({
   onOpenChange,
   onCreateTask,
 }) => {
+  const { t } = useTranslation();
   const [title, setTitle] = useState('');
   const [assignee, setAssignee] = useState('Ahmed Waleh');
   const [department, setDepartment] = useState('Développement');
@@ -243,10 +245,10 @@ export const TaskCreationDialog: React.FC<TaskCreationDialogProps> = ({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="low">🟢 Faible</SelectItem>
-                  <SelectItem value="medium">🟡 Moyenne</SelectItem>
-                  <SelectItem value="high">🟠 Élevée</SelectItem>
-                  <SelectItem value="urgent">🔴 Urgente</SelectItem>
+                  <SelectItem value="low">🟢 {t('tasks.priority.low')}</SelectItem>
+                  <SelectItem value="medium">🟡 {t('tasks.priority.medium')}</SelectItem>
+                  <SelectItem value="high">🟠 {t('tasks.priority.high')}</SelectItem>
+                  <SelectItem value="urgent">🔴 {t('tasks.priority.urgent')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -261,10 +263,10 @@ export const TaskCreationDialog: React.FC<TaskCreationDialogProps> = ({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="todo">📝 À faire</SelectItem>
-                  <SelectItem value="doing">⚡ En cours</SelectItem>
-                  <SelectItem value="blocked">🚫 Bloqué</SelectItem>
-                  <SelectItem value="done">✅ Terminé</SelectItem>
+                  <SelectItem value="todo">📝 {t('tasks.status.todo')}</SelectItem>
+                  <SelectItem value="doing">⚡ {t('tasks.status.in_progress')}</SelectItem>
+                  <SelectItem value="blocked">🚫 {t('tasks.status.blocked')}</SelectItem>
+                  <SelectItem value="done">✅ {t('tasks.status.done')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>

@@ -164,8 +164,7 @@ export function useStrictAuth() {
   const signOut = useCallback(async () => {
     setState(prev => ({ ...prev, loading: true }));
 
-    // 🚨 CRITIQUE: Utiliser le nettoyage sécurisé complet
-    await secureLogout();
+    await invalidateSession();
 
     setState({
       user: null,

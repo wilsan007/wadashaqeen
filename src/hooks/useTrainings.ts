@@ -3,9 +3,10 @@
  * Pattern: Cornerstone, LinkedIn Learning, BambooHR
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useUserFilterContext } from '@/hooks/useUserAuth';
+import { useAuth } from '@/contexts/AuthContext';
 import { applyRoleFilters } from '@/lib/roleBasedFiltering';
 import { useToast } from '@/hooks/use-toast';
 
@@ -61,66 +62,37 @@ export interface TrainingFilters {
 }
 
 export function useTrainings() {
-  const { userContext, profile, loading: authLoading } = useUserFilterContext();
+  const { userContext, profile, loading: authLoading } = useAuth();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
-  const [trainings, setTrainings] = useState<Training[]>([]);
-  const [myEnrollments, setMyEnrollments] = useState<TrainingEnrollment[]>([]);
-  const [pendingApprovals, setPendingApprovals] = useState<TrainingEnrollment[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const { data: trainings = [], isLoading: trainingsLoading, error: trainingsError } = useQuery<Training[]>({
+    queryKey: ['trainings', userContext?.userId, userContext?.role, userContext?.tenantId],
+    queryFn: async () => {
+      if (!userContext) return [];
 
-  // Fetch catalogue formations avec filtres
-  const fetchTrainings = useCallback(
-    async (filters?: TrainingFilters) => {
-      if (!userContext) return;
+      let query = supabase.from('trainings').select('*').eq('is_active', true).order('title');
+      query = applyRoleFilters(query, userContext, 'trainings');
 
-      try {
-        let query = supabase.from('trainings').select('*').eq('is_active', true).order('title');
-
-        query = applyRoleFilters(query, userContext, 'trainings');
-
-        // Appliquer filtres
-        if (filters?.category) {
-          query = query.eq('category', filters.category);
-        }
-        if (filters?.type) {
-          query = query.eq('type', filters.type);
-        }
-        if (filters?.level) {
-          query = query.eq('level', filters.level);
-        }
-        if (filters?.is_mandatory !== undefined) {
-          query = query.eq('is_mandatory', filters.is_mandatory);
-        }
-        if (filters?.search) {
-          query = query.or(`title.ilike.%${filters.search}%,description.ilike.%${filters.search}%`);
-        }
-
-        const { data, error: fetchError } = await query;
-
-        if (fetchError) throw fetchError;
-        setTrainings(data || []);
-      } catch (err: any) {
-        console.error('Erreur chargement formations:', err);
-        setError(err.message);
-      }
+      const { data, error: fetchError } = await query;
+      if (fetchError) throw fetchError;
+      return data || [];
     },
-    [userContext]
-  );
+    enabled: !authLoading && !!userContext,
+  });
 
-  // Fetch mes inscriptions
-  const fetchMyEnrollments = useCallback(async () => {
-    if (!profile) return;
+  const { data: myEnrollments = [], isLoading: enrollmentsLoading, error: enrollmentsError } = useQuery<TrainingEnrollment[]>({
+    queryKey: ['trainings', 'my-enrollments', profile?.userId],
+    queryFn: async () => {
+      if (!profile) return [];
 
-    try {
       const { data: employee } = await supabase
         .from('employees')
         .select('id')
         .eq('user_id', profile.userId)
         .single();
 
-      if (!employee) return;
+      if (!employee) return [];
 
       const { data, error: fetchError } = await supabase
         .from('training_enrollments')
@@ -134,23 +106,21 @@ export function useTrainings() {
         .order('created_at', { ascending: false });
 
       if (fetchError) throw fetchError;
-      setMyEnrollments(data || []);
-    } catch (err: any) {
-      console.error('Erreur chargement inscriptions:', err);
-      setError(err.message);
-    }
-  }, [profile]);
+      return data || [];
+    },
+    enabled: !authLoading && !!profile,
+  });
 
-  // Fetch demandes en attente (manager)
-  const fetchPendingApprovals = useCallback(async () => {
-    if (
-      !userContext ||
-      !['project_manager', 'team_lead', 'hr_manager', 'tenant_admin'].includes(userContext.role)
-    ) {
-      return;
-    }
+  const { data: pendingApprovals = [], isLoading: approvalsLoading, error: approvalsError } = useQuery<TrainingEnrollment[]>({
+    queryKey: ['trainings', 'pending-approvals', userContext?.userId, userContext?.role],
+    queryFn: async () => {
+      if (
+        !userContext ||
+        !['project_manager', 'team_lead', 'hr_manager', 'tenant_admin'].includes(userContext.role)
+      ) {
+        return [];
+      }
 
-    try {
       let query = supabase
         .from('training_enrollments')
         .select(
@@ -166,220 +136,301 @@ export function useTrainings() {
       query = applyRoleFilters(query, userContext, 'training_enrollments');
 
       const { data, error: fetchError } = await query;
-
       if (fetchError) throw fetchError;
-      setPendingApprovals(data || []);
-    } catch (err: any) {
-      console.error('Erreur chargement approbations:', err);
-      setError(err.message);
-    }
-  }, [userContext]);
+      return data || [];
+    },
+    enabled: !authLoading && !!userContext,
+  });
+
+  const loading = trainingsLoading || enrollmentsLoading || approvalsLoading;
+  const error = trainingsError
+    ? (trainingsError as Error).message
+    : enrollmentsError
+    ? (enrollmentsError as Error).message
+    : approvalsError
+    ? (approvalsError as Error).message
+    : null;
+
+  // Fetch catalogue formations avec filtres
+  const fetchTrainings = useCallback(
+    async (filters?: TrainingFilters) => {
+      if (!userContext) return;
+
+      try {
+        let query = supabase.from('trainings').select('*').eq('is_active', true).order('title');
+        query = applyRoleFilters(query, userContext, 'trainings');
+
+        if (filters?.category) query = query.eq('category', filters.category);
+        if (filters?.type) query = query.eq('type', filters.type);
+        if (filters?.level) query = query.eq('level', filters.level);
+        if (filters?.is_mandatory !== undefined) query = query.eq('is_mandatory', filters.is_mandatory);
+        if (filters?.search) {
+          query = query.or(`title.ilike.%${filters.search}%,description.ilike.%${filters.search}%`);
+        }
+
+        await query;
+        // Invalidate to trigger re-fetch with new data
+        queryClient.invalidateQueries({ queryKey: ['trainings', userContext?.userId] });
+      } catch (err: any) {
+        console.error('Erreur chargement formations:', err);
+      }
+    },
+    [userContext, queryClient]
+  );
+
+  const fetchMyEnrollments = useCallback(async () => {
+    queryClient.invalidateQueries({ queryKey: ['trainings', 'my-enrollments'] });
+  }, [queryClient]);
+
+  const fetchPendingApprovals = useCallback(async () => {
+    queryClient.invalidateQueries({ queryKey: ['trainings', 'pending-approvals'] });
+  }, [queryClient]);
+
+  const enrollInTrainingMutation = useMutation({
+    mutationFn: async ({
+      trainingId,
+      sessionId,
+    }: {
+      trainingId: string;
+      sessionId?: string;
+    }) => {
+      if (!profile) throw new Error('Profil non disponible');
+
+      const { data: employee } = await supabase
+        .from('employees')
+        .select('id')
+        .eq('user_id', profile.userId)
+        .single();
+
+      if (!employee) throw new Error('Employé non trouvé');
+
+      // Vérifier si formation externe coûteuse (nécessite approbation)
+      const { data: training } = await supabase
+        .from('trainings')
+        .select('cost, type, is_mandatory')
+        .eq('id', trainingId)
+        .single();
+
+      const requiresApproval = training && training.type === 'external' && training.cost > 100;
+      const status = requiresApproval ? 'pending' : 'approved';
+
+      const { error: insertError } = await supabase.from('training_enrollments').insert({
+        training_id: trainingId,
+        session_id: sessionId || null,
+        employee_id: employee.id,
+        status,
+        tenant_id: profile.tenantId,
+      });
+
+      if (insertError) throw insertError;
+      return { requiresApproval };
+    },
+    onSuccess: ({ requiresApproval }) => {
+      toast({
+        title: requiresApproval ? 'Demande envoyée' : 'Inscription confirmée',
+        description: requiresApproval
+          ? 'Votre manager recevra une notification pour approuver cette formation'
+          : 'Vous êtes inscrit à cette formation',
+      });
+      queryClient.invalidateQueries({ queryKey: ['trainings', 'my-enrollments'] });
+    },
+    onError: (err: any) => {
+      toast({
+        title: 'Erreur',
+        description: err.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const approveEnrollmentMutation = useMutation({
+    mutationFn: async ({ enrollmentId, approverId }: { enrollmentId: string; approverId: string }) => {
+      const { error: updateError } = await supabase
+        .from('training_enrollments')
+        .update({
+          status: 'approved',
+          approved_by: approverId,
+          approved_at: new Date().toISOString(),
+        })
+        .eq('id', enrollmentId);
+      if (updateError) throw updateError;
+    },
+    onSuccess: () => {
+      toast({
+        title: 'Formation approuvée',
+        description: "L'employé a été notifié de l'approbation",
+      });
+      queryClient.invalidateQueries({ queryKey: ['trainings', 'pending-approvals'] });
+    },
+    onError: (err: any) => {
+      toast({
+        title: 'Erreur',
+        description: err.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const rejectEnrollmentMutation = useMutation({
+    mutationFn: async ({ enrollmentId, reason }: { enrollmentId: string; reason: string }) => {
+      const { error: updateError } = await supabase
+        .from('training_enrollments')
+        .update({
+          status: 'rejected',
+          rejection_reason: reason,
+        })
+        .eq('id', enrollmentId);
+      if (updateError) throw updateError;
+    },
+    onSuccess: () => {
+      toast({
+        title: 'Formation rejetée',
+        description: "L'employé a été notifié avec la raison du refus",
+      });
+      queryClient.invalidateQueries({ queryKey: ['trainings', 'pending-approvals'] });
+    },
+    onError: (err: any) => {
+      toast({
+        title: 'Erreur',
+        description: err.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const markCompletedMutation = useMutation({
+    mutationFn: async ({ enrollmentId, quizScore }: { enrollmentId: string; quizScore?: number }) => {
+      const { error: updateError } = await supabase
+        .from('training_enrollments')
+        .update({
+          status: 'completed',
+          completion_date: new Date().toISOString(),
+          quiz_score: quizScore || null,
+        })
+        .eq('id', enrollmentId);
+      if (updateError) throw updateError;
+    },
+    onSuccess: () => {
+      toast({
+        title: 'Formation terminée',
+        description: 'Félicitations ! Vous pouvez maintenant télécharger votre certificat',
+      });
+      queryClient.invalidateQueries({ queryKey: ['trainings', 'my-enrollments'] });
+    },
+    onError: (err: any) => {
+      toast({
+        title: 'Erreur',
+        description: err.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const rateTrainingMutation = useMutation({
+    mutationFn: async ({
+      enrollmentId,
+      rating,
+      feedback,
+    }: {
+      enrollmentId: string;
+      rating: number;
+      feedback?: string;
+    }) => {
+      const { error: updateError } = await supabase
+        .from('training_enrollments')
+        .update({
+          rating,
+          feedback: feedback || null,
+        })
+        .eq('id', enrollmentId);
+      if (updateError) throw updateError;
+    },
+    onSuccess: () => {
+      toast({
+        title: 'Merci pour votre évaluation',
+        description: 'Votre feedback nous aide à améliorer nos formations',
+      });
+      queryClient.invalidateQueries({ queryKey: ['trainings', 'my-enrollments'] });
+    },
+    onError: (err: any) => {
+      toast({
+        title: 'Erreur',
+        description: err.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const cancelEnrollmentMutation = useMutation({
+    mutationFn: async (enrollmentId: string) => {
+      const { error: updateError } = await supabase
+        .from('training_enrollments')
+        .update({ status: 'cancelled' })
+        .eq('id', enrollmentId);
+      if (updateError) throw updateError;
+    },
+    onSuccess: () => {
+      toast({
+        title: 'Inscription annulée',
+        description: 'Votre place a été libérée',
+      });
+      queryClient.invalidateQueries({ queryKey: ['trainings', 'my-enrollments'] });
+    },
+    onError: (err: any) => {
+      toast({
+        title: 'Erreur',
+        description: err.message,
+        variant: 'destructive',
+      });
+    },
+  });
 
   // S'inscrire à une formation
   const enrollInTraining = useCallback(
     async (trainingId: string, sessionId?: string, justification?: string) => {
-      if (!profile) return;
-
-      try {
-        const { data: employee } = await supabase
-          .from('employees')
-          .select('id')
-          .eq('user_id', profile.userId)
-          .single();
-
-        if (!employee) throw new Error('Employé non trouvé');
-
-        // Vérifier si formation externe coûteuse (nécessite approbation)
-        const { data: training } = await supabase
-          .from('trainings')
-          .select('cost, type, is_mandatory')
-          .eq('id', trainingId)
-          .single();
-
-        const requiresApproval = training && training.type === 'external' && training.cost > 100;
-        const status = requiresApproval ? 'pending' : 'approved';
-
-        const { error: insertError } = await supabase.from('training_enrollments').insert({
-          training_id: trainingId,
-          session_id: sessionId || null,
-          employee_id: employee.id,
-          status,
-          tenant_id: profile.tenantId,
-        });
-
-        if (insertError) throw insertError;
-
-        toast({
-          title: requiresApproval ? 'Demande envoyée' : 'Inscription confirmée',
-          description: requiresApproval
-            ? 'Votre manager recevra une notification pour approuver cette formation'
-            : 'Vous êtes inscrit à cette formation',
-        });
-
-        fetchMyEnrollments();
-      } catch (err: any) {
-        toast({
-          title: 'Erreur',
-          description: err.message,
-          variant: 'destructive',
-        });
-      }
+      return enrollInTrainingMutation.mutateAsync({ trainingId, sessionId });
     },
-    [profile, toast, fetchMyEnrollments]
+    [enrollInTrainingMutation]
   );
 
   // Approuver inscription (manager)
   const approveEnrollment = useCallback(
     async (enrollmentId: string, approverId: string) => {
-      try {
-        const { error: updateError } = await supabase
-          .from('training_enrollments')
-          .update({
-            status: 'approved',
-            approved_by: approverId,
-            approved_at: new Date().toISOString(),
-          })
-          .eq('id', enrollmentId);
-
-        if (updateError) throw updateError;
-
-        toast({
-          title: 'Formation approuvée',
-          description: "L'employé a été notifié de l'approbation",
-        });
-
-        fetchPendingApprovals();
-      } catch (err: any) {
-        toast({
-          title: 'Erreur',
-          description: err.message,
-          variant: 'destructive',
-        });
-      }
+      return approveEnrollmentMutation.mutateAsync({ enrollmentId, approverId });
     },
-    [toast, fetchPendingApprovals]
+    [approveEnrollmentMutation]
   );
 
   // Rejeter inscription (manager)
   const rejectEnrollment = useCallback(
     async (enrollmentId: string, reason: string) => {
-      try {
-        const { error: updateError } = await supabase
-          .from('training_enrollments')
-          .update({
-            status: 'rejected',
-            rejection_reason: reason,
-          })
-          .eq('id', enrollmentId);
-
-        if (updateError) throw updateError;
-
-        toast({
-          title: 'Formation rejetée',
-          description: "L'employé a été notifié avec la raison du refus",
-        });
-
-        fetchPendingApprovals();
-      } catch (err: any) {
-        toast({
-          title: 'Erreur',
-          description: err.message,
-          variant: 'destructive',
-        });
-      }
+      return rejectEnrollmentMutation.mutateAsync({ enrollmentId, reason });
     },
-    [toast, fetchPendingApprovals]
+    [rejectEnrollmentMutation]
   );
 
   // Marquer formation comme terminée
   const markCompleted = useCallback(
     async (enrollmentId: string, quizScore?: number) => {
-      try {
-        const { error: updateError } = await supabase
-          .from('training_enrollments')
-          .update({
-            status: 'completed',
-            completion_date: new Date().toISOString(),
-            quiz_score: quizScore || null,
-          })
-          .eq('id', enrollmentId);
-
-        if (updateError) throw updateError;
-
-        toast({
-          title: 'Formation terminée',
-          description: 'Félicitations ! Vous pouvez maintenant télécharger votre certificat',
-        });
-
-        fetchMyEnrollments();
-      } catch (err: any) {
-        toast({
-          title: 'Erreur',
-          description: err.message,
-          variant: 'destructive',
-        });
-      }
+      return markCompletedMutation.mutateAsync({ enrollmentId, quizScore });
     },
-    [toast, fetchMyEnrollments]
+    [markCompletedMutation]
   );
 
   // Noter une formation
   const rateTraining = useCallback(
     async (enrollmentId: string, rating: number, feedback?: string) => {
-      try {
-        const { error: updateError } = await supabase
-          .from('training_enrollments')
-          .update({
-            rating,
-            feedback: feedback || null,
-          })
-          .eq('id', enrollmentId);
-
-        if (updateError) throw updateError;
-
-        toast({
-          title: 'Merci pour votre évaluation',
-          description: 'Votre feedback nous aide à améliorer nos formations',
-        });
-
-        fetchMyEnrollments();
-      } catch (err: any) {
-        toast({
-          title: 'Erreur',
-          description: err.message,
-          variant: 'destructive',
-        });
-      }
+      return rateTrainingMutation.mutateAsync({ enrollmentId, rating, feedback });
     },
-    [toast, fetchMyEnrollments]
+    [rateTrainingMutation]
   );
 
   // Annuler inscription
   const cancelEnrollment = useCallback(
     async (enrollmentId: string) => {
-      try {
-        const { error: updateError } = await supabase
-          .from('training_enrollments')
-          .update({ status: 'cancelled' })
-          .eq('id', enrollmentId);
-
-        if (updateError) throw updateError;
-
-        toast({
-          title: 'Inscription annulée',
-          description: 'Votre place a été libérée',
-        });
-
-        fetchMyEnrollments();
-      } catch (err: any) {
-        toast({
-          title: 'Erreur',
-          description: err.message,
-          variant: 'destructive',
-        });
-      }
+      return cancelEnrollmentMutation.mutateAsync(enrollmentId);
     },
-    [toast, fetchMyEnrollments]
+    [cancelEnrollmentMutation]
   );
 
   // Statistiques formations
@@ -401,18 +452,6 @@ export function useTrainings() {
         .reduce((sum, e, _, arr) => sum + (e.rating || 0) / arr.length, 0),
     };
   }, [myEnrollments]);
-
-  useEffect(() => {
-    if (authLoading || !userContext) return;
-
-    const loadData = async () => {
-      setLoading(true);
-      await Promise.all([fetchTrainings(), fetchMyEnrollments(), fetchPendingApprovals()]);
-      setLoading(false);
-    };
-
-    loadData();
-  }, [authLoading, userContext, fetchTrainings, fetchMyEnrollments, fetchPendingApprovals]);
 
   return {
     // Data
@@ -438,9 +477,7 @@ export function useTrainings() {
 
     // Utils
     refresh: () => {
-      fetchTrainings();
-      fetchMyEnrollments();
-      fetchPendingApprovals();
+      queryClient.invalidateQueries({ queryKey: ['trainings'] });
     },
   };
 }

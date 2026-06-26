@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useHRMinimal } from '@/hooks/useHRMinimal';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -20,7 +21,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
 export const AbsenceTypeManagement = () => {
-  const { absenceTypes, loading, refetch } = useHRMinimal();
+  const { absenceTypes, loading, refresh } = useHRMinimal();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingType, setEditingType] = useState<any>(null);
   const isMobile = useIsMobile();
@@ -28,8 +29,8 @@ export const AbsenceTypeManagement = () => {
 
   const { register, handleSubmit, reset, setValue, watch } = useForm();
 
-  const onSubmit = async (data: any) => {
-    try {
+  const upsertAbsenceType = useMutation({
+    mutationFn: async ({ data, editingId }: { data: any; editingId: string | null }) => {
       const absenceTypeData = {
         name: data.name,
         code: data.code,
@@ -38,36 +39,61 @@ export const AbsenceTypeManagement = () => {
         deducts_from_balance: data.deducts_from_balance,
         max_days_per_year: data.max_days_per_year ? parseInt(data.max_days_per_year) : null,
       };
-
-      let error;
-      if (editingType) {
-        ({ error } = await supabase
+      if (editingId) {
+        const { error } = await supabase
           .from('absence_types')
           .update(absenceTypeData)
-          .eq('id', editingType.id));
+          .eq('id', editingId);
+        if (error) throw error;
       } else {
-        ({ error } = await supabase.from('absence_types').insert(absenceTypeData));
+        const { error } = await supabase.from('absence_types').insert(absenceTypeData);
+        if (error) throw error;
       }
-
-      if (error) throw error;
-
+    },
+    onSuccess: (_, { editingId }) => {
       toast({
         title: 'Succès',
-        description: `Type d'absence ${editingType ? 'modifié' : 'créé'} avec succès`,
+        description: `Type d'absence ${editingId ? 'modifié' : 'créé'} avec succès`,
       });
-
       reset();
       setIsCreateDialogOpen(false);
       setEditingType(null);
-      refetch();
-    } catch (error: any) {
+      refresh();
+    },
+    onError: (error: any, { editingId }) => {
       console.error('Error managing absence type:', error);
       toast({
         title: 'Erreur',
-        description: `Impossible de ${editingType ? 'modifier' : 'créer'} le type d'absence`,
+        description: `Impossible de ${editingId ? 'modifier' : 'créer'} le type d'absence`,
         variant: 'destructive',
       });
-    }
+    },
+  });
+
+  const deleteAbsenceType = useMutation({
+    mutationFn: async (typeId: string) => {
+      const { error } = await supabase.from('absence_types').delete().eq('id', typeId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({
+        title: 'Succès',
+        description: "Type d'absence supprimé avec succès",
+      });
+      refresh();
+    },
+    onError: (error: any) => {
+      console.error('Error deleting absence type:', error);
+      toast({
+        title: 'Erreur',
+        description: "Impossible de supprimer le type d'absence",
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const onSubmit = (data: any) => {
+    upsertAbsenceType.mutate({ data, editingId: editingType?.id ?? null });
   };
 
   const handleEdit = (type: any) => {
@@ -81,26 +107,8 @@ export const AbsenceTypeManagement = () => {
     setIsCreateDialogOpen(true);
   };
 
-  const handleDelete = async (typeId: string) => {
-    try {
-      const { error } = await supabase.from('absence_types').delete().eq('id', typeId);
-
-      if (error) throw error;
-
-      toast({
-        title: 'Succès',
-        description: "Type d'absence supprimé avec succès",
-      });
-
-      refetch();
-    } catch (error: any) {
-      console.error('Error deleting absence type:', error);
-      toast({
-        title: 'Erreur',
-        description: "Impossible de supprimer le type d'absence",
-        variant: 'destructive',
-      });
-    }
+  const handleDelete = (typeId: string) => {
+    deleteAbsenceType.mutate(typeId);
   };
 
   if (loading) {

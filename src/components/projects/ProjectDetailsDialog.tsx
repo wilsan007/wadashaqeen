@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Calendar, Users, Target, DollarSign, Activity, Clock } from 'lucide-react';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface Project {
   id: string;
@@ -34,30 +35,32 @@ export const ProjectDetailsDialog: React.FC<ProjectDetailsDialogProps> = ({
   onOpenChange,
   project,
 }) => {
+  const { t } = useTranslation();
+
   if (!project) return null;
 
   const getStatusBadge = (status?: string) => {
-    if (!status) return { label: 'Inconnu', color: 'bg-gray-400' };
+    if (!status) return { label: t('projectsBloc.creation.unassigned'), color: 'bg-gray-400' };
 
     const statusConfig: Record<string, { label: string; color: string }> = {
-      en_cours: { label: 'En cours', color: 'bg-blue-500' },
-      a_venir: { label: 'À venir', color: 'bg-gray-500' },
-      termine: { label: 'Terminé', color: 'bg-green-500' },
-      active: { label: 'Actif', color: 'bg-green-500' },
-      completed: { label: 'Terminé', color: 'bg-blue-500' },
-      planning: { label: 'Planification', color: 'bg-yellow-500' },
+      en_cours: { label: t('gantt.status.inProgress'), color: 'bg-blue-500' },
+      a_venir: { label: t('gantt.status.todo'), color: 'bg-gray-500' },
+      termine: { label: t('gantt.status.completed'), color: 'bg-green-500' },
+      active: { label: t('projectsBloc.analytics.statusActive'), color: 'bg-green-500' },
+      completed: { label: t('gantt.status.completed'), color: 'bg-blue-500' },
+      planning: { label: t('gantt.status.todo'), color: 'bg-yellow-500' },
     };
     return statusConfig[status] || { label: status, color: 'bg-gray-400' };
   };
 
   const getPriorityBadge = (priority?: string) => {
-    if (!priority) return { label: '⚪ Non défini', color: 'bg-gray-100 text-gray-800' };
+    if (!priority) return { label: `⚪ ${t('projectsBloc.creation.unassigned')}`, color: 'bg-gray-100 text-gray-800' };
 
     const priorityConfig: Record<string, { label: string; color: string }> = {
-      low: { label: '🟢 Faible', color: 'bg-green-100 text-green-800' },
-      medium: { label: '🟡 Moyenne', color: 'bg-yellow-100 text-yellow-800' },
-      high: { label: '🟠 Élevée', color: 'bg-orange-100 text-orange-800' },
-      urgent: { label: '🔴 Urgente', color: 'bg-red-100 text-red-800' },
+      low: { label: `🟢 ${t('gantt.priority.low')}`, color: 'bg-green-100 text-green-800' },
+      medium: { label: `🟡 ${t('gantt.priority.medium')}`, color: 'bg-yellow-100 text-yellow-800' },
+      high: { label: `🟠 ${t('gantt.priority.high')}`, color: 'bg-orange-100 text-orange-800' },
+      urgent: { label: `🔴 ${t('gantt.priority.urgent')}`, color: 'bg-red-100 text-red-800' },
     };
     return priorityConfig[priority] || { label: priority, color: 'bg-gray-100 text-gray-800' };
   };
@@ -78,7 +81,7 @@ export const ProjectDetailsDialog: React.FC<ProjectDetailsDialogProps> = ({
         <DialogHeader className="shrink-0 border-b px-6 py-4">
           <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
             <Target className="h-4 w-4 sm:h-5 sm:w-5" />
-            <span className="truncate">Détails du Projet: {project.name}</span>
+            <span className="truncate">{t('projectsBloc.details.title').replace('%s', project.name)}</span>
           </DialogTitle>
         </DialogHeader>
 
@@ -87,7 +90,7 @@ export const ProjectDetailsDialog: React.FC<ProjectDetailsDialogProps> = ({
             {/* Informations générales */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Informations Générales</CardTitle>
+                <CardTitle className="text-lg">{t('projectsBloc.details.generalInfo')}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex flex-wrap items-center gap-2">
@@ -124,13 +127,13 @@ export const ProjectDetailsDialog: React.FC<ProjectDetailsDialogProps> = ({
                   {project.budget && (
                     <div className="flex items-center gap-2">
                       <DollarSign className="text-muted-foreground h-4 w-4" />
-                      <span className="text-sm">Budget: {project.budget.toLocaleString()} €</span>
+                      <span className="text-sm">{t('projectsBloc.enterprise.budget')}: {project.budget.toLocaleString()} DJF</span>
                     </div>
                   )}
 
                   <div className="flex items-center gap-2">
                     <Activity className="text-muted-foreground h-4 w-4" />
-                    <span className="text-sm">Progression: {project.progress ?? 0}%</span>
+                    <span className="text-sm">{t('projectsBloc.details.progress').replace('%s', (project.progress ?? 0).toString())}</span>
                   </div>
                 </div>
 
@@ -144,7 +147,7 @@ export const ProjectDetailsDialog: React.FC<ProjectDetailsDialogProps> = ({
             {project.team_members && project.team_members.length > 0 && (
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">Équipe du Projet</CardTitle>
+                  <CardTitle className="text-lg">{t('projectsBloc.details.team')}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="flex flex-wrap gap-2">
@@ -162,7 +165,7 @@ export const ProjectDetailsDialog: React.FC<ProjectDetailsDialogProps> = ({
             {project.skills_required && project.skills_required.length > 0 && (
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">Compétences Requises</CardTitle>
+                  <CardTitle className="text-lg">{t('projectsBloc.details.skills')}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="flex flex-wrap gap-2">
@@ -181,7 +184,7 @@ export const ProjectDetailsDialog: React.FC<ProjectDetailsDialogProps> = ({
               <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-lg">
                   <Clock className="h-5 w-5" />
-                  Historique des Modifications
+                  {t('projectsBloc.details.history')}
                 </CardTitle>
               </CardHeader>
               <CardContent>

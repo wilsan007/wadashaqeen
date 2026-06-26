@@ -14,6 +14,7 @@ import { CalendarIcon, Clock, User, Flag, Building2, FolderKanban } from '@/lib/
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface TaskPropertiesProps {
   status: string;
@@ -62,22 +63,23 @@ export const TaskProperties: React.FC<TaskPropertiesProps> = ({
   statusIcons,
   priorityIcons,
 }) => {
+  const { t } = useTranslation();
   return (
     <div className="space-y-4">
       {/* Statut */}
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
         <Label className="text-muted-foreground flex shrink-0 items-center gap-2 text-sm sm:w-40">
-          Statut
+          {t('common.status')}
         </Label>
         <Select value={status} onValueChange={onStatusChange}>
           <SelectTrigger className="w-full">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="todo">{statusIcons.todo} À faire</SelectItem>
-            <SelectItem value="doing">{statusIcons.doing} En cours</SelectItem>
-            <SelectItem value="blocked">{statusIcons.blocked} Bloqué</SelectItem>
-            <SelectItem value="done">{statusIcons.done} Terminé</SelectItem>
+            <SelectItem value="todo">{statusIcons.todo} {t('tasks.status.todo')}</SelectItem>
+            <SelectItem value="doing">{statusIcons.doing} {t('tasks.status.in_progress')}</SelectItem>
+            <SelectItem value="blocked">{statusIcons.blocked} {t('tasks.status.blocked')}</SelectItem>
+            <SelectItem value="done">{statusIcons.done} {t('tasks.status.done')}</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -86,7 +88,7 @@ export const TaskProperties: React.FC<TaskPropertiesProps> = ({
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
         <Label className="text-muted-foreground flex shrink-0 items-center gap-2 text-sm sm:w-40">
           <User className="h-4 w-4" />
-          Responsable
+          {t('tasks.assignedTo')}
         </Label>
         <Select value={assignee} onValueChange={onAssigneeChange}>
           <SelectTrigger className="w-full">
@@ -161,17 +163,17 @@ export const TaskProperties: React.FC<TaskPropertiesProps> = ({
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
         <Label className="text-muted-foreground flex shrink-0 items-center gap-2 text-sm sm:w-40">
           <Flag className="h-4 w-4" />
-          Priorité
+          {t('tasks.priority.title')}
         </Label>
         <Select value={priority} onValueChange={onPriorityChange}>
           <SelectTrigger className="w-full">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="low">{priorityIcons.low} Basse</SelectItem>
-            <SelectItem value="medium">{priorityIcons.medium} Moyenne</SelectItem>
-            <SelectItem value="high">{priorityIcons.high} Haute</SelectItem>
-            <SelectItem value="urgent">{priorityIcons.urgent} Urgente</SelectItem>
+            <SelectItem value="low">{priorityIcons.low} {t('tasks.priority.low')}</SelectItem>
+            <SelectItem value="medium">{priorityIcons.medium} {t('tasks.priority.medium')}</SelectItem>
+            <SelectItem value="high">{priorityIcons.high} {t('tasks.priority.high')}</SelectItem>
+            <SelectItem value="urgent">{priorityIcons.urgent} {t('tasks.priority.urgent')}</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -216,7 +218,7 @@ export const TaskProperties: React.FC<TaskPropertiesProps> = ({
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
         <Label className="text-muted-foreground flex shrink-0 items-center gap-2 text-sm sm:w-40">
           <FolderKanban className="h-4 w-4" />
-          Projet
+          {t('tasks.project')}
         </Label>
         <Select value={project} onValueChange={onProjectChange}>
           <SelectTrigger className="w-full">

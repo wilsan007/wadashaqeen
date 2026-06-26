@@ -1,6 +1,7 @@
 import React from 'react';
 import { GanttTask, ViewConfig, getUnitPosition, getTaskWidth } from '@/lib/ganttHelpers';
 import { darkenColor, lightenColor } from '@/lib/ganttColors';
+import { AlertTriangle } from 'lucide-react';
 
 interface GanttTaskBarProps {
   task: GanttTask;
@@ -61,13 +62,12 @@ export const GanttTaskBar = ({
       }}
     >
       <div
-        className={`group relative h-full overflow-hidden rounded-lg ${
-          isDragging || isResizing ? 'z-10 scale-105 shadow-lg' : 'hover:shadow-md'
-        } shadow-sm transition-all duration-200`}
+        className={`group relative h-full overflow-hidden rounded-lg ${isDragging || isResizing ? 'z-10 scale-105 shadow-lg' : 'hover:shadow-md'
+          } ${task.isOverloaded ? 'shadow-red-500/50 shadow-[0_0_8px_rgba(239,68,68,0.6)]' : 'shadow-sm'} transition-all duration-200`}
         style={{
-          backgroundColor: remainingColor, // Fond = partie non complétée
-          borderColor: baseColor,
-          borderWidth: `${borderWidth}px`,
+          backgroundColor: task.isOverloaded ? '#fee2e2' : remainingColor, // Fond rouge clair si surchargé
+          borderColor: task.isOverloaded ? '#ef4444' : baseColor, // Bordure rouge si surchargé
+          borderWidth: `${task.isOverloaded ? borderWidth + 1 : borderWidth}px`,
           borderStyle: 'solid',
           opacity: isSubtask ? 0.85 : 1, // Légèrement transparent pour sous-tâches
         }}
@@ -118,9 +118,12 @@ export const GanttTaskBar = ({
         >
           {/* Taux de progression en gras et gros - centré avec taille adaptée */}
           <span
-            className="pointer-events-none font-extrabold whitespace-nowrap text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)] dark:text-white"
+            className="pointer-events-none font-extrabold flex items-center justify-center whitespace-nowrap text-white drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)] dark:text-white"
             style={{ fontSize: isSubtask ? '1rem' : '1.5rem' }}
           >
+            {task.isOverloaded && (
+              <AlertTriangle className="mr-2 text-red-500" style={{ width: isSubtask ? '1rem' : '1.5rem', height: isSubtask ? '1rem' : '1.5rem' }} />
+            )}
             {task.progress}%
           </span>
         </div>

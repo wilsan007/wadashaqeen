@@ -61,6 +61,36 @@ export class ProjectService {
     return data;
   }
 
+  // ── Projets sans activité depuis N jours ──────────────────────────────────
+  static async getInactiveProjectsCount(days = 7): Promise<{
+    count: number;
+    total: number;
+  }> {
+    const since = new Date();
+    since.setDate(since.getDate() - days);
+
+    const { data: projects, error: projError } = await supabase
+      .from('projects')
+      .select('id')
+      .not('status', 'in', '("completed","done","cancelled","on_hold")');
+    if (projError) throw new ServiceError(projError.message);
+
+    const projectIds = (projects ?? []).map((p: any) => p.id as string);
+    if (projectIds.length === 0) return { count: 0, total: 0 };
+
+    const { data: recentTasks } = await supabase
+      .from('tasks')
+      .select('project_id')
+      .in('project_id', projectIds)
+      .gte('updated_at', since.toISOString());
+
+    const activeIds = new Set((recentTasks ?? []).map((t: any) => t.project_id as string).filter(Boolean));
+    return {
+      count: projectIds.filter(id => !activeIds.has(id)).length,
+      total: projectIds.length,
+    };
+  }
+
   static async getStats(): Promise<ProjectStats> {
     const { data, error } = await supabase.from('projects').select('status, end_date');
     if (error) throw new ServiceError(error.message, error.code);

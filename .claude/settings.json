@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Edit(*)",
+      "Write(*)",
+      "Bash(find:*)",
+      "Bash(ls *)",
+      "Bash(grep *)",
+      "Bash(npm run typecheck)",
+      "Bash(npm run lint)",
+      "Bash(npx tsc --noEmit)"
+    ],
+    "deny": []
+  }
+}

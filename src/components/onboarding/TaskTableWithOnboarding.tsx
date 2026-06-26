@@ -13,17 +13,19 @@ import { TaskTemplate } from '@/data/taskTemplates';
 import { useToast } from '@/hooks/use-toast';
 import { useTenant } from '@/hooks/useTenant';
 import { supabase } from '@/integrations/supabase/client';
-import { BrandedLoadingScreen } from '@/components/layout/BrandedLoadingScreen';
+
 import type { Task } from '@/types/tasks';
 
 const ONBOARDING_DISMISSED_KEY = 'wadashaqayn_onboarding_dismissed';
 
 import { ModernTaskCreationDialog } from '@/components/tasks/ModernTaskCreationDialog';
+import { useTranslation } from '@/hooks/useTranslation';
 
 export function TaskTableWithOnboarding() {
   const { tasks, loading, createTask } = useTasks();
   const { toast } = useToast();
   const { tenantId } = useTenant();
+  const { t } = useTranslation();
 
   // État pour le modal de création
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -55,9 +57,8 @@ export function TaskTableWithOnboarding() {
     () => [
       {
         id: '00000000-0000-0000-0000-000000000001',
-        title: 'Créer votre première tâche',
-        description:
-          "Exemple de tâche pour découvrir l'interface. Cliquez pour voir: Désigner un responsable, Choisir la priorité, Choisir le statut, Définir le nombre d'heures, Ajouter des dates...",
+        title: t('onboarding.fakeTask1Format'),
+        description: t('onboarding.fakeTask1Desc'),
         status: 'todo',
         priority: 'medium',
         start_date: new Date().toISOString(),
@@ -120,9 +121,8 @@ export function TaskTableWithOnboarding() {
       },
       {
         id: '00000000-0000-0000-0000-000000000002',
-        title: 'Créer votre seconde tâche',
-        description:
-          "Exemple: Désigner un responsable, Choisir la priorité, Choisir le statut, Définir le nombre d'heures. Explorez les différentes colonnes du tableau.",
+        title: t('onboarding.fakeTask2Format'),
+        description: t('onboarding.fakeTask2Desc'),
         status: 'todo',
         priority: 'medium',
         start_date: new Date().toISOString(),
@@ -192,9 +192,8 @@ export function TaskTableWithOnboarding() {
       },
       {
         id: '00000000-0000-0000-0000-000000000003',
-        title: 'Créer votre troisième tâche',
-        description:
-          "Exemple: Désigner un responsable, Choisir la priorité, Choisir le statut, Définir le nombre d'heures. Testez toutes les fonctionnalités: filtres, tri, recherche...",
+        title: t('onboarding.fakeTask3Format'),
+        description: t('onboarding.fakeTask3Desc'),
         status: 'todo',
         priority: 'medium',
         start_date: new Date().toISOString(),
@@ -265,16 +264,21 @@ export function TaskTableWithOnboarding() {
     setOnboardingDismissed(true);
 
     toast({
-      title: '🎨 Mode découverte activé!',
-      description:
-        "Explorez le tableau avec des données d'exemple. Créez votre première vraie tâche quand vous êtes prêt!",
+      title: t('onboarding.demoModeActivated'),
+      description: t('onboarding.demoModeDesc'),
     });
   };
 
-  // ⏳ ÉTAPE 1 : Afficher l'écran de chargement pendant le chargement
-  // Cela évite les flashes visuels désagréables
+  // ⏳ ÉTAPE 1 : Spinner inline pendant le chargement (ne masque pas les onglets)
   if (loading) {
-    return <BrandedLoadingScreen appName="Wadashaqayn" logoSrc="/logo-w.svg" />;
+    return (
+      <div className="flex min-h-[200px] items-center justify-center py-12">
+        <div className="flex flex-col items-center gap-3">
+          <div className="border-primary h-8 w-8 animate-spin rounded-full border-2 border-t-transparent" />
+          <p className="text-muted-foreground text-sm">{t('onboarding.loadingTasks')}</p>
+        </div>
+      </div>
+    );
   }
 
   // Si en mode démo et pas de vraies tâches, afficher les données mockées
@@ -286,14 +290,14 @@ export function TaskTableWithOnboarding() {
           <div className="flex items-start gap-3">
             <div className="text-2xl">🎨</div>
             <div className="flex-1">
-              <h4 className="font-semibold text-blue-900">Mode Découverte - Données d'exemple</h4>
+              <h4 className="font-semibold text-blue-900">{t('onboarding.demoTitle')}</h4>
               <p className="mt-1 text-sm text-blue-700">
-                Ces 3 tâches sont des exemples pour découvrir l'interface.{' '}
-                <strong>Elles ne sont pas sauvegardées</strong>. Explorez:{' '}
-                <strong>Désigner un responsable</strong>, <strong>Choisir la priorité</strong>,{' '}
-                <strong>Choisir le statut</strong>,<strong>Définir le nombre d'heures</strong>, et
-                voir les <strong>actions associées</strong>. Créez votre première vraie tâche avec{' '}
-                <strong>"+ Nouvelle tâche"</strong> quand vous êtes prêt!
+                {t('onboarding.demoDesc1')}{' '}
+                <strong>{t('onboarding.demoDesc2')}</strong>{t('onboarding.demoDesc3')}{' '}
+                <strong>{t('onboarding.demoOpt1')}</strong>, <strong>{t('onboarding.demoOpt2')}</strong>,{' '}
+                <strong>{t('onboarding.demoOpt3')}</strong>,<strong>{t('onboarding.demoOpt4')}</strong>, {t('onboarding.demoOpt5')}{' '}
+                <strong>{t('onboarding.demoOpt6')}</strong>{t('onboarding.demoCreate')}{' '}
+                <strong>{t('onboarding.demoCreateBtn')}</strong> {t('onboarding.demoReady')}
               </p>
             </div>
             <button
@@ -305,7 +309,7 @@ export function TaskTableWithOnboarding() {
               }}
               className="text-xs whitespace-nowrap text-blue-600 hover:text-blue-800 hover:underline"
             >
-              Retour au guide
+              {t('onboarding.backToGuide')}
             </button>
           </div>
         </div>
@@ -329,11 +333,11 @@ export function TaskTableWithOnboarding() {
       <div className="flex h-full w-full items-center justify-center p-4 sm:p-8">
         <div className="max-w-md space-y-4 text-center">
           <div className="mb-4 text-6xl">📋</div>
-          <h3 className="text-2xl font-bold">Aucune tâche pour le moment</h3>
+          <h3 className="text-2xl font-bold">{t('onboarding.noTaskYet')}</h3>
           <p className="text-muted-foreground">
-            Commencez par créer votre première tâche avec le bouton
-            <span className="text-primary font-semibold"> "+ Nouvelle tâche" </span>
-            en haut à droite.
+            {t('onboarding.startCreateFirst')}
+            <span className="text-primary font-semibold"> {t('onboarding.startCreateFirstBtn')} </span>
+            {t('onboarding.topRight')}
           </p>
           <button
             onClick={() => {
@@ -342,7 +346,7 @@ export function TaskTableWithOnboarding() {
             }}
             className="text-primary text-sm hover:underline"
           >
-            Afficher à nouveau les templates d'aide
+            {t('onboarding.showHelpAgain')}
           </button>
         </div>
 

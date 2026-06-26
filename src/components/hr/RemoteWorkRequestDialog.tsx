@@ -35,13 +35,10 @@ import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { useTranslation } from '@/hooks/useTranslation';
 
-const FREQUENCIES = [
-  { value: 'one_time', label: 'Ponctuel (1 jour)' },
-  { value: 'weekly', label: 'Hebdomadaire' },
-  { value: 'bi_weekly', label: 'Bi-hebdomadaire' },
-  { value: 'monthly', label: 'Mensuel' },
-];
+// Note: Translations handle frequencies locally in component
+// as they are static strings. We can also fetch them dynamically if needed.
 
 interface RemoteWorkRequestDialogProps {
   open: boolean;
@@ -55,6 +52,14 @@ export function RemoteWorkRequestDialog({
   onSuccess,
 }: RemoteWorkRequestDialogProps) {
   const { createRemoteWorkRequest, loading } = useHRSelfService();
+  const { t } = useTranslation();
+
+  const FREQUENCIES = [
+    { value: 'one_time', label: t('hrAdvanced.dialogs.remoteWork.freqOneTime') },
+    { value: 'weekly', label: t('hrAdvanced.dialogs.remoteWork.freqWeekly') },
+    { value: 'bi_weekly', label: t('hrAdvanced.dialogs.remoteWork.freqBiWeekly') },
+    { value: 'monthly', label: t('hrAdvanced.dialogs.remoteWork.freqMonthly') },
+  ];
 
   const [startDate, setStartDate] = useState<Date | undefined>(new Date());
   const [endDate, setEndDate] = useState<Date | undefined>();
@@ -91,10 +96,10 @@ export function RemoteWorkRequestDialog({
         <ResponsiveModalHeader>
           <ResponsiveModalTitle className="flex items-center gap-2">
             <Home className="h-5 w-5" />
-            Demande de Télétravail
+            {t('hrAdvanced.dialogs.remoteWork.title')}
           </ResponsiveModalTitle>
           <ResponsiveModalDescription>
-            Demandez l'autorisation de travailler à distance
+            {t('hrAdvanced.dialogs.remoteWork.desc')}
           </ResponsiveModalDescription>
         </ResponsiveModalHeader>
 
@@ -102,13 +107,13 @@ export function RemoteWorkRequestDialog({
           <Alert>
             <Info className="h-4 w-4" />
             <AlertDescription>
-              Les demandes de télétravail doivent être soumises au moins 48h à l'avance.
+              {t('hrAdvanced.dialogs.remoteWork.alert')}
             </AlertDescription>
           </Alert>
 
           {/* Fréquence */}
           <div className="space-y-2">
-            <Label>Type de demande *</Label>
+            <Label>{t('hrAdvanced.dialogs.remoteWork.typeLabel')}</Label>
             <Select value={frequency} onValueChange={setFrequency} required>
               <SelectTrigger>
                 <SelectValue />
@@ -127,7 +132,7 @@ export function RemoteWorkRequestDialog({
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             {/* Date début */}
             <div className="space-y-2">
-              <Label>Date de début *</Label>
+              <Label>{t('hrAdvanced.dialogs.remoteWork.startDate')}</Label>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button
@@ -141,7 +146,7 @@ export function RemoteWorkRequestDialog({
                     {startDate ? (
                       format(startDate, 'PPP', { locale: fr })
                     ) : (
-                      <span>Sélectionner</span>
+                      <span>{t('hrAdvanced.dialogs.remoteWork.select')}</span>
                     )}
                   </Button>
                 </PopoverTrigger>
@@ -160,7 +165,7 @@ export function RemoteWorkRequestDialog({
             {/* Date fin */}
             {frequency !== 'one_time' && (
               <div className="space-y-2">
-                <Label>Date de fin (optionnel)</Label>
+                <Label>{t('hrAdvanced.dialogs.remoteWork.endDate')}</Label>
                 <Popover>
                   <PopoverTrigger asChild>
                     <Button
@@ -171,7 +176,7 @@ export function RemoteWorkRequestDialog({
                       )}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {endDate ? format(endDate, 'PPP', { locale: fr }) : <span>Indéterminée</span>}
+                      {endDate ? format(endDate, 'PPP', { locale: fr }) : <span>{t('hrAdvanced.dialogs.remoteWork.undetermined')}</span>}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0">
@@ -191,28 +196,28 @@ export function RemoteWorkRequestDialog({
 
           {/* Raison */}
           <div className="space-y-2">
-            <Label htmlFor="reason">Raison de la demande *</Label>
+            <Label htmlFor="reason">{t('hrAdvanced.dialogs.remoteWork.reason')}</Label>
             <Textarea
               id="reason"
-              placeholder="Expliquez pourquoi vous souhaitez travailler à distance..."
+              placeholder={t('hrAdvanced.dialogs.remoteWork.reasonHolder')}
               rows={4}
               value={reason}
               onChange={e => setReason(e.target.value)}
               required
             />
             <p className="text-muted-foreground text-xs">
-              Ex: Contraintes familiales, déménagement, réduction temps de trajet, etc.
+              {t('hrAdvanced.dialogs.remoteWork.reasonHint')}
             </p>
           </div>
 
           {/* Informations complémentaires */}
           <div className="bg-muted/50 space-y-2 rounded-lg p-4 text-sm">
-            <p className="font-medium">Rappel des conditions :</p>
+            <p className="font-medium">{t('hrAdvanced.dialogs.remoteWork.rulesTitle')}</p>
             <ul className="text-muted-foreground list-inside list-disc space-y-1">
-              <li>Connexion internet stable requise</li>
-              <li>Disponibilité pendant les heures de travail</li>
-              <li>Participation aux réunions en visio</li>
-              <li>Respect des règles de sécurité des données</li>
+              <li>{t('hrAdvanced.dialogs.remoteWork.rule1')}</li>
+              <li>{t('hrAdvanced.dialogs.remoteWork.rule2')}</li>
+              <li>{t('hrAdvanced.dialogs.remoteWork.rule3')}</li>
+              <li>{t('hrAdvanced.dialogs.remoteWork.rule4')}</li>
             </ul>
           </div>
 
@@ -224,10 +229,10 @@ export function RemoteWorkRequestDialog({
               onClick={() => onOpenChange(false)}
               disabled={loading}
             >
-              Annuler
+              {t('hrAdvanced.dialogs.remoteWork.cancelBtn')}
             </Button>
             <Button type="submit" disabled={loading || !startDate || !reason}>
-              {loading ? 'Envoi en cours...' : 'Soumettre la demande'}
+              {loading ? t('hrAdvanced.dialogs.remoteWork.submittingBtn') : t('hrAdvanced.dialogs.remoteWork.submitBtn')}
             </Button>
           </div>
         </form>

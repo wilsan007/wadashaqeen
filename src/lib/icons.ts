@@ -127,6 +127,16 @@ export { default as Repeat } from 'lucide-react/dist/esm/icons/repeat';
 // FolderKanban déjà défini plus haut
 // BookTemplate, Edit, Filter déjà définis plus haut
 
+// Icônes Navigation et Dashboard — ajouts pour DashboardHome & sidebar
+export { default as LayoutDashboard } from 'lucide-react/dist/esm/icons/layout-dashboard';
+export { default as GanttChartSquare } from 'lucide-react/dist/esm/icons/gantt-chart-square';
+export { default as ListChecks } from 'lucide-react/dist/esm/icons/list-checks';
+export { default as ListTodo } from 'lucide-react/dist/esm/icons/list-todo';
+export { default as Percent } from 'lucide-react/dist/esm/icons/percent';
+export { default as Database } from 'lucide-react/dist/esm/icons/database';
+export { default as Server } from 'lucide-react/dist/esm/icons/server';
+export { default as Activity } from 'lucide-react/dist/esm/icons/activity';
+
 /**
  * Usage dans les fichiers critiques:
  *

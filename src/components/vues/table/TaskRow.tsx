@@ -9,6 +9,7 @@ import { type Task } from '@/hooks/optimized';
 import { TaskRowActions } from './TaskRowActions';
 import { SimpleAssigneeDisplay } from './SimpleAssigneeDisplay';
 import { AssigneeSelect } from './AssigneeSelect';
+import { getTaskColor } from '@/lib/ganttColors';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { priorityColors, statusColors, formatDate } from '@/lib/taskHelpers';
 import { DocumentCellColumn } from './DocumentCellColumn';
@@ -59,6 +60,9 @@ interface TaskRowProps {
   onUpdateAssignee: (taskId: string, assignee: string) => void;
   onUpdateTask?: (taskId: string, updates: Partial<Task>) => void;
   isGhost?: boolean;
+  projectColorMap?: Record<string, string>;
+  taskIndex?: number;
+  totalProjects?: number;
 }
 
 export const TaskRow = ({
@@ -74,6 +78,9 @@ export const TaskRow = ({
   onUpdateAssignee,
   onUpdateTask,
   isGhost = false,
+  projectColorMap,
+  taskIndex = 0,
+  totalProjects = 0,
 }: TaskRowProps) => {
   const isSubtask = (task.task_level || 0) > 0;
   const [subtaskDialogOpen, setSubtaskDialogOpen] = useState(false);
@@ -81,14 +88,17 @@ export const TaskRow = ({
   // 🔒 Permissions pour cette tâche
   const permissions = useTaskEditPermissions({ task });
 
+  const color = !isGhost && projectColorMap
+    ? getTaskColor({ project_id: task.project_id }, projectColorMap, taskIndex, totalProjects)
+    : undefined;
+
   return (
     <>
       <TableRow
-        className={`border-gantt-grid/30 cursor-pointer border-b transition-colors ${
-          selectedTaskId === task.id
-            ? 'border-primary/40 bg-primary/15'
-            : 'hover:bg-gantt-task-bg/50'
-        } ${isGhost ? 'border-dashed opacity-60 hover:opacity-100' : ''}`}
+        className={`border-gantt-grid/30 cursor-pointer border-b transition-colors ${selectedTaskId === task.id
+          ? 'border-primary/40 bg-primary/15'
+          : 'hover:bg-gantt-task-bg/50'
+          } ${isGhost ? 'border-dashed opacity-60 hover:opacity-100' : ''}`}
         style={{
           height: isSubtask ? '51px' : '64px',
           minHeight: isSubtask ? '51px' : '64px',
@@ -106,6 +116,7 @@ export const TaskRow = ({
         {/* Titre de la tâche avec actions */}
         <EditableTitleCell
           value={task.title}
+          style={{ color: color }}
           onChange={title => onUpdateTask && onUpdateTask(task.id, { title })}
           readOnly={isGhost ? false : !permissions.canEditTitle}
           placeholder={isGhost ? '+ Ajouter une nouvelle tâche...' : undefined}
@@ -131,13 +142,13 @@ export const TaskRow = ({
           <div className="flex h-full items-center px-2">
             {task.project_name ? (
               <div className="group relative">
-                <div className="absolute -inset-0.5 rounded-lg bg-gradient-to-r from-cyan-500 via-blue-500 to-purple-500 opacity-30 blur transition duration-300 group-hover:opacity-60"></div>
                 <Badge
                   variant="outline"
-                  className="relative border-cyan-300 bg-gradient-to-r from-cyan-50 to-blue-50 text-xs font-medium text-cyan-700 shadow-sm transition-all duration-300 hover:scale-105 hover:shadow-md dark:border-cyan-700 dark:from-cyan-950 dark:to-blue-950 dark:text-cyan-300"
+                  className="relative border-primary/30 text-xs font-medium shadow-sm transition-all duration-300 hover:scale-105 hover:shadow-md"
+                  style={color ? { backgroundColor: color, color: '#fff', borderColor: color } : undefined}
                 >
                   <span className="flex items-center gap-1.5">
-                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-gradient-to-r from-cyan-400 to-blue-500"></span>
+                    <span className="bg-white h-1.5 w-1.5 animate-pulse rounded-full"></span>
                     {task.project_name}
                   </span>
                 </Badge>
@@ -238,7 +249,7 @@ export const TaskRow = ({
           style={{ height: isSubtask ? '51px' : '64px' }}
         >
           <div className="flex items-center gap-2">
-            <Progress value={task.progress} className={isSubtask ? 'h-1 w-12' : 'w-16'} />
+            <Progress value={task.progress} className={isSubtask ? 'h-1 w-12' : 'w-16'} indicatorColor={color} />
             <span className={`font-medium ${isSubtask ? 'text-xs' : 'text-sm'} text-foreground`}>
               {task.progress}%
             </span>

@@ -15,6 +15,7 @@ interface EditableTitleCellProps {
   debounceMs?: number;
   readOnly?: boolean; // 🔒 Désactiver l'édition si pas de permission
   placeholder?: string;
+  style?: React.CSSProperties;
 }
 
 type SaveStatus = 'idle' | 'editing' | 'saving' | 'saved' | 'error';
@@ -30,6 +31,7 @@ export const EditableTitleCell = ({
   debounceMs = 800,
   readOnly = false,
   placeholder,
+  style,
 }: EditableTitleCellProps) => {
   const [isEditing, setIsEditing] = useState(false);
   const [localValue, setLocalValue] = useState(value || '');
@@ -178,6 +180,7 @@ export const EditableTitleCell = ({
                 saveStatus === 'error' && 'text-destructive',
                 isSubtask ? 'text-muted-foreground font-normal' : 'font-medium'
               )}
+              style={style}
             />
           ) : (
             <div
@@ -190,6 +193,7 @@ export const EditableTitleCell = ({
                 !value && 'text-muted-foreground'
               )}
               title={readOnly ? 'Modification non autorisée' : undefined}
+              style={style}
             >
               {value || 'Nom de la tâche...'}
             </div>

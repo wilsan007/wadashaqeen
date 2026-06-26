@@ -5,6 +5,7 @@
  */
 
 import React from 'react';
+import { useTranslation } from '@/hooks/useTranslation';
 import { CalendarClock, CalendarDays, Sparkles, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -18,6 +19,7 @@ export const OperationsEmptyState: React.FC<OperationsEmptyStateProps> = ({
   onCreateRecurring,
   onCreateOneOff,
 }) => {
+  const { t } = useTranslation();
   return (
     <div className="container mx-auto px-4 py-12">
       <div className="mx-auto max-w-4xl">
@@ -26,7 +28,7 @@ export const OperationsEmptyState: React.FC<OperationsEmptyStateProps> = ({
           <div className="mb-6 inline-flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-blue-500 to-purple-600">
             <Sparkles className="h-10 w-10 text-white" />
           </div>
-          <h1 className="mb-4 text-4xl font-bold">Activités Opérationnelles</h1>
+          <h1 className="mb-4 text-4xl font-bold">{t('operations.pageTitle')}</h1>
           <p className="text-muted-foreground mx-auto max-w-2xl text-xl">
             Automatisez vos tâches récurrentes et planifiez vos opérations ponctuelles hors projet
           </p>
@@ -42,7 +44,7 @@ export const OperationsEmptyState: React.FC<OperationsEmptyStateProps> = ({
                   <CalendarClock className="h-8 w-8 text-blue-600 dark:text-blue-400" />
                 </div>
                 <div>
-                  <h3 className="mb-2 text-xl font-semibold">Activités Récurrentes</h3>
+                  <h3 className="mb-2 text-xl font-semibold">{t('operations.emptyRecurringTitle')}</h3>
                   <p className="text-muted-foreground mb-4 text-sm">
                     Génération automatique de tâches selon une planification (quotidienne,
                     hebdomadaire, mensuelle)
@@ -51,20 +53,20 @@ export const OperationsEmptyState: React.FC<OperationsEmptyStateProps> = ({
                 <ul className="w-full space-y-2 text-left text-sm">
                   <li className="flex items-start gap-2">
                     <ArrowRight className="mt-0.5 h-4 w-4 flex-shrink-0 text-blue-600" />
-                    <span>Réunions d'équipe hebdomadaires</span>
+                    <span>{t('operations.emptyRecurringItem1')}</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <ArrowRight className="mt-0.5 h-4 w-4 flex-shrink-0 text-blue-600" />
-                    <span>Rapports mensuels automatiques</span>
+                    <span>{t('operations.emptyRecurringItem2')}</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <ArrowRight className="mt-0.5 h-4 w-4 flex-shrink-0 text-blue-600" />
-                    <span>Audits de sécurité trimestriels</span>
+                    <span>{t('operations.emptyRecurringItem3')}</span>
                   </li>
                 </ul>
                 <Button onClick={onCreateRecurring} className="w-full group-hover:bg-blue-700">
                   <CalendarClock className="mr-2 h-4 w-4" />
-                  Créer une activité récurrente
+                  {t('operations.createRecurringBtn')}
                 </Button>
               </div>
             </CardContent>
@@ -78,7 +80,7 @@ export const OperationsEmptyState: React.FC<OperationsEmptyStateProps> = ({
                   <CalendarDays className="h-8 w-8 text-purple-600 dark:text-purple-400" />
                 </div>
                 <div>
-                  <h3 className="mb-2 text-xl font-semibold">Activités Ponctuelles</h3>
+                  <h3 className="mb-2 text-xl font-semibold">{t('operations.emptyOneOffTitle')}</h3>
                   <p className="text-muted-foreground mb-4 text-sm">
                     Création manuelle d'une tâche unique à une date précise
                   </p>
@@ -86,15 +88,15 @@ export const OperationsEmptyState: React.FC<OperationsEmptyStateProps> = ({
                 <ul className="w-full space-y-2 text-left text-sm">
                   <li className="flex items-start gap-2">
                     <ArrowRight className="mt-0.5 h-4 w-4 flex-shrink-0 text-purple-600" />
-                    <span>Événement spécial ponctuel</span>
+                    <span>{t('operations.emptyOneOffItem1')}</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <ArrowRight className="mt-0.5 h-4 w-4 flex-shrink-0 text-purple-600" />
-                    <span>Formation unique planifiée</span>
+                    <span>{t('operations.emptyOneOffItem2')}</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <ArrowRight className="mt-0.5 h-4 w-4 flex-shrink-0 text-purple-600" />
-                    <span>Audit exceptionnel à date fixe</span>
+                    <span>{t('operations.emptyOneOffItem3')}</span>
                   </li>
                 </ul>
                 <Button
@@ -103,7 +105,7 @@ export const OperationsEmptyState: React.FC<OperationsEmptyStateProps> = ({
                   className="w-full group-hover:bg-purple-50 dark:group-hover:bg-purple-950"
                 >
                   <CalendarDays className="mr-2 h-4 w-4" />
-                  Créer une activité ponctuelle
+                  {t('operations.createOneOffBtn')}
                 </Button>
               </div>
             </CardContent>
@@ -112,27 +114,27 @@ export const OperationsEmptyState: React.FC<OperationsEmptyStateProps> = ({
 
         {/* Fonctionnalités */}
         <div className="rounded-lg bg-gradient-to-br from-gray-50 to-gray-100 p-8 dark:from-gray-900 dark:to-gray-800">
-          <h3 className="mb-6 text-center text-xl font-semibold">Fonctionnalités Clés</h3>
+          <h3 className="mb-6 text-center text-xl font-semibold">{t('operations.featuresTitle')}</h3>
           <div className="grid gap-6 md:grid-cols-3">
             <div className="text-center">
               <div className="mb-2 text-3xl">🔄</div>
-              <h4 className="mb-2 font-semibold">Génération Automatique</h4>
+              <h4 className="mb-2 font-semibold">{t('operations.featAutoTitle')}</h4>
               <p className="text-muted-foreground text-sm">
-                Les tâches récurrentes sont générées automatiquement chaque jour par le système
+                {t('operations.featAutoDesc')}
               </p>
             </div>
             <div className="text-center">
               <div className="mb-2 text-3xl">✅</div>
-              <h4 className="mb-2 font-semibold">Actions Prédéfinies</h4>
+              <h4 className="mb-2 font-semibold">{t('operations.featActionsTitle')}</h4>
               <p className="text-muted-foreground text-sm">
-                Créez des checklists qui seront automatiquement clonées sur chaque tâche
+                {t('operations.featActionsDesc')}
               </p>
             </div>
             <div className="text-center">
               <div className="mb-2 text-3xl">📊</div>
-              <h4 className="mb-2 font-semibold">Statistiques Détaillées</h4>
+              <h4 className="mb-2 font-semibold">{t('operations.featStatsTitle')}</h4>
               <p className="text-muted-foreground text-sm">
-                Suivez le taux de complétion et les performances de vos activités
+                {t('operations.featStatsDesc')}
               </p>
             </div>
           </div>
@@ -141,9 +143,9 @@ export const OperationsEmptyState: React.FC<OperationsEmptyStateProps> = ({
         {/* Call to Action */}
         <div className="mt-12 text-center">
           <p className="text-muted-foreground text-sm">
-            Besoin d'aide pour démarrer ?{' '}
+            {t('operations.needHelp')}{' '}
             <a href="/docs/operations" className="text-primary hover:underline">
-              Consultez la documentation
+              {t('operations.docsLink')}
             </a>
           </p>
         </div>

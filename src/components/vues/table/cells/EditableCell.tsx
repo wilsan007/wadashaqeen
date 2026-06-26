@@ -65,7 +65,7 @@ export const EditableCell = ({
       className={cn(
         'group cursor-text transition-colors',
         isSubtask ? 'py-0 text-xs' : 'py-0',
-        isEditing && 'bg-blue-50 dark:bg-blue-950',
+        isEditing && 'bg-accent/50 dark:bg-accent/25',
         className
       )}
       style={{ height: isSubtask ? '51px' : '64px' }}

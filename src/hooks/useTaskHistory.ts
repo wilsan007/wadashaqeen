@@ -1,5 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { CACHE_TTL } from '@/lib/queryConfig';
 
 export interface TaskHistoryEntry {
   id: string;
@@ -26,65 +28,52 @@ export interface RecentActivity {
 }
 
 export const useTaskHistory = (taskId?: string) => {
-  const [history, setHistory] = useState<TaskHistoryEntry[]>([]);
-  const [recentActivities, setRecentActivities] = useState<RecentActivity[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
-  // Récupérer l'historique d'une tâche spécifique
-  const fetchTaskHistory = async (id: string) => {
-    if (!id) return;
-
-    try {
-      setLoading(true);
-      setError(null);
-
-      const { data, error: historyError } = await supabase.rpc('get_task_history', {
-        p_task_id: id,
+  // useQuery pour l'historique d'une tâche spécifique
+  const historyQuery = useQuery<TaskHistoryEntry[]>({
+    queryKey: ['task-history', taskId],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_task_history', {
+        p_task_id: taskId!,
       });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!taskId,
+    ...CACHE_TTL.realtime,
+  });
 
-      if (historyError) throw historyError;
-
-      setHistory(data || []);
-    } catch (err: any) {
-      console.error('Error fetching task history:', err);
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Récupérer les activités récentes
-  const fetchRecentActivities = async (limit: number = 50) => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      const { data, error: activitiesError } = await supabase.rpc('get_recent_task_activities', {
-        p_limit: limit,
+  // useQuery pour les activités récentes
+  const recentActivitiesQuery = useQuery<RecentActivity[]>({
+    queryKey: ['task-recent-activities'],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_recent_task_activities', {
+        p_limit: 50,
       });
+      if (error) throw error;
+      return data || [];
+    },
+    ...CACHE_TTL.realtime,
+  });
 
-      if (activitiesError) throw activitiesError;
-
-      setRecentActivities(data || []);
-    } catch (err: any) {
-      console.error('Error fetching recent activities:', err);
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Enregistrer une modification manuelle
-  const logTaskChange = async (
-    taskId: string,
-    actionType: string,
-    fieldName?: string,
-    oldValue?: string,
-    newValue?: string,
-    metadata?: any
-  ) => {
-    try {
+  // useMutation pour enregistrer une modification
+  const logTaskChangeMutation = useMutation({
+    mutationFn: async ({
+      taskId,
+      actionType,
+      fieldName,
+      oldValue,
+      newValue,
+      metadata,
+    }: {
+      taskId: string;
+      actionType: string;
+      fieldName?: string;
+      oldValue?: string;
+      newValue?: string;
+      metadata?: any;
+    }) => {
       const { data, error } = await supabase.rpc('log_task_change', {
         p_task_id: taskId,
         p_action_type: actionType,
@@ -93,20 +82,38 @@ export const useTaskHistory = (taskId?: string) => {
         p_new_value: newValue,
         p_metadata: metadata || {},
       });
-
       if (error) throw error;
-
-      // Rafraîchir l'historique si on affiche cette tâche
-      if (taskId === taskId) {
-        await fetchTaskHistory(taskId);
-      }
-
       return data;
-    } catch (err: any) {
-      console.error('Error logging task change:', err);
-      throw err;
-    }
-  };
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['task-history', variables.taskId] });
+    },
+  });
+
+  // supabase.channel() reste dans useEffect — NE PAS migrer
+  useEffect(() => {
+    if (!taskId) return;
+
+    const channel = supabase
+      .channel(`task_history_${taskId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'task_history',
+          filter: `task_id=eq.${taskId}`,
+        },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['task-history', taskId] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [taskId, queryClient]);
 
   // Formater le message d'historique pour l'affichage
   const formatHistoryMessage = (entry: TaskHistoryEntry): string => {
@@ -181,45 +188,41 @@ export const useTaskHistory = (taskId?: string) => {
     }
   };
 
-  // Effet pour charger l'historique quand taskId change
-  useEffect(() => {
-    if (taskId) {
-      fetchTaskHistory(taskId);
-    }
-  }, [taskId]);
+  const logTaskChange = async (
+    taskId: string,
+    actionType: string,
+    fieldName?: string,
+    oldValue?: string,
+    newValue?: string,
+    metadata?: any
+  ) => {
+    return logTaskChangeMutation.mutateAsync({
+      taskId,
+      actionType,
+      fieldName,
+      oldValue,
+      newValue,
+      metadata,
+    });
+  };
 
-  // Configuration du temps réel pour l'historique
-  useEffect(() => {
-    if (!taskId) return;
+  const fetchTaskHistory = async (id: string) => {
+    await queryClient.invalidateQueries({ queryKey: ['task-history', id] });
+  };
 
-    const channel = supabase
-      .channel(`task_history_${taskId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'task_history',
-          filter: `task_id=eq.${taskId}`,
-        },
-        payload => {
-          // console.log('Task history change detected:', payload);
-          // Rafraîchir l'historique
-          fetchTaskHistory(taskId);
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [taskId]);
+  const fetchRecentActivities = async (_limit: number = 50) => {
+    await queryClient.invalidateQueries({ queryKey: ['task-recent-activities'] });
+  };
 
   return {
-    history,
-    recentActivities,
-    loading,
-    error,
+    history: historyQuery.data || [],
+    recentActivities: recentActivitiesQuery.data || [],
+    loading: historyQuery.isLoading || recentActivitiesQuery.isLoading,
+    error: historyQuery.error
+      ? (historyQuery.error as Error).message
+      : recentActivitiesQuery.error
+        ? (recentActivitiesQuery.error as Error).message
+        : null,
     fetchTaskHistory,
     fetchRecentActivities,
     logTaskChange,
@@ -231,31 +234,21 @@ export const useTaskHistory = (taskId?: string) => {
 
 // Hook spécialisé pour les activités récentes globales
 export const useRecentActivities = (limit: number = 50) => {
-  const [activities, setActivities] = useState<RecentActivity[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
-  const fetchActivities = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      const { data, error: activitiesError } = await supabase.rpc('get_recent_task_activities', {
+  const query = useQuery<RecentActivity[]>({
+    queryKey: ['task-recent-activities', limit],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_recent_task_activities', {
         p_limit: limit,
       });
+      if (error) throw error;
+      return data || [];
+    },
+    ...CACHE_TTL.realtime,
+  });
 
-      if (activitiesError) throw activitiesError;
-
-      setActivities(data || []);
-    } catch (err: any) {
-      console.error('Error fetching recent activities:', err);
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Configuration du temps réel pour les activités
+  // supabase.channel() reste dans useEffect — NE PAS migrer
   useEffect(() => {
     const channel = supabase
       .channel('recent_activities')
@@ -266,26 +259,21 @@ export const useRecentActivities = (limit: number = 50) => {
           schema: 'public',
           table: 'task_history',
         },
-        payload => {
-          // console.log('New activity detected:', payload);
-          // Rafraîchir les activités
-          fetchActivities();
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['task-recent-activities', limit] });
         }
       )
       .subscribe();
 
-    // Charger les activités initiales
-    fetchActivities();
-
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [limit]);
+  }, [limit, queryClient]);
 
   return {
-    activities,
-    loading,
-    error,
-    refetch: fetchActivities,
+    activities: query.data || [],
+    loading: query.isLoading,
+    error: query.error ? (query.error as Error).message : null,
+    refetch: () => query.refetch(),
   };
 };

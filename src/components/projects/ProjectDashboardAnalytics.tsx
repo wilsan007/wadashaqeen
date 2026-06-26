@@ -8,6 +8,7 @@ import { useProjectsEnterprise } from '@/hooks/useProjectsEnterprise';
 import { MetricCard } from '@/components/ui/badges';
 import { DistributionChart } from '@/components/analytics/DistributionChart';
 import { Button } from '@/components/ui/button';
+import { useTranslation } from '@/hooks/useTranslation';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -26,6 +27,11 @@ import {
   RefreshCw,
   FileText,
   Image,
+  Target,
+  DollarSign,
+  ShieldAlert,
+  ShieldCheck,
+  ShieldOff,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -41,6 +47,7 @@ export const ProjectDashboardAnalytics: React.FC = () => {
   } = useProjectsEnterprise({});
 
   const { toast } = useToast();
+  const { t } = useTranslation();
 
   // Calculs des métriques avancées
   const analytics = useMemo(() => {
@@ -50,10 +57,10 @@ export const ProjectDashboardAnalytics: React.FC = () => {
         statusDistribution: [],
         priorityDistribution: [],
         trends: {
-          total: { value: 0, isPositive: true },
-          active: { value: 0, isPositive: true },
-          completed: { value: 0, isPositive: true },
-          overdue: { value: 0, isPositive: false },
+          total: { value: 0, isPositive: true, label: '' },
+          active: { value: 0, isPositive: true, label: '' },
+          completed: { value: 0, isPositive: true, label: '' },
+          overdue: { value: 0, isPositive: false, label: '' },
         },
       };
     }
@@ -66,13 +73,13 @@ export const ProjectDashboardAnalytics: React.FC = () => {
     const avgDuration =
       completedWithDates.length > 0
         ? Math.round(
-            completedWithDates.reduce((sum, p) => {
-              const start = new Date(p.start_date!);
-              const end = new Date(p.end_date!);
-              const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
-              return sum + days;
-            }, 0) / completedWithDates.length
-          )
+          completedWithDates.reduce((sum, p) => {
+            const start = new Date(p.start_date!);
+            const end = new Date(p.end_date!);
+            const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+            return sum + days;
+          }, 0) / completedWithDates.length
+        )
         : 0;
 
     // Distribution par statut
@@ -85,10 +92,10 @@ export const ProjectDashboardAnalytics: React.FC = () => {
     );
 
     const statusDistribution = [
-      { name: 'Actifs', value: statusCounts.active || 0, color: '#10b981' },
-      { name: 'Terminés', value: statusCounts.completed || 0, color: '#3b82f6' },
-      { name: 'En pause', value: statusCounts.on_hold || 0, color: '#f59e0b' },
-      { name: 'Annulés', value: statusCounts.cancelled || 0, color: '#ef4444' },
+      { name: t('projectsBloc.analytics.statusActive'), value: statusCounts.active || 0, color: '#10b981' },
+      { name: t('projectsBloc.analytics.statusCompleted'), value: statusCounts.completed || 0, color: '#3b82f6' },
+      { name: t('projectsBloc.analytics.statusOnHold'), value: statusCounts.on_hold || 0, color: '#f59e0b' },
+      { name: t('projectsBloc.analytics.statusCancelled'), value: statusCounts.cancelled || 0, color: '#ef4444' },
     ].filter(item => item.value > 0);
 
     // Distribution par priorité
@@ -101,40 +108,76 @@ export const ProjectDashboardAnalytics: React.FC = () => {
     );
 
     const priorityDistribution = [
-      { name: 'Haute', value: priorityCounts.high || 0, color: '#ef4444' },
-      { name: 'Moyenne', value: priorityCounts.medium || 0, color: '#f59e0b' },
-      { name: 'Basse', value: priorityCounts.low || 0, color: '#10b981' },
+      { name: t('projectsBloc.analytics.priorityHigh'), value: priorityCounts.high || 0, color: '#ef4444' },
+      { name: t('projectsBloc.analytics.priorityMedium'), value: priorityCounts.medium || 0, color: '#f59e0b' },
+      { name: t('projectsBloc.analytics.priorityLow'), value: priorityCounts.low || 0, color: '#10b981' },
     ].filter(item => item.value > 0);
 
-    // Tendances simulées (à remplacer par vraies données historiques)
+    // Tendances réelles — comparaison mois courant vs mois précédent
+    const now = new Date();
+    const currentMonthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
+    const lastMonthEnd = currentMonthStart;
+    const today = now.toISOString().split('T')[0];
+    const currentMonthDay = currentMonthStart.split('T')[0];
+    const lastMonthDay = lastMonthStart.split('T')[0];
+    const lastMonthEndDay = lastMonthEnd.split('T')[0];
+
+    const thisMonthNew = projects.filter(p => p.created_at && p.created_at >= currentMonthStart).length;
+    const lastMonthNew = projects.filter(p => p.created_at && p.created_at >= lastMonthStart && p.created_at < lastMonthEnd).length;
+
+    const thisMonthCompleted = projects.filter(p => (p.status === 'completed' || p.status === 'done') && p.updated_at && p.updated_at >= currentMonthStart).length;
+    const lastMonthCompleted = projects.filter(p => (p.status === 'completed' || p.status === 'done') && p.updated_at && p.updated_at >= lastMonthStart && p.updated_at < lastMonthEnd).length;
+
+    const thisMonthOverdue = projects.filter(p => p.end_date && p.end_date >= currentMonthDay && p.end_date < today && p.status !== 'completed' && p.status !== 'done').length;
+    const lastMonthOverdue = projects.filter(p => p.end_date && p.end_date >= lastMonthDay && p.end_date < lastMonthEndDay && p.status !== 'completed' && p.status !== 'done').length;
+
+    const calcPct = (current: number, previous: number) =>
+      previous > 0 ? Math.round(((current - previous) / previous) * 100) : current > 0 ? 100 : 0;
+
     const trends = {
-      total: {
-        value: 8,
-        isPositive: true,
-        label: 'vs mois dernier',
-      },
-      active: {
-        value: 12,
-        isPositive: true,
-        label: 'vs mois dernier',
-      },
-      completed: {
-        value: 15,
-        isPositive: true,
-        label: 'vs mois dernier',
-      },
-      overdue: {
-        value: 5,
-        isPositive: false,
-        label: 'vs mois dernier',
-      },
+      total: { value: Math.abs(calcPct(thisMonthNew, lastMonthNew)), isPositive: thisMonthNew >= lastMonthNew, label: 'nouveaux ce mois' },
+      active: { value: Math.abs(calcPct(thisMonthNew, lastMonthNew)), isPositive: thisMonthNew >= lastMonthNew, label: 'vs mois dernier' },
+      completed: { value: Math.abs(calcPct(thisMonthCompleted, lastMonthCompleted)), isPositive: thisMonthCompleted >= lastMonthCompleted, label: 'vs mois dernier' },
+      overdue: { value: Math.abs(calcPct(thisMonthOverdue, lastMonthOverdue)), isPositive: thisMonthOverdue <= lastMonthOverdue, label: 'vs mois dernier' },
     };
+
+    // On-Time Delivery Rate
+    const completedWithDates2 = projects.filter(p => (p.status === 'completed' || p.status === 'done') && p.completion_date && p.end_date);
+    const onTimeCount = completedWithDates2.filter(p => p.completion_date! <= p.end_date!).length;
+    const onTimeRate = completedWithDates2.length > 0 ? Math.round((onTimeCount / completedWithDates2.length) * 100) : null;
+
+    // Budget total
+    const totalBudget = projects.reduce((sum, p) => sum + (p.budget ?? 0), 0);
+    const projectsWithBudget = projects.filter(p => p.budget && p.budget > 0).length;
+
+    // RAG Status du portefeuille
+    type RAGStatus = 'red' | 'amber' | 'green';
+    const computeRAG = (p: typeof projects[0]): RAGStatus => {
+      if (p.end_date && p.end_date < today && p.status !== 'completed' && p.status !== 'done') return 'red';
+      if (p.start_date && p.end_date) {
+        const start = new Date(p.start_date).getTime();
+        const end = new Date(p.end_date).getTime();
+        const elapsed = end > start ? (Date.now() - start) / (end - start) : 0;
+        if (elapsed > 0.5 && (p.progress ?? 0) < 30 && p.status !== 'completed' && p.status !== 'done') return 'amber';
+      }
+      return 'green';
+    };
+    const ragRed = projects.filter(p => computeRAG(p) === 'red').length;
+    const ragAmber = projects.filter(p => computeRAG(p) === 'amber').length;
+    const ragGreen = projects.filter(p => computeRAG(p) === 'green').length;
 
     return {
       avgDuration,
       statusDistribution,
       priorityDistribution,
       trends,
+      onTimeRate,
+      totalBudget,
+      projectsWithBudget,
+      ragRed,
+      ragAmber,
+      ragGreen,
     };
   }, [projects]);
 
@@ -148,15 +191,15 @@ export const ProjectDashboardAnalytics: React.FC = () => {
       'Date début': formatDateForExport(p.start_date),
       'Date fin': formatDateForExport(p.end_date),
       Progression: p.progress || 0,
-      Budget: formatCurrencyForExport(p.budget, p.currency || 'DJF'),
+      Budget: formatCurrencyForExport(p.budget, 'DJF'),
       'Créé par': p.profiles?.full_name || '',
     }));
 
     exportToCSV(exportData, `projets-${new Date().toISOString().split('T')[0]}.csv`);
 
     toast({
-      title: 'Export CSV réussi',
-      description: `${exportData.length} projets exportés`,
+      title: t('projectsBloc.analytics.exportSuccess'),
+      description: t('projectsBloc.analytics.exportCsvDesc').replace('%s', exportData.length.toString()),
     });
   };
 
@@ -170,7 +213,7 @@ export const ProjectDashboardAnalytics: React.FC = () => {
         debut: formatDateForExport(p.start_date),
         fin: formatDateForExport(p.end_date),
         progression: `${p.progress || 0}%`,
-        budget: formatCurrencyForExport(p.budget, p.currency || 'DJF'),
+        budget: formatCurrencyForExport(p.budget, 'DJF'),
       }));
 
       await exportTableToPDF(
@@ -194,13 +237,13 @@ export const ProjectDashboardAnalytics: React.FC = () => {
       );
 
       toast({
-        title: 'Export PDF réussi',
-        description: 'Rapport tabulaire téléchargé',
+        title: t('projectsBloc.analytics.exportSuccess'),
+        description: t('projectsBloc.analytics.exportPdfTableDesc'),
       });
     } catch (error) {
       toast({
-        title: 'Erreur export PDF',
-        description: 'Une erreur est survenue',
+        title: t('projectsBloc.analytics.exportError'),
+        description: t('projectsBloc.analytics.exportErrorDesc'),
         variant: 'destructive',
       });
     }
@@ -216,13 +259,13 @@ export const ProjectDashboardAnalytics: React.FC = () => {
       });
 
       toast({
-        title: 'Export PDF réussi',
-        description: 'Dashboard visuel téléchargé',
+        title: t('projectsBloc.analytics.exportSuccess'),
+        description: t('projectsBloc.analytics.exportPdfVisualDesc'),
       });
     } catch (error) {
       toast({
-        title: 'Erreur export PDF',
-        description: 'Une erreur est survenue',
+        title: t('projectsBloc.analytics.exportError'),
+        description: t('projectsBloc.analytics.exportErrorDesc'),
         variant: 'destructive',
       });
     }
@@ -268,13 +311,13 @@ export const ProjectDashboardAnalytics: React.FC = () => {
       );
 
       toast({
-        title: 'Export PDF complet réussi',
-        description: 'Rapport avec métriques + données téléchargé',
+        title: t('projectsBloc.analytics.exportSuccess'),
+        description: t('projectsBloc.analytics.exportPdfCompleteDesc'),
       });
     } catch (error) {
       toast({
-        title: 'Erreur export PDF',
-        description: 'Une erreur est survenue',
+        title: t('projectsBloc.analytics.exportError'),
+        description: t('projectsBloc.analytics.exportErrorDesc'),
         variant: 'destructive',
       });
     }
@@ -285,39 +328,39 @@ export const ProjectDashboardAnalytics: React.FC = () => {
       {/* Header avec actions */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Analytics Projets</h1>
-          <p className="text-muted-foreground mt-1">Vue d'ensemble et métriques clés</p>
+          <h1 className="text-3xl font-bold">{t('projectsBloc.analytics.title')}</h1>
+          <p className="text-muted-foreground mt-1">{t('projectsBloc.analytics.subtitle')}</p>
         </div>
         <div className="flex items-center gap-2">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm" disabled={projects.length === 0}>
                 <Download className="mr-2 h-4 w-4" />
-                Exporter
+                {t('projectsBloc.analytics.exportBtn')}
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuItem onClick={handleExportCSV}>
                 <FileText className="mr-2 h-4 w-4" />
-                CSV (Tableau)
+                {t('projectsBloc.analytics.csvTable')}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={handleExportPDFTable}>
                 <FileText className="mr-2 h-4 w-4" />
-                PDF Tableau
+                {t('projectsBloc.analytics.pdfTable')}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={handleExportPDFDashboard}>
                 <Image className="mr-2 h-4 w-4" />
-                PDF Visuel
+                {t('projectsBloc.analytics.pdfVisual')}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={handleExportPDFComplete}>
                 <FileText className="mr-2 h-4 w-4" />
-                PDF Complet
+                {t('projectsBloc.analytics.pdfComplete')}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
           <Button variant="outline" size="sm" onClick={refresh} disabled={loading}>
             <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-            Actualiser
+            {t('projectsBloc.analytics.refreshBtn')}
           </Button>
         </div>
       </div>
@@ -327,54 +370,125 @@ export const ProjectDashboardAnalytics: React.FC = () => {
         {/* KPIs avec tendances */}
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
           <MetricCard
-            label="Total Projets"
+            label={t('projectsBloc.analytics.totalProjects')}
             value={totalCount}
-            subtitle={`+${analytics.trends.total.value}% vs précédent`}
+            subtitle={analytics.trends.total.value > 0 ? `${analytics.trends.total.isPositive ? '+' : '-'}${analytics.trends.total.value}% ${analytics.trends.total.label}` : analytics.trends.total.label}
             icon={<BarChart3 className="h-6 w-6" />}
             color="blue"
-            trend="up"
+            trend={analytics.trends.total.isPositive ? 'up' : 'down'}
           />
           <MetricCard
-            label="Projets Actifs"
+            label={t('projectsBloc.analytics.activeProjects')}
             value={activeProjects}
-            subtitle={`+${analytics.trends.active.value}% vs précédent`}
+            subtitle={analytics.trends.active.value > 0 ? `${analytics.trends.active.isPositive ? '+' : '-'}${analytics.trends.active.value}% ${analytics.trends.active.label}` : analytics.trends.active.label}
             icon={<TrendingUp className="h-6 w-6" />}
             color="green"
-            trend="up"
+            trend={analytics.trends.active.isPositive ? 'up' : 'down'}
           />
           <MetricCard
-            label="Terminés"
+            label={t('projectsBloc.analytics.completedProjects')}
             value={completedProjects}
-            subtitle={`+${analytics.trends.completed.value}% vs précédent`}
+            subtitle={analytics.trends.completed.value > 0 ? `${analytics.trends.completed.isPositive ? '+' : '-'}${analytics.trends.completed.value}% ${analytics.trends.completed.label}` : analytics.trends.completed.label}
             icon={<CheckCircle2 className="h-6 w-6" />}
             color="green"
-            trend="up"
+            trend={analytics.trends.completed.isPositive ? 'up' : 'down'}
           />
           <MetricCard
-            label="En Retard"
+            label={t('projectsBloc.analytics.overdueProjects')}
             value={overdueProjects}
-            subtitle="Nécessitent action"
+            subtitle={analytics.trends.overdue.value > 0 ? `${analytics.trends.overdue.isPositive ? '↓' : '↑'}${analytics.trends.overdue.value}% ${analytics.trends.overdue.label}` : t('projectsBloc.analytics.needsAction')}
             icon={<AlertTriangle className="h-6 w-6" />}
             color="red"
+            trend={analytics.trends.overdue.isPositive ? 'down' : 'up'}
           />
         </div>
 
-        {/* Métrique supplémentaire */}
+        {/* Métriques avancées : Durée, On-Time, Budget */}
         <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <MetricCard
-            label="Durée Moyenne"
+            label={t('projectsBloc.analytics.avgDuration')}
             value={`${analytics.avgDuration}j`}
-            subtitle="Temps de réalisation"
+            subtitle={t('projectsBloc.analytics.avgDurationSub')}
             icon={<Clock className="h-6 w-6" />}
             color="purple"
           />
+          <MetricCard
+            label="Taux de livraison à temps"
+            value={analytics.onTimeRate !== null ? `${analytics.onTimeRate}%` : '—'}
+            subtitle={analytics.onTimeRate !== null ? (analytics.onTimeRate >= 80 ? 'Objectif atteint' : 'À améliorer') : 'Aucun projet terminé'}
+            icon={<Target className="h-6 w-6" />}
+            color={analytics.onTimeRate !== null && analytics.onTimeRate >= 80 ? 'green' : analytics.onTimeRate !== null ? 'orange' : 'gray'}
+            trend={analytics.onTimeRate !== null && analytics.onTimeRate >= 80 ? 'up' : 'neutral'}
+            progress={analytics.onTimeRate !== null ? analytics.onTimeRate : undefined}
+          />
+          <MetricCard
+            label="Budget total portefeuille"
+            value={analytics.totalBudget > 0 ? `${analytics.totalBudget.toLocaleString('fr-DJ')} DJF` : '—'}
+            subtitle={analytics.projectsWithBudget > 0 ? `${analytics.projectsWithBudget} projet(s) budgétisé(s)` : 'Aucun budget renseigné'}
+            icon={<DollarSign className="h-6 w-6" />}
+            color="blue"
+          />
+        </div>
+
+        {/* RAG Status — Santé du portefeuille */}
+        <div className="rounded-xl border bg-card p-5 shadow-sm">
+          <h3 className="mb-4 text-sm font-semibold text-foreground">Santé du portefeuille (RAG)</h3>
+          <div className="grid grid-cols-3 gap-4">
+            {/* Red — En danger */}
+            <div className="relative overflow-hidden rounded-xl border-l-4 border-l-rose-500 border border-rose-200 bg-rose-50 p-4 dark:border-rose-900 dark:bg-rose-950/30">
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-rose-500 to-red-600 shadow-sm">
+                  <ShieldOff className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <p className="text-2xl font-black tabular-nums text-rose-700 dark:text-rose-400">
+                    {analytics.ragRed}
+                  </p>
+                  <p className="text-xs font-semibold text-rose-600 dark:text-rose-400">En danger</p>
+                  <p className="text-xs text-muted-foreground">Retard avéré</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Amber — À risque */}
+            <div className="relative overflow-hidden rounded-xl border-l-4 border-l-amber-500 border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950/30">
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 shadow-sm">
+                  <ShieldAlert className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <p className="text-2xl font-black tabular-nums text-amber-700 dark:text-amber-400">
+                    {analytics.ragAmber}
+                  </p>
+                  <p className="text-xs font-semibold text-amber-600 dark:text-amber-400">À risque</p>
+                  <p className="text-xs text-muted-foreground">Progression lente</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Green — En bonne santé */}
+            <div className="relative overflow-hidden rounded-xl border-l-4 border-l-emerald-500 border border-emerald-200 bg-emerald-50 p-4 dark:border-emerald-900 dark:bg-emerald-950/30">
+              <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 shadow-sm">
+                  <ShieldCheck className="h-5 w-5 text-white" />
+                </div>
+                <div>
+                  <p className="text-2xl font-black tabular-nums text-emerald-700 dark:text-emerald-400">
+                    {analytics.ragGreen}
+                  </p>
+                  <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">En bonne santé</p>
+                  <p className="text-xs text-muted-foreground">Sur les rails</p>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Graphiques de distribution */}
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <DistributionChart title="Distribution par Statut" data={analytics.statusDistribution} />
+          <DistributionChart title={t('projectsBloc.analytics.distByStatus')} data={analytics.statusDistribution} />
           <DistributionChart
-            title="Distribution par Priorité"
+            title={t('projectsBloc.analytics.distByPriority')}
             data={analytics.priorityDistribution}
           />
         </div>

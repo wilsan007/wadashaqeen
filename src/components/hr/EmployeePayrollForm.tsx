@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
+import { z } from 'zod';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
 import { supabase } from '@/integrations/supabase/client';
-import { PaieEmploye } from '../../types/payroll';
 import { toast } from '@/hooks/use-toast';
 
 interface EmployeePayrollFormProps {
@@ -9,22 +11,43 @@ interface EmployeePayrollFormProps {
   onSuccess: () => void;
 }
 
+const employeePayrollSchema = z.object({
+  nom_complet: z.string().min(1, 'Le nom complet est requis'),
+  fonction: z.string().min(1, 'La fonction est requise'),
+  date_embauche: z.string().optional(),
+  salaire_base: z.coerce.number({ invalid_type_error: 'Valeur invalide' }).min(0, 'Doit être ≥ 0'),
+  prime_fonction_fixe: z.coerce.number({ invalid_type_error: 'Valeur invalide' }).min(0, 'Doit être ≥ 0'),
+  prime_responsabilite_fixe: z.coerce.number({ invalid_type_error: 'Valeur invalide' }).min(0, 'Doit être ≥ 0'),
+  prime_transport_fixe: z.coerce.number({ invalid_type_error: 'Valeur invalide' }).min(0, 'Doit être ≥ 0'),
+  prime_logement_fixe: z.coerce.number({ invalid_type_error: 'Valeur invalide' }).min(0, 'Doit être ≥ 0'),
+  retenue_waqf_fixe: z.coerce.number({ invalid_type_error: 'Valeur invalide' }).min(0, 'Doit être ≥ 0'),
+});
+
+type EmployeePayrollValues = z.infer<typeof employeePayrollSchema>;
+
+const DEFAULT_VALUES: EmployeePayrollValues = {
+  nom_complet: '',
+  fonction: '',
+  date_embauche: '',
+  salaire_base: 0,
+  prime_fonction_fixe: 0,
+  prime_responsabilite_fixe: 0,
+  prime_transport_fixe: 0,
+  prime_logement_fixe: 0,
+  retenue_waqf_fixe: 400,
+};
+
 export const EmployeePayrollForm: React.FC<EmployeePayrollFormProps> = ({
   employeeId,
   onClose,
   onSuccess,
 }) => {
-  const [formData, setFormData] = useState<Partial<PaieEmploye>>({
-    nom_complet: '',
-    fonction: '',
-    salaire_base: 0,
-    prime_fonction_fixe: 0,
-    prime_responsabilite_fixe: 0,
-    prime_transport_fixe: 0,
-    prime_logement_fixe: 0,
-    retenue_waqf_fixe: 400, // Default value
+  const form = useForm<EmployeePayrollValues>({
+    resolver: zodResolver(employeePayrollSchema),
+    defaultValues: DEFAULT_VALUES,
   });
-  const [loading, setLoading] = useState(false);
+
+  const { formState: { isSubmitting } } = form;
 
   useEffect(() => {
     if (employeeId) {
@@ -36,27 +59,35 @@ export const EmployeePayrollForm: React.FC<EmployeePayrollFormProps> = ({
     const { data } = await supabase.from('paie_employes').select('*').eq('id', employeeId).single();
 
     if (data) {
-      setFormData(data);
+      form.reset({
+        nom_complet: data.nom_complet ?? '',
+        fonction: data.fonction ?? '',
+        date_embauche: data.date_embauche ?? '',
+        salaire_base: data.salaire_base ?? 0,
+        prime_fonction_fixe: data.prime_fonction_fixe ?? 0,
+        prime_responsabilite_fixe: data.prime_responsabilite_fixe ?? 0,
+        prime_transport_fixe: data.prime_transport_fixe ?? 0,
+        prime_logement_fixe: data.prime_logement_fixe ?? 0,
+        retenue_waqf_fixe: data.retenue_waqf_fixe ?? 400,
+      });
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-
+  const onSubmit = form.handleSubmit(async (data: EmployeePayrollValues) => {
     try {
+      const payload = {
+        ...data,
+        date_embauche: data.date_embauche || null,
+      };
+
       if (employeeId) {
-        // Update
         const { error } = await supabase
           .from('paie_employes')
-          .update(formData)
+          .update(payload)
           .eq('id', employeeId);
-
         if (error) throw error;
       } else {
-        // Insert
-        const { error } = await supabase.from('paie_employes').insert([formData as any]);
-
+        const { error } = await supabase.from('paie_employes').insert([payload as any]);
         if (error) throw error;
       }
 
@@ -65,10 +96,10 @@ export const EmployeePayrollForm: React.FC<EmployeePayrollFormProps> = ({
     } catch (error) {
       console.error(error);
       toast({ title: 'Erreur', description: 'Erreur lors de la sauvegarde.', variant: 'destructive' });
-    } finally {
-      setLoading(false);
     }
-  };
+  });
+
+  type FieldName = keyof EmployeePayrollValues;
 
   const InputField = ({
     label,
@@ -77,29 +108,29 @@ export const EmployeePayrollForm: React.FC<EmployeePayrollFormProps> = ({
     required = false,
   }: {
     label: string;
-    name: keyof PaieEmploye;
+    name: FieldName;
     type?: string;
     required?: boolean;
-  }) => (
-    <div>
-      <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-        {label} {required && <span className="text-red-500">*</span>}
-      </label>
-      <input
-        type={type}
-        name={name}
-        value={formData[name] || ''}
-        onChange={e =>
-          setFormData({
-            ...formData,
-            [name]: type === 'number' ? parseFloat(e.target.value) || 0 : e.target.value,
-          })
-        }
-        required={required}
-        className="w-full rounded-md border-gray-300 bg-white p-2 text-gray-900 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
-      />
-    </div>
-  );
+  }) => {
+    const { register, formState: { errors } } = form;
+    const error = errors[name];
+
+    return (
+      <div>
+        <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
+          {label} {required && <span className="text-red-500">*</span>}
+        </label>
+        <input
+          type={type}
+          {...register(name)}
+          className="w-full rounded-md border-gray-300 bg-white p-2 text-gray-900 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:border-gray-600 dark:bg-gray-700 dark:text-white"
+        />
+        {error && (
+          <p className="mt-1 text-xs text-red-500">{error.message as string}</p>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="bg-opacity-50 fixed inset-0 z-50 flex items-center justify-center bg-black p-4">
@@ -125,7 +156,7 @@ export const EmployeePayrollForm: React.FC<EmployeePayrollFormProps> = ({
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6 p-6">
+        <form onSubmit={onSubmit} className="space-y-6 p-6">
           {/* Section: Informations Générales */}
           <div className="space-y-4">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
@@ -184,10 +215,10 @@ export const EmployeePayrollForm: React.FC<EmployeePayrollFormProps> = ({
             </button>
             <button
               type="submit"
-              disabled={loading}
+              disabled={isSubmitting}
               className="rounded-md bg-indigo-600 px-4 py-2 text-white hover:bg-indigo-700 disabled:opacity-50"
             >
-              {loading ? 'Enregistrement...' : 'Enregistrer'}
+              {isSubmitting ? 'Enregistrement...' : 'Enregistrer'}
             </button>
           </div>
         </form>

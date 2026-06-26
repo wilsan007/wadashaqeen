@@ -3,9 +3,12 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 // @ts-ignore - Deno imports
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
+// @ts-ignore - Deno global
+const _siteUrl = Deno.env.get('SITE_URL') ?? '*';
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': _siteUrl,
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
 interface OnboardRequest {

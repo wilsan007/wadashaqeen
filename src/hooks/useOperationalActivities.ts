@@ -6,12 +6,13 @@
  * avec cache intelligent, filtres avancés et métriques temps réel
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useTenant } from '@/contexts/TenantContext';
 import { useUserRoles } from '@/hooks/useUserRoles';
 import { useSessionManager } from '@/hooks/useSessionManager';
 import { applyRoleFilters, UserContext } from '@/lib/roleBasedFiltering';
+import { CACHE_TTL } from '@/lib/queryConfig';
 
 // =====================================================
 // Types
@@ -82,47 +83,6 @@ interface ActivityMetrics {
 }
 
 // =====================================================
-// Cache intelligent (TTL 3 minutes)
-// =====================================================
-
-interface CacheEntry {
-  data: OperationalActivity[];
-  timestamp: number;
-  filters: string;
-}
-
-const CACHE: Map<string, CacheEntry> = new Map();
-const CACHE_TTL = 3 * 60 * 1000; // 3 minutes
-
-function getCacheKey(filters?: any): string {
-  return JSON.stringify(filters || {});
-}
-
-function getCachedData(filters?: any): OperationalActivity[] | null {
-  const key = getCacheKey(filters);
-  const entry = CACHE.get(key);
-
-  if (!entry) return null;
-
-  const isExpired = Date.now() - entry.timestamp > CACHE_TTL;
-  if (isExpired) {
-    CACHE.delete(key);
-    return null;
-  }
-
-  return entry.data;
-}
-
-function setCachedData(data: OperationalActivity[], filters?: any): void {
-  const key = getCacheKey(filters);
-  CACHE.set(key, {
-    data,
-    timestamp: Date.now(),
-    filters: key,
-  });
-}
-
-// =====================================================
 // Hook Principal
 // =====================================================
 
@@ -131,266 +91,232 @@ export function useOperationalActivities(options: UseOperationalActivitiesOption
   const { currentTenant } = useTenant();
   const { session } = useSessionManager();
   const { getRoleNames, isSuperAdmin } = useUserRoles();
+  const queryClient = useQueryClient();
 
   const userId = session?.user?.id || '';
   const tenantId = currentTenant?.id || '';
   const roleNames = getRoleNames();
   const userRole = (isSuperAdmin() ? 'super_admin' : roleNames[0] || 'employee') as any;
 
-  // États
-  const [activities, setActivities] = useState<OperationalActivity[]>([]);
-  const [loading, setLoading] = useState(autoFetch);
-  const [error, setError] = useState<string | null>(null);
-  const [metrics, setMetrics] = useState<ActivityMetrics>({
+  // =====================================================
+  // Query Key (stable, serializable)
+  // =====================================================
+
+  const queryKey = ['operational-activities', { filters, userId, tenantId, userRole }];
+
+  // =====================================================
+  // Fetch Activities via useQuery
+  // =====================================================
+
+  const {
+    data: activitiesData,
+    isLoading: loading,
+    error: queryError,
+    dataUpdatedAt,
+  } = useQuery<OperationalActivity[]>({
+    queryKey,
+    queryFn: async () => {
+      const startTime = Date.now();
+
+      let query = supabase
+        .from('operational_activities')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      // 🔒 Appliquer le filtrage par rôle (SÉCURITÉ)
+      const userContext: UserContext = {
+        userId,
+        role: userRole,
+        tenantId,
+      };
+      query = applyRoleFilters(query, userContext, 'operational_activities');
+
+      // Appliquer les filtres additionnels
+      if (filters?.kind) {
+        query = query.eq('kind', filters.kind);
+      }
+      if (filters?.scope) {
+        query = query.eq('scope', filters.scope);
+      }
+      if (filters?.isActive !== undefined) {
+        query = query.eq('is_active', filters.isActive);
+      }
+      if (filters?.ownerId) {
+        query = query.eq('owner_id', filters.ownerId);
+      }
+      if (filters?.search) {
+        query = query.or(`name.ilike.%${filters.search}%,description.ilike.%${filters.search}%`);
+      }
+
+      const { data, error: fetchError } = await query;
+
+      if (fetchError) throw fetchError;
+
+      return (data || []) as OperationalActivity[];
+    },
+    enabled: autoFetch && !!tenantId,
+    ...CACHE_TTL.semiStatic,
+  });
+
+  const activities = activitiesData || [];
+
+  const error = queryError ? (queryError as Error).message : null;
+
+  // Métriques calculées à partir des données
+  const metrics: ActivityMetrics = {
     fetchTime: 0,
-    dataSize: 0,
+    dataSize: JSON.stringify(activities).length,
     cacheHit: false,
-    totalCount: 0,
-    activeCount: 0,
-    recurringCount: 0,
-    oneOffCount: 0,
+    totalCount: activities.length,
+    activeCount: activities.filter(a => a.is_active).length,
+    recurringCount: activities.filter(a => a.kind === 'recurring').length,
+    oneOffCount: activities.filter(a => a.kind === 'one_off').length,
+  };
+
+  // =====================================================
+  // Mutations
+  // =====================================================
+
+  const createMutation = useMutation({
+    mutationFn: async (activity: Partial<OperationalActivity>) => {
+      if (!currentTenant?.id) {
+        throw new Error('Aucun tenant actif. Veuillez vous connecter.');
+      }
+
+      // Récupérer l'utilisateur actuel
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        throw new Error('Utilisateur non authentifié. Veuillez vous reconnecter.');
+      }
+
+      // Injecter automatiquement tenant_id et created_by (requis par RLS)
+      const activityWithTenant = {
+        ...activity,
+        tenant_id: currentTenant.id,
+        created_by: user.id,
+      };
+
+      const { data, error: createError } = await supabase
+        .from('operational_activities')
+        .insert(activityWithTenant as any)
+        .select()
+        .single();
+
+      if (createError) throw createError;
+
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['operational-activities'] });
+    },
+    onError: (err: any) => {
+      console.error('❌ Erreur createActivity:', err);
+    },
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<OperationalActivity> }) => {
+      const { data, error: updateError } = await supabase
+        .from('operational_activities')
+        .update({ ...updates, updated_at: new Date().toISOString() } as OperationalActivity)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (updateError) throw updateError;
+
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['operational-activities'] });
+    },
+    onError: (err: any) => {
+      console.error('❌ Erreur updateActivity:', err);
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async ({
+      id,
+      keepCompletedTasks = true,
+    }: {
+      id: string;
+      keepCompletedTasks?: boolean;
+    }) => {
+      // Utiliser la fonction RPC pour supprimer proprement
+      const { data, error: deleteError } = await supabase.rpc(
+        'delete_activity_with_future_occurrences',
+        {
+          p_activity_id: id,
+          p_keep_completed: keepCompletedTasks,
+        }
+      );
+
+      if (deleteError) throw deleteError;
+
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['operational-activities'] });
+    },
+    onError: (err: any) => {
+      console.error('❌ Erreur deleteActivity:', err);
+    },
+  });
+
+  const toggleActiveMutation = useMutation({
+    mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) => {
+      const { error: toggleError } = await supabase.rpc('pause_activity', {
+        p_activity_id: id,
+        p_is_active: isActive,
+      });
+
+      if (toggleError) throw toggleError;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['operational-activities'] });
+    },
+    onError: (err: any) => {
+      console.error('❌ Erreur toggleActive:', err);
+    },
   });
 
   // =====================================================
-  // Fetch Activities
+  // Fonctions exposées (compatibilité interface publique)
   // =====================================================
 
-  const fetchActivities = useCallback(
-    async (forceRefresh = false) => {
-      const startTime = Date.now();
-      setLoading(true);
-      setError(null);
+  const fetchActivities = async (_forceRefresh = false) => {
+    await queryClient.invalidateQueries({ queryKey: ['operational-activities'] });
+  };
 
-      try {
-        // Vérifier le cache
-        if (!forceRefresh) {
-          const cached = getCachedData(filters);
-          if (cached) {
-            setActivities(cached);
-            setMetrics({
-              fetchTime: Date.now() - startTime,
-              dataSize: JSON.stringify(cached).length,
-              cacheHit: true,
-              totalCount: cached.length,
-              activeCount: cached.filter(a => a.is_active).length,
-              recurringCount: cached.filter(a => a.kind === 'recurring').length,
-              oneOffCount: cached.filter(a => a.kind === 'one_off').length,
-            });
-            setLoading(false);
-            return;
-          }
-        }
+  const createActivity = async (activity: Partial<OperationalActivity>) => {
+    return createMutation.mutateAsync(activity);
+  };
 
-        // Query builder
-        let query = supabase
-          .from('operational_activities')
-          .select('*')
-          .order('created_at', { ascending: false });
+  const updateActivity = async (id: string, updates: Partial<OperationalActivity>) => {
+    return updateMutation.mutateAsync({ id, updates });
+  };
 
-        // 🔒 Appliquer le filtrage par rôle (SÉCURITÉ)
-        const userContext: UserContext = {
-          userId,
-          role: userRole,
-          tenantId,
-        };
-        query = applyRoleFilters(query, userContext, 'operational_activities');
+  const deleteActivity = async (id: string, keepCompletedTasks = true) => {
+    return deleteMutation.mutateAsync({ id, keepCompletedTasks });
+  };
 
-        // Appliquer les filtres additionnels
-        if (filters?.kind) {
-          query = query.eq('kind', filters.kind);
-        }
-        if (filters?.scope) {
-          query = query.eq('scope', filters.scope);
-        }
-        if (filters?.isActive !== undefined) {
-          query = query.eq('is_active', filters.isActive);
-        }
-        if (filters?.ownerId) {
-          query = query.eq('owner_id', filters.ownerId);
-        }
-        if (filters?.search) {
-          query = query.or(`name.ilike.%${filters.search}%,description.ilike.%${filters.search}%`);
-        }
+  const toggleActive = async (id: string, isActive: boolean) => {
+    return toggleActiveMutation.mutateAsync({ id, isActive });
+  };
 
-        const { data, error: fetchError } = await query;
+  const getStatistics = async (activityId: string) => {
+    const { data, error: statsError } = await supabase.rpc('get_activity_statistics', {
+      p_activity_id: activityId,
+    });
 
-        if (fetchError) throw fetchError;
+    if (statsError) throw statsError;
 
-        const activitiesData = (data || []) as OperationalActivity[];
-        setActivities(activitiesData);
-
-        // Mettre en cache
-        setCachedData(activitiesData, filters);
-
-        // Métriques
-        setMetrics({
-          fetchTime: Date.now() - startTime,
-          dataSize: JSON.stringify(activitiesData).length,
-          cacheHit: false,
-          totalCount: activitiesData.length,
-          activeCount: activitiesData.filter(a => a.is_active).length,
-          recurringCount: activitiesData.filter(a => a.kind === 'recurring').length,
-          oneOffCount: activitiesData.filter(a => a.kind === 'one_off').length,
-        });
-      } catch (err: any) {
-        console.error('❌ Erreur fetchActivities:', err);
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    },
-    [filters]
-  );
-
-  // =====================================================
-  // CRUD Operations
-  // =====================================================
-
-  const createActivity = useCallback(
-    async (activity: Partial<OperationalActivity>) => {
-      try {
-        if (!currentTenant?.id) {
-          throw new Error('Aucun tenant actif. Veuillez vous connecter.');
-        }
-
-        // Récupérer l'utilisateur actuel
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-
-        if (!user) {
-          throw new Error('Utilisateur non authentifié. Veuillez vous reconnecter.');
-        }
-
-        // Injecter automatiquement tenant_id et created_by (requis par RLS)
-        const activityWithTenant = {
-          ...activity,
-          tenant_id: currentTenant.id,
-          created_by: user.id,
-        };
-
-
-        const { data, error: createError } = await supabase
-          .from('operational_activities')
-          .insert(activityWithTenant as any)
-          .select()
-          .single();
-
-        if (createError) throw createError;
-
-
-        // Invalider le cache
-        CACHE.clear();
-        await fetchActivities(true);
-
-        return data;
-      } catch (err: any) {
-        console.error('❌ Erreur createActivity:', err);
-        setError(err.message);
-        throw err;
-      }
-    },
-    [fetchActivities, currentTenant]
-  );
-
-  const updateActivity = useCallback(
-    async (id: string, updates: Partial<OperationalActivity>) => {
-      try {
-        const { data, error: updateError } = await supabase
-          .from('operational_activities')
-          .update({ ...updates, updated_at: new Date().toISOString() } as OperationalActivity)
-          .eq('id', id)
-          .select()
-          .single();
-
-        if (updateError) throw updateError;
-        CACHE.clear();
-        await fetchActivities(true);
-
-        return data;
-      } catch (err: any) {
-        console.error('❌ Erreur updateActivity:', err);
-        setError(err.message);
-        throw err;
-      }
-    },
-    [fetchActivities]
-  );
-
-  const deleteActivity = useCallback(
-    async (id: string, keepCompletedTasks = true) => {
-      try {
-        // Utiliser la fonction RPC pour supprimer proprement
-        const { data, error: deleteError } = await supabase.rpc(
-          'delete_activity_with_future_occurrences',
-          {
-            p_activity_id: id,
-            p_keep_completed: keepCompletedTasks,
-          }
-        );
-
-        if (deleteError) throw deleteError;
-
-        // Invalider le cache
-        CACHE.clear();
-        await fetchActivities(true);
-
-        return data;
-      } catch (err: any) {
-        console.error('❌ Erreur deleteActivity:', err);
-        setError(err.message);
-        throw err;
-      }
-    },
-    [fetchActivities]
-  );
-
-  const toggleActive = useCallback(
-    async (id: string, isActive: boolean) => {
-      try {
-        const { error: toggleError } = await supabase.rpc('pause_activity', {
-          p_activity_id: id,
-          p_is_active: isActive,
-        });
-
-        if (toggleError) throw toggleError;
-
-        // Invalider le cache
-        CACHE.clear();
-        await fetchActivities(true);
-      } catch (err: any) {
-        console.error('❌ Erreur toggleActive:', err);
-        setError(err.message);
-        throw err;
-      }
-    },
-    [fetchActivities]
-  );
-
-  const getStatistics = useCallback(async (activityId: string) => {
-    try {
-      const { data, error: statsError } = await supabase.rpc('get_activity_statistics', {
-        p_activity_id: activityId,
-      });
-
-      if (statsError) throw statsError;
-
-      return data;
-    } catch (err: any) {
-      console.error('❌ Erreur getStatistics:', err);
-      throw err;
-    }
-  }, []);
-
-  // =====================================================
-  // Auto-fetch on mount
-  // =====================================================
-
-  useEffect(() => {
-    if (autoFetch) {
-      fetchActivities();
-    }
-  }, [autoFetch, fetchActivities]);
+    return data;
+  };
 
   // =====================================================
   // Return API
@@ -412,7 +338,7 @@ export function useOperationalActivities(options: UseOperationalActivitiesOption
     getStatistics,
 
     // Utilities
-    refresh: () => fetchActivities(true),
-    clearCache: () => CACHE.clear(),
+    refresh: () => queryClient.invalidateQueries({ queryKey: ['operational-activities'] }),
+    clearCache: () => queryClient.removeQueries({ queryKey: ['operational-activities'] }),
   };
 }

@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Plus, CheckCircle2, Circle } from '@/lib/icons';
 // Hooks optimisés avec cache intelligent et métriques
 import { useTasks, type Task } from '@/hooks/optimized';
+import { useTranslation } from '@/hooks/useTranslation';
 import { LoadingState } from '@/components/ui/loading-state';
 import { ErrorState } from '@/components/ui/error-state';
 import { MobileTaskCard } from './MobileTaskCard';
@@ -46,12 +47,13 @@ export function MobileDynamicTable({
 }: MobileDynamicTableProps) {
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('todo');
+  const { t } = useTranslation();
 
   const statusLabels = {
-    todo: 'À faire',
-    doing: 'En cours',
-    blocked: 'Bloqué',
-    done: 'Terminé',
+    todo: t('gantt.status.todo'),
+    doing: t('gantt.status.inProgress'),
+    blocked: t('gantt.status.blocked'),
+    done: t('gantt.status.completed'),
   };
 
   // Grouper les tâches par statut
@@ -89,7 +91,7 @@ export function MobileDynamicTable({
   };
 
   if (propLoading) {
-    return <LoadingState message="Chargement des tâches..." />;
+    return <LoadingState message={t('common.loading')} />;
   }
 
   if (propError) {
@@ -99,7 +101,7 @@ export function MobileDynamicTable({
   return (
     <Card className="modern-card glow-accent transition-smooth flex h-[calc(100vh-120px)] w-full flex-col">
       <CardHeader className="from-primary/10 via-accent/10 to-tech-purple/10 flex shrink-0 flex-row items-center justify-between border-b bg-gradient-to-r px-4 py-3 backdrop-blur-sm">
-        <CardTitle className="text-foreground text-lg font-semibold">Tableau Dynamique</CardTitle>
+        <CardTitle className="text-foreground text-lg font-semibold">{t('gantt.toolbar.board')}</CardTitle>
         {onSwitchToDesktop && (
           <Button variant="outline" size="sm" onClick={onSwitchToDesktop} className="h-8 text-xs">
             🖥️ Vue Bureau

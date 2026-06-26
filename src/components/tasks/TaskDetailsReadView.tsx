@@ -22,6 +22,7 @@ import {
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { type Task } from '@/hooks/optimized';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface TaskDetailsReadViewProps {
   task: Task;
@@ -40,22 +41,24 @@ export const TaskDetailsReadView: React.FC<TaskDetailsReadViewProps> = ({
   statusIcons,
   priorityIcons,
 }) => {
+  const { t } = useTranslation();
+
   const getStatusLabel = (status: string) => {
     const labels: Record<string, string> = {
-      todo: 'À faire',
-      doing: 'En cours',
-      blocked: 'Bloqué',
-      done: 'Terminé',
+      todo: t('tasks.status.todo'),
+      doing: t('tasks.status.in_progress'),
+      blocked: t('tasks.status.blocked'),
+      done: t('tasks.status.done'),
     };
     return labels[status] || status;
   };
 
   const getPriorityLabel = (priority: string) => {
     const labels: Record<string, string> = {
-      low: 'Basse',
-      medium: 'Moyenne',
-      high: 'Haute',
-      urgent: 'Urgente',
+      low: t('tasks.priority.low'),
+      medium: t('tasks.priority.medium'),
+      high: t('tasks.priority.high'),
+      urgent: t('tasks.priority.urgent'),
     };
     return labels[priority] || priority;
   };

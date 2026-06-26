@@ -21,15 +21,16 @@ export function ThemeToggle() {
 
   return (
     <Button
-      variant="outline"
+      variant="ghost"
       size="icon"
       onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-      className="transition-smooth hover-glow glass border-primary/30"
+      className="h-9 w-9 rounded-lg text-muted-foreground transition-all duration-150 hover:bg-accent hover:text-foreground"
+      aria-label="Changer de thème"
     >
       {theme === 'light' ? (
-        <Moon className="text-primary h-4 w-4" />
+        <Moon className="h-4 w-4" />
       ) : (
-        <Sun className="text-primary h-4 w-4" />
+        <Sun className="h-4 w-4" />
       )}
       <span className="sr-only">Changer de thème</span>
     </Button>

@@ -1,4 +1,5 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
+import * as Sentry from '@sentry/react';
 import { AlertCircle, RefreshCw, Home } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -39,18 +40,8 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    // Log l'erreur dans la console (en dev) et dans un service de monitoring (en prod)
-    console.error('❌ ErrorBoundary caught an error:', error, errorInfo);
-
-    this.setState({
-      error,
-      errorInfo,
-    });
-
-    // TODO: Envoyer à un service de monitoring (Sentry, LogRocket, etc.)
-    // if (process.env.NODE_ENV === 'production') {
-    //   // Sentry.captureException(error, { extra: errorInfo });
-    // }
+    this.setState({ error, errorInfo });
+    Sentry.captureException(error, { extra: { componentStack: errorInfo.componentStack } });
   }
 
   handleReset = () => {

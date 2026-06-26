@@ -195,6 +195,7 @@ class RoleCacheManager {
       });
 
       if (expiredKeys.length > 0) {
+        // Expired keys have already been removed above
       }
     }, 60000); // Nettoyer chaque minute
   }
@@ -358,6 +359,7 @@ class RoleCacheManager {
       this.removeFromStorage(key);
     });
 
+    console.log(
       `🗑️ Cache invalidé pour l'utilisateur ${userId}: ${keysToDelete.length} entrées supprimées`
     );
     this.notifyListeners('user_cache_invalidated', { userId, tenantId });

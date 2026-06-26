@@ -1,9 +1,13 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
+declare const Deno: any;
+
+const _siteUrl = (typeof Deno !== 'undefined' ? Deno.env.get('SITE_URL') : null) ?? '*';
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': _siteUrl,
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
 };
 
 serve(async req => {
@@ -120,33 +124,35 @@ serve(async req => {
       // 5. Create Tenant (if needed) & Profile
       // Transaction-like operations
 
-      // Create Tenant (if it doesn't exist yet - idempotency)
-      const { error: tenantError } = await supabaseAdmin
-        .from('tenants')
-        .insert({
-          id: invitation.tenant_id,
-          name: invitation.tenant_name,
-          slug:
-            invitation.tenant_name.toLowerCase().replace(/[^a-z0-9]/g, '-') +
-            '-' +
-            Math.floor(Math.random() * 1000),
-          status: 'active',
-        })
-        .select()
-        .single();
+      // Create Tenant only for tenant_owner invitations
+      if (invitation.invitation_type === 'tenant_owner') {
+        const { error: tenantError } = await supabaseAdmin
+          .from('tenants')
+          .insert({
+            id: invitation.tenant_id,
+            name: invitation.tenant_name,
+            slug:
+              invitation.tenant_name.toLowerCase().replace(/[^a-z0-9]/g, '-') +
+              '-' +
+              Math.floor(Math.random() * 1000),
+            status: 'active',
+          })
+          .select()
+          .single();
 
-      if (tenantError && !tenantError.message.includes('duplicate key')) {
-        throw tenantError;
+        if (tenantError && !tenantError.message.includes('duplicate key')) {
+          throw tenantError;
+        }
       }
 
-      // Create Profile
+      // Create Profile — use role from invitation, never hardcode
       const { error: profileError } = await supabaseAdmin.from('profiles').insert({
-        id: user.id,
+        user_id: user.id,
         first_name: invitation.full_name.split(' ')[0],
         last_name: invitation.full_name.split(' ').slice(1).join(' ') || '',
         email: user.email,
         tenant_id: invitation.tenant_id,
-        role: 'tenant_admin',
+        role: invitation.role_to_assign ?? 'employee',
         status: 'active',
       });
 

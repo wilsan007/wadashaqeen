@@ -10,11 +10,13 @@ import { AuthErrorAlert, useAuthErrors } from '@/components/ui/auth-error-alert'
 import { useAuthErrorHandler } from '@/lib/authErrorHandler';
 import { useErrorHandler } from '@/hooks/useErrorHandler';
 import { useMultiplePlaceholderHandler } from '@/hooks/usePlaceholderHandler';
+import { useTranslation } from '@/hooks/useTranslation';
 
 export const TenantOwnerLogin: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { t } = useTranslation();
   const { errors, addError, removeError, clearErrors } = useAuthErrors();
   const { handleAuthError: handleLegacyAuthError, handleInvitationError } = useAuthErrorHandler();
   const { handleAuthError } = useErrorHandler({ showToast: false, persistErrors: false });
@@ -23,8 +25,8 @@ export const TenantOwnerLogin: React.FC = () => {
 
   // Gestion des placeholders (sécurisée - pas d'auto-complétion)
   const { handleFocus, getPlaceholder, forceHidePlaceholder } = useMultiplePlaceholderHandler({
-    email: 'votre@email.com',
-    password: 'Votre mot de passe',
+    email: t('auth.email'),
+    password: t('auth.password'),
   });
 
   // Forcer le masquage des placeholders si des valeurs sont détectées (sécurité)
@@ -44,6 +46,7 @@ export const TenantOwnerLogin: React.FC = () => {
       setInvitationProcessing(true);
       clearErrors();
 
+      console.log('[TenantOwnerLogin] Processing invitation token', {
         token: token.substring(0, 20) + '...',
         type,
         email,
@@ -59,8 +62,8 @@ export const TenantOwnerLogin: React.FC = () => {
           } else if (data.user?.email) {
             setForm(prev => ({ ...prev, email: data.user.email || '' }));
             toast({
-              title: '✅ Email confirmé avec succès',
-              description: 'Votre invitation a été validée. Vous pouvez maintenant vous connecter.',
+              title: t('auth.emailConfirmed'),
+              description: t('auth.emailConfirmedDesc'),
             });
           }
         })
@@ -81,92 +84,6 @@ export const TenantOwnerLogin: React.FC = () => {
     }
   }, [searchParams, handleAuthError, handleInvitationError, addError, clearErrors, toast]);
 
-  const triggerEdgeFunction = async (user: any) => {
-    try {
-
-      // Récupérer le token de session de l'utilisateur connecté
-      const { data: sessionData } = await supabase.auth.getSession();
-      const userToken = sessionData?.session?.access_token;
-
-      if (!userToken) {
-        console.error('❌ Pas de token de session disponible');
-        return;
-      }
-
-      const supabaseUrl =
-        import.meta.env.VITE_SUPABASE_URL || 'https://qliinxtanjdnwxlvnxji.supabase.co';
-      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
-
-      const response = await fetch(`${supabaseUrl}/functions/v1/handle-email-confirmation`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${userToken}`,
-          'Content-Type': 'application/json',
-          apikey: supabaseAnonKey,
-        },
-        body: JSON.stringify({
-          type: 'UPDATE',
-          table: 'users',
-          schema: 'auth',
-          record: {
-            id: user.id,
-            email: user.email,
-            email_confirmed_at: new Date().toISOString(), // Forcer la confirmation
-          },
-          old_record: {
-            id: user.id,
-            email: user.email,
-            email_confirmed_at: null,
-          },
-        }),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ Erreur HTTP Edge Function:', response.status, errorText);
-        throw new Error(`Erreur serveur ${response.status}: ${errorText}`);
-      }
-
-      const result = await response.json();
-
-      if (result.success) {
-        toast({
-          title: '🎉 Configuration terminée',
-          description: 'Votre entreprise a été configurée avec succès!',
-        });
-
-        // Rediriger vers le dashboard
-        setTimeout(() => {
-          navigate('/dashboard');
-        }, 2000);
-        return true;
-      } else {
-        if (result.error) {
-          const authError = handleAuthError(new Error(result.error));
-
-          // Convertir AppError vers le format attendu par l'ancien système
-          addError({
-            title: authError.title,
-            message: authError.userMessage,
-            type: 'error',
-          });
-        }
-        return false;
-      }
-    } catch (error) {
-      console.error('💥 Erreur Edge Function:', error);
-      const authError = handleAuthError(error);
-
-      // Convertir AppError vers le format attendu par l'ancien système
-      addError({
-        title: authError.title,
-        message: authError.userMessage,
-        type: 'error',
-      });
-      return false;
-    }
-  };
-
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -177,8 +94,8 @@ export const TenantOwnerLogin: React.FC = () => {
       // Validation côté client
       if (!form.email || !form.password) {
         addError({
-          title: '📝 Champs requis',
-          message: 'Veuillez saisir votre email et mot de passe.',
+          title: t('auth.requiredFields'),
+          message: t('auth.requiredFieldsDesc'),
           type: 'warning',
         });
         return;
@@ -205,18 +122,11 @@ export const TenantOwnerLogin: React.FC = () => {
         return;
       }
 
-      // Connexion réussie directement
       if (data.user) {
         toast({
-          title: '✅ Connexion réussie',
-          description: 'Configuration automatique en cours...',
+          title: t('auth.loginSuccess'),
+          description: t('auth.loginSuccessDesc'),
         });
-
-        // Déclencher l'Edge Function en arrière-plan même si déjà connecté
-        setTimeout(() => {
-          triggerEdgeFunction(data.user);
-        }, 1000);
-
         navigate('/');
       }
     } catch (error: any) {
@@ -267,14 +177,14 @@ export const TenantOwnerLogin: React.FC = () => {
         <Card className="w-full">
           <CardHeader className="text-center">
             <CardTitle className="text-2xl font-bold text-gray-900">
-              🏢 Connexion Tenant Owner
+              🏢 {t('auth.tenantLoginTitle')}
             </CardTitle>
-            <p className="mt-2 text-gray-600">Connectez-vous à votre espace entreprise</p>
+            <p className="mt-2 text-gray-600">{t('auth.tenantLoginSubtitle')}</p>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleLogin} className="space-y-4" autoComplete="off">
               <div>
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">{t('auth.email')}</Label>
                 <Input
                   id="email"
                   type="email"
@@ -294,7 +204,7 @@ export const TenantOwnerLogin: React.FC = () => {
               </div>
 
               <div>
-                <Label htmlFor="password">Mot de passe</Label>
+                <Label htmlFor="password">{t('auth.password')}</Label>
                 <Input
                   id="password"
                   type="password"
@@ -317,13 +227,13 @@ export const TenantOwnerLogin: React.FC = () => {
 
               <Button type="submit" disabled={isLoading || invitationProcessing}>
                 {isLoading
-                  ? '🔄 Connexion...'
+                  ? `🔄 ${t('auth.loggingIn')}`
                   : invitationProcessing
-                    ? '⏳ Traitement...'
-                    : '🚀 Se connecter'}
+                    ? `⏳ ${t('common.processing')}`
+                    : `🚀 ${t('auth.signIn')}`}
               </Button>
 
-              {/* Liens utiles */}
+              {/* Useful links */}
               <div className="space-y-2 text-center text-sm text-gray-600">
                 <p>
                   <button
@@ -333,11 +243,11 @@ export const TenantOwnerLogin: React.FC = () => {
                       // Implémenter la réinitialisation de mot de passe
                     }}
                   >
-                    Mot de passe oublié ?
+                    {t('auth.forgotPassword')}
                   </button>
                 </p>
                 <p className="text-xs text-gray-500">
-                  Problème avec votre invitation ? Contactez votre administrateur.
+                  {t('auth.invitationIssue')}
                 </p>
               </div>
             </form>

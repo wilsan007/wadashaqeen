@@ -92,8 +92,8 @@ export const useNotificationChannels = () => {
           const { data: recipient } = await supabase
             .from('profiles')
             .select('full_name')
-            .eq('id', notification?.recipient_id)
-            .single();
+            .eq('user_id', notification?.recipient_id)
+            .maybeSingle();
 
           return {
             '@type': 'MessageCard',

@@ -14,8 +14,10 @@ import { useLocation } from 'react-router-dom';
 // 🚀 OPTIMISATION BUNDLE - Import depuis barrel export optimisé
 import { Menu, X, Building2 } from '@/lib/icons';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 import { NotionStyleSidebar } from './NotionStyleSidebar';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { LanguageToggle } from '@/components/LanguageToggle';
 import { NotificationButton } from '@/components/notifications/NotificationButton';
 import { RoleIndicator } from '@/components/auth/RoleIndicator';
 import { SessionIndicator } from '@/components/SessionIndicator';
@@ -27,6 +29,7 @@ import { useTenant } from '@/contexts/TenantContext';
 import { useScrollDirection } from '@/hooks/use-scroll-direction';
 import { useIsMobileLayout } from '@/hooks/use-mobile';
 import FuturisticBackground from '@/components/ui/FuturisticBackground';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface AppLayoutWithSidebarProps {
   children: React.ReactNode;
@@ -53,6 +56,7 @@ export const AppLayoutWithSidebar: React.FC<AppLayoutWithSidebarProps> = ({
   const isSuperAdmin = checkIsSuperAdmin();
   const { currentTenant } = useTenant();
   const tenantName = currentTenant?.name;
+  const { t } = useTranslation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const location = useLocation();
 
@@ -95,17 +99,18 @@ export const AppLayoutWithSidebar: React.FC<AppLayoutWithSidebarProps> = ({
 
       {/* Menu Mobile Overlay - REDESIGNED */}
       {isMobileMenuOpen && (
-        <div className="fixed inset-0 z-[100] lg:hidden">
-          {/* Backdrop cliquable - AVEC BLUR */}
+        <div className="fixed inset-0 z-[100] lg:hidden" role="dialog" aria-modal="true" aria-label="Menu de navigation">
+          {/* Backdrop cliquable + accessible au clavier */}
           <div
             className="animate-in fade-in absolute inset-0 bg-black/40 backdrop-blur-sm duration-300"
             onClick={() => setIsMobileMenuOpen(false)}
-            aria-label="Fermer le menu"
+            onKeyDown={e => e.key === 'Escape' && setIsMobileMenuOpen(false)}
+            tabIndex={-1}
+            aria-hidden="true"
           />
 
-          {/* Sidebar Mobile - Design Moderne & Élégant */}
-          {/* overflow-y-auto au lieu de overflow-hidden : évite de clipper le footer sur iOS Safari */}
-          <div className="animate-in slide-in-from-left absolute inset-y-0 left-0 w-fit overflow-y-auto rounded-r-3xl border-r border-white/10 bg-zinc-950 shadow-2xl duration-300">
+          {/* Sidebar Mobile — token CSS sidebar-background, border cohérente */}
+          <div className="animate-in slide-in-from-left absolute inset-y-0 left-0 w-fit overflow-y-auto rounded-r-xl border-r border-sidebar-border bg-sidebar shadow-2xl duration-300">
             <NotionStyleSidebar
               accessRights={accessRights}
               accessLoading={accessLoading}
@@ -154,14 +159,20 @@ export const AppLayoutWithSidebar: React.FC<AppLayoutWithSidebarProps> = ({
           </div>
         )}
 
-        {/* Header Desktop (optionnel - pour actions supplémentaires) */}
-        <header className="bg-background/95 supports-[backdrop-filter]:bg-background/60 sticky top-0 z-30 hidden border-b backdrop-blur lg:block">
-          <div className="flex items-center justify-between px-6 py-2.5">
+        {/* Header Desktop — épuré avec backdrop-blur premium */}
+        <header
+          className={cn(
+            'sticky top-0 z-30 hidden lg:block',
+            'border-b border-border/60',
+            'bg-background/80 backdrop-blur-md',
+            'supports-[backdrop-filter]:bg-background/70'
+          )}
+        >
+          <div className="flex items-center justify-between px-6 py-3">
             {/* Nom et Logo Entreprise Tenant */}
             <div className="flex items-center gap-3">
-              {/* Logo de l'entreprise */}
               {currentTenant?.logo_url ? (
-                <div className="border-primary/20 bg-background flex h-10 w-auto max-w-[12rem] min-w-[2.5rem] items-center justify-center overflow-hidden rounded-lg border-2 px-1 shadow-sm">
+                <div className="flex h-8 w-auto max-w-[10rem] min-w-[2rem] items-center justify-center overflow-hidden rounded-md border border-border/50 bg-card px-1 shadow-sm">
                   <img
                     src={currentTenant.logo_url}
                     alt={`Logo ${tenantName}`}
@@ -169,30 +180,31 @@ export const AppLayoutWithSidebar: React.FC<AppLayoutWithSidebarProps> = ({
                   />
                 </div>
               ) : (
-                <div className="border-primary/30 from-primary/5 to-accent/5 flex h-10 w-10 items-center justify-center rounded-lg border-2 border-dashed bg-gradient-to-br">
-                  <Building2 className="text-primary/60 h-5 w-5" />
+                <div className="flex h-8 w-8 items-center justify-center rounded-md border border-primary/20 bg-primary/5">
+                  <Building2 className="h-4 w-4 text-primary/70" />
                 </div>
               )}
 
-              {/* Nom de l'entreprise */}
-              <h1 className="from-primary via-accent to-tech-purple bg-gradient-to-r bg-clip-text text-lg font-bold text-transparent">
+              {/* Nom de l'entreprise — texte direct, plus lisible qu'un gradient */}
+              <h1 className="text-base font-semibold tracking-tight text-foreground">
                 {tenantName || 'Mon Entreprise'}
               </h1>
             </div>
 
             {/* Actions Desktop */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
               {showWarning && (
-                <div className="flex items-center gap-2 rounded-md bg-orange-100 px-3 py-1.5 text-sm font-medium text-orange-800 dark:bg-orange-900 dark:text-orange-200">
-                  ⏰ {timeLeftFormatted}
+                <div className="flex items-center gap-1.5 rounded-md bg-warning/15 px-2.5 py-1 text-sm font-medium text-amber-800 dark:bg-warning/10 dark:text-amber-300">
+                  <span aria-hidden="true">⏰</span>
+                  {timeLeftFormatted}
                 </div>
               )}
 
               <NotificationButton />
               <RoleIndicator />
               <SessionIndicator />
+              <LanguageToggle />
               <ThemeToggle />
-              {/* Menu Utilisateur - Conditionnel selon rôle */}
               {user &&
                 (isSuperAdmin ? (
                   <UserMenu
@@ -216,21 +228,31 @@ export const AppLayoutWithSidebar: React.FC<AppLayoutWithSidebarProps> = ({
 
         {/* Page Content with Scroll - SANS ESPACE EN HAUT */}
         {/* Pas de overflow-y-auto ici : le scroll unique est géré par scrollContainerRef ci-dessus */}
-        <main className="bg-muted/30 flex-1">
+        <main id="main-content" className="bg-muted/30 flex-1">
           <div className="flex min-h-full w-full flex-col">
             <div className="flex-1">{children}</div>
             <footer className="text-muted-foreground py-6 text-center text-xs">
               <div className="flex justify-center gap-4">
-                <a href="/privacy-policy" className="hover:underline">
-                  Politique de Confidentialité
+                <a
+                  href="/privacy-policy"
+                  className="hover:underline focus-visible:rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[hsl(var(--ring))]"
+                >
+                  {t('footer.privacyPolicy')}
                 </a>
-                <a href="/terms-of-use" className="hover:underline">
-                  Conditions d'Utilisation
+                <a
+                  href="/terms-of-use"
+                  className="hover:underline focus-visible:rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[hsl(var(--ring))]"
+                >
+                  {t('footer.termsOfUse')}
                 </a>
               </div>
               <p className="mt-2">
-                © {new Date().getFullYear()} Wadashaqayn. Tous droits réservés.
+                © {new Date().getFullYear()} Wadashaqayn. {t('footer.allRightsReserved')}
               </p>
             </footer>
           </div>
-        </m
+        </main>
+      </div>
+    </div>
+  );
+};

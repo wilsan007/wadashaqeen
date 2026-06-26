@@ -16,6 +16,7 @@ interface MobileTaskCardProps {
   isSelected?: boolean;
   onSelect?: (taskId: string) => void;
   onClick?: () => void;
+  color?: string;
 }
 
 export const MobileTaskCard: React.FC<MobileTaskCardProps> = ({
@@ -24,6 +25,7 @@ export const MobileTaskCard: React.FC<MobileTaskCardProps> = ({
   isSelected,
   onSelect,
   onClick,
+  color,
 }) => {
   const priorityColors = {
     low: 'bg-blue-100 text-blue-800',
@@ -72,13 +74,22 @@ export const MobileTaskCard: React.FC<MobileTaskCardProps> = ({
                 {task.priority}
               </Badge>
               {task.project_name && (
-                <span className="text-muted-foreground max-w-[120px] truncate text-[10px] font-medium">
-                  {task.project_name}
+                <span
+                  className={cn(
+                    "max-w-[120px] truncate text-[10px] font-semibold px-1.5 py-0.5 rounded",
+                    color ? "" : "text-muted-foreground"
+                  )}
+                  style={color ? { backgroundColor: `${color}1A`, color: color } : undefined}
+                >
+                  📁 {task.project_name}
                 </span>
               )}
             </div>
 
-            <h3 className="text-foreground line-clamp-2 text-sm leading-tight font-semibold">
+            <h3
+              className="line-clamp-2 text-sm leading-tight font-semibold"
+              style={{ color: color || 'inherit' }}
+            >
               {task.title}
             </h3>
 
@@ -127,7 +138,7 @@ export const MobileTaskCard: React.FC<MobileTaskCardProps> = ({
 
             {task.progress !== undefined && (
               <div className="w-12">
-                <Progress value={task.progress} className="h-1.5" />
+                <Progress value={task.progress} className="h-1.5" indicatorColor={color} />
               </div>
             )}
           </div>

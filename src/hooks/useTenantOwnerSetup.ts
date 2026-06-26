@@ -1,31 +1,21 @@
-import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
-interface TenantOwnerSetupState {
-  isLoading: boolean;
+interface TenantOwnerSetupData {
   isPendingTenantOwner: boolean;
   hasCompletedSetup: boolean;
   userEmail: string | null;
-  error: string | null;
 }
 
 export const useTenantOwnerSetup = () => {
-  const [state, setState] = useState<TenantOwnerSetupState>({
-    isLoading: true,
-    isPendingTenantOwner: false,
-    hasCompletedSetup: false,
-    userEmail: null,
-    error: null,
-  });
-
-  useEffect(() => {
-    checkTenantOwnerStatus();
-  }, []);
-
-  const checkTenantOwnerStatus = async () => {
-    try {
-      setState(prev => ({ ...prev, isLoading: true, error: null }));
-
+  const {
+    data,
+    isLoading,
+    error: queryError,
+    refetch,
+  } = useQuery<TenantOwnerSetupData>({
+    queryKey: ['tenant-owner-setup'],
+    queryFn: async () => {
       // Récupérer l'utilisateur connecté
       const {
         data: { user },
@@ -33,32 +23,27 @@ export const useTenantOwnerSetup = () => {
       } = await supabase.auth.getUser();
 
       if (authError || !user) {
-        setState(prev => ({
-          ...prev,
-          isLoading: false,
+        return {
           isPendingTenantOwner: false,
           hasCompletedSetup: false,
-        }));
-        return;
+          userEmail: null,
+        };
       }
 
       // Vérifier si l'utilisateur a déjà un profil (setup terminé)
-      const { data: profile, error: profileError } = await supabase
+      const { data: profile } = await supabase
         .from('profiles')
         .select('user_id, tenant_id, role')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle(); // ✅ pas de 406 si pas encore de profil
 
       if (profile && profile.tenant_id) {
         // L'utilisateur a déjà un tenant, setup terminé
-        setState(prev => ({
-          ...prev,
-          isLoading: false,
+        return {
           isPendingTenantOwner: false,
           hasCompletedSetup: true,
-          userEmail: user.email,
-        }));
-        return;
+          userEmail: user.email ?? null,
+        };
       }
 
       // Vérifier s'il y a une invitation tenant_owner en attente pour cet email
@@ -69,37 +54,25 @@ export const useTenantOwnerSetup = () => {
 
       if (pendingError) {
         console.error('Erreur vérification invitation:', pendingError);
-        setState(prev => ({
-          ...prev,
-          isLoading: false,
-          error: "Erreur lors de la vérification de l'invitation",
-        }));
-        return;
+        throw new Error("Erreur lors de la vérification de l'invitation");
       }
 
-      setState(prev => ({
-        ...prev,
-        isLoading: false,
+      return {
         isPendingTenantOwner: isPending || false,
         hasCompletedSetup: false,
-        userEmail: user.email,
-      }));
-    } catch (error: any) {
-      console.error('Erreur checkTenantOwnerStatus:', error);
-      setState(prev => ({
-        ...prev,
-        isLoading: false,
-        error: 'Erreur lors de la vérification du statut',
-      }));
-    }
-  };
+        userEmail: user.email ?? null,
+      };
+    },
+  });
 
-  const refreshStatus = () => {
-    checkTenantOwnerStatus();
-  };
+  const error = queryError ? (queryError as Error).message : null;
 
   return {
-    ...state,
-    refreshStatus,
+    isLoading,
+    isPendingTenantOwner: data?.isPendingTenantOwner ?? false,
+    hasCompletedSetup: data?.hasCompletedSetup ?? false,
+    userEmail: data?.userEmail ?? null,
+    error,
+    refreshStatus: refetch,
   };
 };

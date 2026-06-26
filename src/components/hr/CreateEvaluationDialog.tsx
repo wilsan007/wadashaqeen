@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { z } from 'zod';
+import { zodResolver } from '@hookform/resolvers/zod';
 import {
   ResponsiveModal,
   ResponsiveModalContent,
@@ -42,6 +44,15 @@ interface EvaluationFormData {
   overall_score: number;
 }
 
+const evaluationSchema = z.object({
+  employee_name: z.string().min(1, "L'employé est obligatoire"),
+  evaluator_name: z.string().min(1, "L'évaluateur est obligatoire"),
+  period: z.string().min(1, 'La période est obligatoire'),
+  type: z.enum(['annual', 'quarterly', '360']),
+  status: z.enum(['scheduled', 'in_progress']),
+  overall_score: z.coerce.number().min(0).max(5),
+});
+
 export const CreateEvaluationDialog = ({
   onCreateEvaluation,
   trigger,
@@ -56,6 +67,7 @@ export const CreateEvaluationDialog = ({
     reset,
     formState: { errors },
   } = useForm<EvaluationFormData>({
+    resolver: zodResolver(evaluationSchema),
     defaultValues: {
       status: 'scheduled',
       type: 'quarterly',
@@ -180,7 +192,7 @@ export const CreateEvaluationDialog = ({
                 <Label htmlFor="period">Période *</Label>
                 <Input
                   id="period"
-                  {...register('period', { required: 'La période est obligatoire' })}
+                  {...register('period')}
                   placeholder="Ex: Q1 2024"
                   value={watch('period')}
                 />

@@ -104,11 +104,11 @@ export const useRoleBasedAccess = () => {
 
     // Déterminer les droits d'accès basés sur les rôles
     const newAccessRights = {
-      // Pages principales - accès de base pour tous les utilisateurs connectés
+      // Pages principales
       canAccessDashboard: userRoles.length > 0,
       canAccessHR: isHRManager() || isTenantAdmin() || isSuperAdmin(),
-      canAccessProjects: isProjectManager() || isTenantAdmin() || isSuperAdmin(),
-      canAccessTasks: userRoles.length > 0, // Tous les utilisateurs peuvent voir les tâches
+      canAccessProjects: userRoles.length > 0,
+      canAccessTasks: userRoles.length > 0,
       canAccessSuperAdmin: isSuperAdmin(),
 
       // Fonctionnalités HR
@@ -144,7 +144,9 @@ export const useRoleBasedAccess = () => {
       canManageProjectBudgets: isTenantAdmin() || isSuperAdmin(),
 
       // Fonctionnalités Tâches
-      canCreateTasks: hasPermission(PermissionNames.MANAGE_TASKS) || userRoles.length > 0, // Tous peuvent créer des tâches
+      canCreateTasks: hasPermission(PermissionNames.MANAGE_TASKS) ||
+        isProjectManager() || isTenantAdmin() || isSuperAdmin() ||
+        (userRoles.length > 0 && !userRoles.every(r => ['intern', 'viewer'].includes(r.roles.name))),
       canAssignTasks:
         hasPermission(PermissionNames.MANAGE_TASKS) ||
         isProjectManager() ||
@@ -169,7 +171,7 @@ export const useRoleBasedAccess = () => {
       canViewSystemLogs: isSuperAdmin(),
 
       // Notifications et alertes
-      canReceiveAlerts: userRoles.length > 0, // Tous les utilisateurs connectés
+      canReceiveAlerts: true, // Tous les utilisateurs connectés
       canManageAlerts: isProjectManager() || isTenantAdmin() || isSuperAdmin(),
 
       // Niveau d'accès général

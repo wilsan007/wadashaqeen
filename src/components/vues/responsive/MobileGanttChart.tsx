@@ -29,7 +29,7 @@ export function MobileGanttChart({
   updateTaskDates: propUpdateTaskDates,
   onSwitchToDesktop,
 }: MobileGanttChartProps) {
-  const [viewMode, setViewMode] = useState<ViewMode>('Month' as ViewMode);
+  const [viewMode, setViewMode] = useState<ViewMode>('month');
 
   const statusLabels = {
     todo: 'À faire',

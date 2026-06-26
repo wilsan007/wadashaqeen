@@ -24,16 +24,18 @@ import { usePayrollManagement } from '@/hooks/usePayrollManagement';
 import { useSkillsTraining } from '@/hooks/useSkillsTraining';
 import { useHealthSafety } from '@/hooks/useHealthSafety';
 import { usePerformance } from '@/hooks/usePerformance';
-import { useUserAuth } from '@/hooks/useUserAuth';
+import { useAuth } from '@/contexts/AuthContext';
 import { useEmployees } from '@/hooks/useEmployees';
 import { supabase } from '@/integrations/supabase/client';
 import { Plus, Upload, Lock, FileSpreadsheet } from 'lucide-react';
 import { CurrencySelect } from '@/components/common/CurrencySelect';
+import { useTranslation } from '@/hooks/useTranslation';
 
 // === ONBOARDING DIALOG ===
 export const CreateOnboardingDialog = ({ children }: { children: React.ReactNode }) => {
   const [open, setOpen] = useState(false);
   const { createOnboardingProcess } = useOnboardingOffboarding();
+  const { t } = useTranslation();
   // We would ideally use useEmployees here, but let's keep it simple for now or import it if needed.
   // Assuming the user wants to enter data manually or select from a list.
   // Let's add the fields from the JSON: employee_name, position, department, start_date.
@@ -59,31 +61,31 @@ export const CreateOnboardingDialog = ({ children }: { children: React.ReactNode
       <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent className="glass-panel max-h-[90vh] overflow-y-auto sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Nouveau processus d'onboarding</DialogTitle>
+          <DialogTitle>{t('hrAdvanced.dialogs.onboarding.title')}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="employee_name">Nom de l'employé</Label>
+            <Label htmlFor="employee_name">{t('hrAdvanced.dialogs.onboarding.empName')}</Label>
             <Input
               id="employee_name"
               value={formData.employee_name}
               onChange={e => setFormData({ ...formData, employee_name: e.target.value })}
-              placeholder="Ex: Jean Martin"
+              placeholder={t('hrAdvanced.dialogs.onboarding.empNameHolder')}
               required
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="position">Poste</Label>
+            <Label htmlFor="position">{t('hrAdvanced.dialogs.onboarding.position')}</Label>
             <Input
               id="position"
               value={formData.position}
               onChange={e => setFormData({ ...formData, position: e.target.value })}
-              placeholder="Ex: Chef de projet"
+              placeholder={t('hrAdvanced.dialogs.onboarding.positionHolder')}
               required
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="department">Département</Label>
+            <Label htmlFor="department">{t('hrAdvanced.dialogs.onboarding.department')}</Label>
             <Select
               value={formData.department}
               onValueChange={val => setFormData({ ...formData, department: val })}
@@ -92,16 +94,16 @@ export const CreateOnboardingDialog = ({ children }: { children: React.ReactNode
                 <SelectValue placeholder="Sélectionner..." />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="Operations">Opérations</SelectItem>
+                <SelectItem value="Operations">{t('hrAdvanced.dialogs.onboarding.deptOps')}</SelectItem>
                 <SelectItem value="IT">IT</SelectItem>
-                <SelectItem value="RH">Ressources Humaines</SelectItem>
-                <SelectItem value="Sales">Commercial</SelectItem>
+                <SelectItem value="RH">{t('hrAdvanced.dialogs.onboarding.deptHR')}</SelectItem>
+                <SelectItem value="Sales">{t('hrAdvanced.dialogs.onboarding.deptSales')}</SelectItem>
                 <SelectItem value="Marketing">Marketing</SelectItem>
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="start_date">Date de début</Label>
+            <Label htmlFor="start_date">{t('hrAdvanced.dialogs.onboarding.startDate')}</Label>
             <Input
               id="start_date"
               type="date"
@@ -111,7 +113,7 @@ export const CreateOnboardingDialog = ({ children }: { children: React.ReactNode
             />
           </div>
           <DialogFooter>
-            <Button type="submit">Créer le processus</Button>
+            <Button type="submit">{t('hrAdvanced.dialogs.onboarding.createBtn')}</Button>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -123,7 +125,8 @@ export const CreateOnboardingDialog = ({ children }: { children: React.ReactNode
 export const CreateExpenseReportDialog = ({ children }: { children: React.ReactNode }) => {
   const [open, setOpen] = useState(false);
   const { createExpenseReport } = useExpenseManagement();
-  const { profile } = useUserAuth();
+  const { profile } = useAuth();
+  const { t } = useTranslation();
   const [formData, setFormData] = useState({
     title: '', // Maps to description in JSON example
     expense_date: new Date().toISOString().split('T')[0],
@@ -153,11 +156,11 @@ export const CreateExpenseReportDialog = ({ children }: { children: React.ReactN
       <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent className="glass-panel max-h-[90vh] overflow-y-auto sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Nouvelle note de frais</DialogTitle>
+          <DialogTitle>{t('hrAdvanced.dialogs.expense.title')}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="expense_date">Date</Label>
+            <Label htmlFor="expense_date">{t('hrAdvanced.dialogs.expense.date')}</Label>
             <Input
               id="expense_date"
               type="date"
@@ -167,17 +170,17 @@ export const CreateExpenseReportDialog = ({ children }: { children: React.ReactN
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="title">Description</Label>
+            <Label htmlFor="title">{t('hrAdvanced.dialogs.expense.desc')}</Label>
             <Input
               id="title"
-              placeholder="Ex: Déjeuner client"
+              placeholder={t('hrAdvanced.dialogs.expense.descHolder')}
               value={formData.title}
               onChange={e => setFormData({ ...formData, title: e.target.value })}
               required
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="category">Catégorie</Label>
+            <Label htmlFor="category">{t('hrAdvanced.dialogs.expense.category')}</Label>
             <Select
               value={formData.category_name}
               onValueChange={val => setFormData({ ...formData, category_name: val })}
@@ -186,17 +189,17 @@ export const CreateExpenseReportDialog = ({ children }: { children: React.ReactN
                 <SelectValue placeholder="Sélectionner..." />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="Repas">Repas</SelectItem>
-                <SelectItem value="Transport">Transport</SelectItem>
-                <SelectItem value="Hébergement">Hébergement</SelectItem>
-                <SelectItem value="Fournitures">Fournitures</SelectItem>
-                <SelectItem value="Autre">Autre</SelectItem>
+                <SelectItem value="Repas">{t('hrAdvanced.dialogs.expense.catMeal')}</SelectItem>
+                <SelectItem value="Transport">{t('hrAdvanced.dialogs.expense.catTransport')}</SelectItem>
+                <SelectItem value="Hébergement">{t('hrAdvanced.dialogs.expense.catHotel')}</SelectItem>
+                <SelectItem value="Fournitures">{t('hrAdvanced.dialogs.expense.catSupplies')}</SelectItem>
+                <SelectItem value="Autre">{t('hrAdvanced.dialogs.expense.catOther')}</SelectItem>
               </SelectContent>
             </Select>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="amount">Montant</Label>
+              <Label htmlFor="amount">{t('hrAdvanced.dialogs.expense.amount')}</Label>
               <Input
                 id="amount"
                 type="number"
@@ -208,7 +211,7 @@ export const CreateExpenseReportDialog = ({ children }: { children: React.ReactN
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="currency">Devise</Label>
+              <Label htmlFor="currency">{t('hrAdvanced.dialogs.expense.currency')}</Label>
               <CurrencySelect
                 value={formData.currency}
                 onValueChange={val => setFormData({ ...formData, currency: val })}
@@ -216,7 +219,7 @@ export const CreateExpenseReportDialog = ({ children }: { children: React.ReactN
             </div>
           </div>
           <DialogFooter>
-            <Button type="submit">Créer la note</Button>
+            <Button type="submit">{t('hrAdvanced.dialogs.expense.createBtn')}</Button>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -228,6 +231,7 @@ export const CreateExpenseReportDialog = ({ children }: { children: React.ReactN
 export const CreatePayrollPeriodDialog = ({ children }: { children: React.ReactNode }) => {
   const [open, setOpen] = useState(false);
   const { createPayrollPeriod } = usePayrollManagement();
+  const { t } = useTranslation();
   const [formData, setFormData] = useState({
     year: new Date().getFullYear(),
     month: new Date().getMonth() + 1,
@@ -250,12 +254,12 @@ export const CreatePayrollPeriodDialog = ({ children }: { children: React.ReactN
       <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent className="glass-panel max-h-[90vh] overflow-y-auto sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Nouvelle période de paie</DialogTitle>
+          <DialogTitle>{t('hrAdvanced.dialogs.payrollPeriod.title')}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="month">Mois</Label>
+              <Label htmlFor="month">{t('hrAdvanced.dialogs.payrollPeriod.month')}</Label>
               <Select
                 value={formData.month.toString()}
                 onValueChange={val => setFormData({ ...formData, month: parseInt(val) })}
@@ -273,7 +277,7 @@ export const CreatePayrollPeriodDialog = ({ children }: { children: React.ReactN
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="year">Année</Label>
+              <Label htmlFor="year">{t('hrAdvanced.dialogs.payrollPeriod.year')}</Label>
               <Input
                 id="year"
                 type="number"
@@ -285,14 +289,14 @@ export const CreatePayrollPeriodDialog = ({ children }: { children: React.ReactN
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="currency">Devise de la période</Label>
+            <Label htmlFor="currency">{t('hrAdvanced.dialogs.payrollPeriod.currency')}</Label>
             <CurrencySelect
               value={formData.currency}
               onValueChange={val => setFormData({ ...formData, currency: val })}
             />
           </div>
           <DialogFooter>
-            <Button type="submit">Initialiser la période</Button>
+            <Button type="submit">{t('hrAdvanced.dialogs.payrollPeriod.initBtn')}</Button>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -304,6 +308,7 @@ export const CreatePayrollPeriodDialog = ({ children }: { children: React.ReactN
 export const CreateSkillDialog = ({ children }: { children: React.ReactNode }) => {
   const [open, setOpen] = useState(false);
   const { createSkill } = useSkillsTraining();
+  const { t } = useTranslation();
   const [formData, setFormData] = useState({
     name: '',
     category: '',
@@ -324,21 +329,21 @@ export const CreateSkillDialog = ({ children }: { children: React.ReactNode }) =
       <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent className="glass-panel max-h-[90vh] overflow-y-auto sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Nouvelle compétence</DialogTitle>
+          <DialogTitle>{t('hrAdvanced.dialogs.skill.title')}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="name">Nom</Label>
+            <Label htmlFor="name">{t('hrAdvanced.dialogs.skill.name')}</Label>
             <Input
               id="name"
               value={formData.name}
               onChange={e => setFormData({ ...formData, name: e.target.value })}
-              placeholder="Ex: React.js"
+              placeholder={t('hrAdvanced.dialogs.skill.nameHolder')}
               required
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="category">Catégorie</Label>
+            <Label htmlFor="category">{t('hrAdvanced.dialogs.skill.category')}</Label>
             <Select
               value={formData.category}
               onValueChange={val => setFormData({ ...formData, category: val })}
@@ -347,24 +352,24 @@ export const CreateSkillDialog = ({ children }: { children: React.ReactNode }) =
                 <SelectValue placeholder="Sélectionner..." />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="Technique">Technique</SelectItem>
-                <SelectItem value="Soft Skill">Soft Skill</SelectItem>
-                <SelectItem value="Langue">Langue</SelectItem>
-                <SelectItem value="Gestion">Gestion</SelectItem>
+                <SelectItem value="Technique">{t('hrAdvanced.dialogs.skill.catTech')}</SelectItem>
+                <SelectItem value="Soft Skill">{t('hrAdvanced.dialogs.skill.catSoft')}</SelectItem>
+                <SelectItem value="Langue">{t('hrAdvanced.dialogs.skill.catLang')}</SelectItem>
+                <SelectItem value="Gestion">{t('hrAdvanced.dialogs.skill.catMgmt')}</SelectItem>
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="description">Description</Label>
+            <Label htmlFor="description">{t('hrAdvanced.dialogs.skill.desc')}</Label>
             <Textarea
               id="description"
               value={formData.description}
               onChange={e => setFormData({ ...formData, description: e.target.value })}
-              placeholder="Description de la compétence..."
+              placeholder={t('hrAdvanced.dialogs.skill.descHolder')}
             />
           </div>
           <DialogFooter>
-            <Button type="submit">Créer</Button>
+            <Button type="submit">{t('hrAdvanced.dialogs.skill.createBtn')}</Button>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -376,7 +381,8 @@ export const CreateSkillAssessmentDialog = ({ children }: { children: React.Reac
   const [open, setOpen] = useState(false);
   const { createEvaluation } = usePerformance();
   const { employees } = useEmployees();
-  const { profile } = useUserAuth({ level: 1 });
+  const { profile } = useAuth();
+  const { t } = useTranslation();
   const [formData, setFormData] = useState({
     employee_id: '',
     period: '',
@@ -401,12 +407,12 @@ export const CreateSkillAssessmentDialog = ({ children }: { children: React.Reac
       <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent className="glass-panel max-h-[90vh] overflow-y-auto sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Nouvelle évaluation</DialogTitle>
+          <DialogTitle>{t('hrAdvanced.dialogs.evaluation.title')}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="employee_id">Employé</Label>
+              <Label htmlFor="employee_id">{t('hrAdvanced.dialogs.evaluation.employee')}</Label>
               <Select
                 onValueChange={val => setFormData({ ...formData, employee_id: val })}
                 required
@@ -416,7 +422,7 @@ export const CreateSkillAssessmentDialog = ({ children }: { children: React.Reac
                 </SelectTrigger>
                 <SelectContent>
                   {employees.length === 0 && (
-                    <SelectItem value="_none" disabled>Aucun employé disponible</SelectItem>
+                    <SelectItem value="_none" disabled>{t('hrAdvanced.dialogs.evaluation.noEmp')}</SelectItem>
                   )}
                   {employees.map(emp => (
                     <SelectItem key={emp.id} value={emp.id}>
@@ -427,17 +433,17 @@ export const CreateSkillAssessmentDialog = ({ children }: { children: React.Reac
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="period">Période</Label>
+              <Label htmlFor="period">{t('hrAdvanced.dialogs.evaluation.period')}</Label>
               <Input
                 id="period"
                 value={formData.period}
                 onChange={e => setFormData({ ...formData, period: e.target.value })}
-                placeholder="Ex: Q1 2024"
+                placeholder={t('hrAdvanced.dialogs.evaluation.periodHolder')}
                 required
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="type">Type</Label>
+              <Label htmlFor="type">{t('hrAdvanced.dialogs.evaluation.type')}</Label>
               <Select
                 value={formData.type}
                 onValueChange={(val: any) => setFormData({ ...formData, type: val })}
@@ -446,14 +452,14 @@ export const CreateSkillAssessmentDialog = ({ children }: { children: React.Reac
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="annual">Annuelle</SelectItem>
-                  <SelectItem value="quarterly">Trimestrielle</SelectItem>
+                  <SelectItem value="annual">{t('hrAdvanced.dialogs.evaluation.typeAnnual')}</SelectItem>
+                  <SelectItem value="quarterly">{t('hrAdvanced.dialogs.evaluation.typeQuarterly')}</SelectItem>
                   <SelectItem value="360">360°</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="overall_score">Score Global (1-10)</Label>
+              <Label htmlFor="overall_score">{t('hrAdvanced.dialogs.evaluation.score')}</Label>
               <Input
                 id="overall_score"
                 type="number"
@@ -467,7 +473,7 @@ export const CreateSkillAssessmentDialog = ({ children }: { children: React.Reac
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="strengths">Points Forts</Label>
+              <Label htmlFor="strengths">{t('hrAdvanced.dialogs.evaluation.strengths')}</Label>
               <Textarea
                 id="strengths"
                 value={formData.strengths}
@@ -475,7 +481,7 @@ export const CreateSkillAssessmentDialog = ({ children }: { children: React.Reac
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="areas_for_improvement">Points d'Amélioration</Label>
+              <Label htmlFor="areas_for_improvement">{t('hrAdvanced.dialogs.evaluation.areas')}</Label>
               <Textarea
                 id="areas_for_improvement"
                 value={formData.areas_for_improvement}
@@ -484,7 +490,7 @@ export const CreateSkillAssessmentDialog = ({ children }: { children: React.Reac
             </div>
           </div>
           <DialogFooter>
-            <Button type="submit">Fermer</Button>
+            <Button type="submit">{t('hrAdvanced.dialogs.evaluation.closeBtn')}</Button>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -496,7 +502,8 @@ export const CreateSkillAssessmentDialog = ({ children }: { children: React.Reac
 export const CreateIncidentDialog = ({ children }: { children: React.ReactNode }) => {
   const [open, setOpen] = useState(false);
   const { createIncident } = useHealthSafety();
-  const { profile } = useUserAuth();
+  const { profile } = useAuth();
+  const { t } = useTranslation();
   const [formData, setFormData] = useState({
     title: '',
     date: new Date().toISOString().split('T')[0],
@@ -522,11 +529,11 @@ export const CreateIncidentDialog = ({ children }: { children: React.ReactNode }
       <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent className="glass-panel max-h-[90vh] overflow-y-auto sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Déclarer un incident</DialogTitle>
+          <DialogTitle>{t('hrAdvanced.dialogs.incident.declareTitle')}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="title">Titre</Label>
+            <Label htmlFor="title">{t('hrAdvanced.dialogs.incident.title')}</Label>
             <Input
               id="title"
               value={formData.title}
@@ -536,7 +543,7 @@ export const CreateIncidentDialog = ({ children }: { children: React.ReactNode }
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="date">Date</Label>
+              <Label htmlFor="date">{t('hrAdvanced.dialogs.incident.date')}</Label>
               <Input
                 id="date"
                 type="date"
@@ -546,7 +553,7 @@ export const CreateIncidentDialog = ({ children }: { children: React.ReactNode }
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="severity">Sévérité</Label>
+              <Label htmlFor="severity">{t('hrAdvanced.dialogs.incident.severity')}</Label>
               <Select
                 value={formData.severity}
                 onValueChange={(val: any) => setFormData({ ...formData, severity: val })}
@@ -555,16 +562,16 @@ export const CreateIncidentDialog = ({ children }: { children: React.ReactNode }
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="low">Faible</SelectItem>
-                  <SelectItem value="medium">Moyenne</SelectItem>
-                  <SelectItem value="high">Élevée</SelectItem>
-                  <SelectItem value="critical">Critique</SelectItem>
+                  <SelectItem value="low">{t('hrAdvanced.dialogs.incident.sevLow')}</SelectItem>
+                  <SelectItem value="medium">{t('hrAdvanced.dialogs.incident.sevMed')}</SelectItem>
+                  <SelectItem value="high">{t('hrAdvanced.dialogs.incident.sevHigh')}</SelectItem>
+                  <SelectItem value="critical">{t('hrAdvanced.dialogs.incident.sevCrit')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="type">Type</Label>
+            <Label htmlFor="type">{t('hrAdvanced.dialogs.incident.type')}</Label>
             <Select
               value={formData.type}
               onValueChange={val => setFormData({ ...formData, type: val })}
@@ -573,15 +580,15 @@ export const CreateIncidentDialog = ({ children }: { children: React.ReactNode }
                 <SelectValue placeholder="Sélectionner..." />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="Accident">Accident</SelectItem>
-                <SelectItem value="Incident">Incident</SelectItem>
-                <SelectItem value="Near Miss">Presque accident</SelectItem>
-                <SelectItem value="Hazard">Danger</SelectItem>
+                <SelectItem value="Accident">{t('hrAdvanced.dialogs.incident.typeAcc')}</SelectItem>
+                <SelectItem value="Incident">{t('hrAdvanced.dialogs.incident.typeInc')}</SelectItem>
+                <SelectItem value="Near Miss">{t('hrAdvanced.dialogs.incident.typeNear')}</SelectItem>
+                <SelectItem value="Hazard">{t('hrAdvanced.dialogs.incident.typeHaz')}</SelectItem>
               </SelectContent>
             </Select>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="location">Lieu</Label>
+            <Label htmlFor="location">{t('hrAdvanced.dialogs.incident.location')}</Label>
             <Input
               id="location"
               value={formData.location}
@@ -589,7 +596,7 @@ export const CreateIncidentDialog = ({ children }: { children: React.ReactNode }
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="description">Description</Label>
+            <Label htmlFor="description">{t('hrAdvanced.dialogs.incident.desc')}</Label>
             <Textarea
               id="description"
               value={formData.description}
@@ -597,7 +604,7 @@ export const CreateIncidentDialog = ({ children }: { children: React.ReactNode }
             />
           </div>
           <DialogFooter>
-            <Button type="submit">Déclarer</Button>
+            <Button type="submit">{t('hrAdvanced.dialogs.incident.declareBtn')}</Button>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -608,6 +615,7 @@ export const CreateIncidentDialog = ({ children }: { children: React.ReactNode }
 export const CreateSafetyDocumentDialog = ({ children }: { children: React.ReactNode }) => {
   const [open, setOpen] = useState(false);
   const { uploadDocument } = useHealthSafety();
+  const { t } = useTranslation();
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const [formData, setFormData] = useState({
@@ -675,11 +683,11 @@ export const CreateSafetyDocumentDialog = ({ children }: { children: React.React
       <DialogTrigger asChild>{children}</DialogTrigger>
       <DialogContent className="glass-panel max-h-[90vh] overflow-y-auto sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Nouveau document sécurité</DialogTitle>
+          <DialogTitle>{t('hrAdvanced.dialogs.safetyDoc.title')}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="title">Titre</Label>
+            <Label htmlFor="title">{t('hrAdvanced.dialogs.safetyDoc.docTitle')}</Label>
             <Input
               id="title"
               value={formData.title}
@@ -689,7 +697,7 @@ export const CreateSafetyDocumentDialog = ({ children }: { children: React.React
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="type">Type</Label>
+              <Label htmlFor="type">{t('hrAdvanced.dialogs.safetyDoc.type')}</Label>
               <Select
                 value={formData.type}
                 onValueChange={(val: any) => setFormData({ ...formData, type: val })}
@@ -698,28 +706,28 @@ export const CreateSafetyDocumentDialog = ({ children }: { children: React.React
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="policy">Politique</SelectItem>
-                  <SelectItem value="procedure">Procédure</SelectItem>
-                  <SelectItem value="training">Formation</SelectItem>
-                  <SelectItem value="certificate">Certificat</SelectItem>
-                  <SelectItem value="inspection">Inspection</SelectItem>
+                  <SelectItem value="policy">{t('hrAdvanced.dialogs.safetyDoc.typePol')}</SelectItem>
+                  <SelectItem value="procedure">{t('hrAdvanced.dialogs.safetyDoc.typeProc')}</SelectItem>
+                  <SelectItem value="training">{t('hrAdvanced.dialogs.safetyDoc.typeTrain')}</SelectItem>
+                  <SelectItem value="certificate">{t('hrAdvanced.dialogs.safetyDoc.typeCert')}</SelectItem>
+                  <SelectItem value="inspection">{t('hrAdvanced.dialogs.safetyDoc.typeInsp')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="category">Catégorie</Label>
+              <Label htmlFor="category">{t('hrAdvanced.dialogs.safetyDoc.category')}</Label>
               <Input
                 id="category"
                 value={formData.category}
                 onChange={e => setFormData({ ...formData, category: e.target.value })}
-                placeholder="Ex: Incendie"
+                placeholder={t('hrAdvanced.dialogs.safetyDoc.catHolder')}
                 required
               />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="version">Version</Label>
+              <Label htmlFor="version">{t('hrAdvanced.dialogs.safetyDoc.version')}</Label>
               <Input
                 id="version"
                 value={formData.version}
@@ -728,7 +736,7 @@ export const CreateSafetyDocumentDialog = ({ children }: { children: React.React
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="status">Statut</Label>
+              <Label htmlFor="status">{t('hrAdvanced.dialogs.safetyDoc.status')}</Label>
               <Select
                 value={formData.status}
                 onValueChange={(val: any) => setFormData({ ...formData, status: val })}
@@ -737,16 +745,16 @@ export const CreateSafetyDocumentDialog = ({ children }: { children: React.React
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="active">Actif</SelectItem>
-                  <SelectItem value="draft">Brouillon</SelectItem>
-                  <SelectItem value="expired">Expiré</SelectItem>
+                  <SelectItem value="active">{t('hrAdvanced.dialogs.safetyDoc.statusActive')}</SelectItem>
+                  <SelectItem value="draft">{t('hrAdvanced.dialogs.safetyDoc.statusDraft')}</SelectItem>
+                  <SelectItem value="expired">{t('hrAdvanced.dialogs.safetyDoc.statusExp')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="publishedDate">Date de publication</Label>
+              <Label htmlFor="publishedDate">{t('hrAdvanced.dialogs.safetyDoc.pubDate')}</Label>
               <Input
                 id="publishedDate"
                 type="date"
@@ -756,7 +764,7 @@ export const CreateSafetyDocumentDialog = ({ children }: { children: React.React
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="expiryDate">Date d'expiration</Label>
+              <Label htmlFor="expiryDate">{t('hrAdvanced.dialogs.safetyDoc.expDate')}</Label>
               <Input
                 id="expiryDate"
                 type="date"
@@ -766,8 +774,18 @@ export const CreateSafetyDocumentDialog = ({ children }: { children: React.React
             </div>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="file">Fichier</Label>
+            <Label htmlFor="file">{t('hrAdvanced.dialogs.safetyDoc.file')}</Label>
             <Input id="file" type="file" onChange={handleFileChange} required />
           </div>
           <DialogFooter>
-            <Button type="submit"
+            <Button type="submit" disabled={uploading}>
+              {uploading ? t('hrAdvanced.dialogs.safetyDoc.uploadingBtn') : (
+                <><Upload className="mr-2 h-4 w-4" />{t('hrAdvanced.dialogs.safetyDoc.uploadBtn')}</>
+              )}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+};

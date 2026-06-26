@@ -42,6 +42,10 @@ export interface Project {
   task_count?: number;
   team_size?: number;
   manager?: string | null;
+  // Dates de réalisation
+  completion_date?: string | null;
+  actual_hours?: number | null;
+  estimated_hours?: number | null;
 }
 
 export interface ProjectMetrics {

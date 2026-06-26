@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 // Hooks optimisés avec cache intelligent et métriques
 import { useTasks } from '@/hooks/optimized';
 import { useProjects } from '@/hooks/optimized';
@@ -14,6 +14,7 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { AdvancedFilters, type TaskFilters } from '@/components/tasks/AdvancedFilters';
 import { useTaskFilters } from '@/hooks/useTaskFilters';
 import { ExportButton } from '@/components/tasks/ExportButton';
+import { useTranslation } from '@/hooks/useTranslation';
 import {
   DndContext,
   DragEndEvent,
@@ -26,6 +27,7 @@ import {
 import { SortableContext, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import type { Task } from '@/hooks/optimized';
+import { assignProjectColors, getTaskColor } from '@/lib/ganttColors';
 
 const TASK_COLUMNS = [
   { id: 'todo', title: 'À faire', status: 'todo' as const },
@@ -50,9 +52,10 @@ const PRIORITY_COLORS = {
 
 interface KanbanCardProps {
   task: Task | any; // Peut être une tâche ou un projet
+  color?: string;
 }
 
-function KanbanCard({ task }: KanbanCardProps) {
+function KanbanCard({ task, color }: KanbanCardProps) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: task.id,
   });
@@ -72,7 +75,10 @@ function KanbanCard({ task }: KanbanCardProps) {
     >
       <Card className="transition-smooth glass hover-glow border-primary/30 bg-card/40 mb-3 cursor-grab backdrop-blur-sm hover:shadow-md active:cursor-grabbing">
         <CardHeader className="pb-2">
-          <CardTitle className="text-foreground text-sm font-medium">
+          <CardTitle
+            className="text-sm font-medium"
+            style={{ color: color || 'inherit' }}
+          >
             {task.title || task.name}
           </CardTitle>
 
@@ -84,7 +90,11 @@ function KanbanCard({ task }: KanbanCardProps) {
               {task.priority}
             </Badge>
             {(task.projects?.name || task.project_name) && (
-              <Badge variant="secondary" className="text-xs">
+              <Badge
+                className="text-xs"
+                style={color ? { backgroundColor: color, color: '#fff', borderColor: color } : undefined}
+                variant={color ? 'default' : 'secondary'}
+              >
                 📁 {task.projects?.name || task.project_name}
               </Badge>
             )}
@@ -122,7 +132,7 @@ function KanbanCard({ task }: KanbanCardProps) {
         </CardHeader>
         <CardContent className="pt-0">
           <div className="space-y-2">
-            <Progress value={task.progress || 0} className="bg-muted/50 h-2" />
+            <Progress value={task.progress || 0} className="bg-muted/50 h-2" indicatorColor={color} />
             <div className="text-muted-foreground flex items-center justify-between text-xs">
               <span>{task.progress || 0}% terminé</span>
               <span className="bg-accent/30 text-accent-foreground rounded px-2 py-1 font-medium">
@@ -145,9 +155,11 @@ function KanbanCard({ task }: KanbanCardProps) {
 interface KanbanColumnProps {
   column: (typeof TASK_COLUMNS)[0] | (typeof PROJECT_COLUMNS)[0];
   tasks: Task[] | any[];
+  projectColorMap?: Record<string, string>;
+  totalProjects?: number;
 }
 
-function KanbanColumn({ column, tasks }: KanbanColumnProps) {
+function KanbanColumn({ column, tasks, projectColorMap, totalProjects = 0 }: KanbanColumnProps) {
   return (
     <div className="min-w-0 flex-1">
       <Card className="glass glow-accent transition-smooth border-primary/30 h-full">
@@ -163,10 +175,22 @@ function KanbanColumn({ column, tasks }: KanbanColumnProps) {
           </CardTitle>
         </CardHeader>
         <CardContent className="bg-card/30 max-h-[calc(100vh-300px)] overflow-y-auto backdrop-blur-sm">
-          <SortableContext items={tasks.map(t => t.id)} strategy={verticalListSortingStrategy}>
-            {tasks.map(task => (
-              <KanbanCard key={task.id} task={task} />
-            ))}
+          <SortableContext items={tasks.filter(Boolean).map(t => t.id)} strategy={verticalListSortingStrategy}>
+            {tasks.filter(Boolean).map((task, index) => {
+              // Determine task color
+              let color = undefined;
+              if (projectColorMap) {
+                // If it's a project, use its own color
+                if (task.name && projectColorMap[task.id]) {
+                  color = projectColorMap[task.id];
+                }
+                // If it's a task, use getTaskColor
+                else {
+                  color = getTaskColor({ project_id: task.project_id || task.projects?.id }, projectColorMap, index, totalProjects);
+                }
+              }
+              return <KanbanCard key={task.id} task={task} color={color} />;
+            })}
           </SortableContext>
         </CardContent>
       </Card>
@@ -175,6 +199,7 @@ function KanbanColumn({ column, tasks }: KanbanColumnProps) {
 }
 
 export default function KanbanBoard() {
+  const { t } = useTranslation();
   const { tasks, updateTaskStatus, loading } = useTasks();
   const { projects, loading: projectsLoading } = useProjects();
   const { employees } = useEmployees();
@@ -190,6 +215,10 @@ export default function KanbanBoard() {
     dateFrom: '',
     dateTo: '',
   });
+
+  const projectColorMap = React.useMemo(() => {
+    return assignProjectColors(projects || []);
+  }, [projects]);
 
   // Appliquer les filtres uniquement en mode tâches
   const { filteredTasks } = useTaskFilters(tasks, filters);
@@ -253,9 +282,23 @@ export default function KanbanBoard() {
     return <MobileKanbanBoard />;
   }
 
-  const columns = displayMode === 'tasks' ? TASK_COLUMNS : PROJECT_COLUMNS;
-  // Utiliser filteredTasks au lieu de tasks en mode tâches
-  const items = displayMode === 'tasks' ? filteredTasks : projects;
+  // Apply translations to columns based on the display mode
+  const rawColumns = displayMode === 'tasks' ? TASK_COLUMNS : PROJECT_COLUMNS;
+  const columns = rawColumns.map(col => {
+    let keyPart = '';
+    if (col.id === 'todo') keyPart = 'Todo';
+    if (col.id === 'doing') keyPart = 'Doing';
+    if (col.id === 'blocked') keyPart = 'Blocked';
+    if (col.id === 'done') keyPart = 'Done';
+    if (col.id === 'planning') keyPart = 'Planning';
+    if (col.id === 'active') keyPart = 'Active';
+    if (col.id === 'on_hold') keyPart = 'OnHold';
+    if (col.id === 'completed') keyPart = 'Completed';
+    return { ...col, title: t(`taskManagement.kanban.col${keyPart}`, col.title) };
+  });
+
+  // Utiliser filteredTasks au lieu de tasks en mode tâches avec sécurité anti-null
+  const items = (displayMode === 'tasks' ? filteredTasks : projects) || [];
 
   const itemsByStatus = columns.map(column => ({
     ...column,
@@ -277,13 +320,13 @@ export default function KanbanBoard() {
               value="tasks"
               className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
             >
-              📝 Tâches
+              {t('taskManagement.kanban.tasksToggle')}
             </ToggleGroupItem>
             <ToggleGroupItem
               value="projects"
               className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
             >
-              📁 Projets
+              {t('taskManagement.kanban.projectsToggle')}
             </ToggleGroupItem>
           </ToggleGroup>
           {displayMode === 'tasks' && filteredTasks.length > 0 && (
@@ -291,7 +334,7 @@ export default function KanbanBoard() {
           )}
         </div>
         {displayMode === 'projects' && (
-          <p className="text-muted-foreground text-sm">Vue Kanban des projets par statut</p>
+          <p className="text-muted-foreground text-sm">{t('taskManagement.kanban.projectsSubtitle')}</p>
         )}
       </div>
 
@@ -311,7 +354,12 @@ export default function KanbanBoard() {
           <div className="grid h-full grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
             {itemsByStatus.map(column => (
               <div key={column.id}>
-                <KanbanColumn column={column} tasks={column.tasks} />
+                <KanbanColumn
+                  column={column}
+                  tasks={column.tasks}
+                  projectColorMap={projectColorMap}
+                  totalProjects={projects?.length || 0}
+                />
               </div>
             ))}
           </div>

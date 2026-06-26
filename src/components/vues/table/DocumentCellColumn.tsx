@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Plus, FileText, Eye, Download } from '@/lib/icons';
+import { useState } from 'react';
+import { Plus, FileText, Download } from '@/lib/icons';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -12,6 +12,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useTenant } from '@/contexts/TenantContext';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 interface Task {
   id: string;
@@ -33,63 +34,44 @@ interface TaskDocument {
   tenant_id: string;
 }
 
+const isDemoTask = (id: string) =>
+  id.startsWith('00000000-0000-0000-0000') || id.startsWith('ghost-task-');
+
 export const DocumentCellColumn = ({ task, isSubtask }: DocumentCellProps) => {
-  const [documents, setDocuments] = useState<TaskDocument[]>([]);
-  const [uploading, setUploading] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const { toast } = useToast();
   const { currentTenant } = useTenant();
+  const queryClient = useQueryClient();
 
-  const loadDocuments = async () => {
-    // Ne pas charger pour les tâches de démonstration (UUIDs fictifs) ou les tâches fantômes
-    if (task.id.startsWith('00000000-0000-0000-0000') || task.id.startsWith('ghost-task-')) {
-      setDocuments([]);
-      return;
-    }
-
-    try {
+  const { data: documents = [] } = useQuery<TaskDocument[]>({
+    queryKey: ['task-documents', task.id],
+    queryFn: async () => {
+      if (isDemoTask(task.id)) return [];
       const { data, error } = await supabase
         .from('task_documents')
         .select('*')
         .eq('task_id', task.id);
-
       if (error) throw error;
-      setDocuments(data || []);
-    } catch (error) {
-      console.error('Error loading documents:', error);
-    }
-  };
+      return data ?? [];
+    },
+    enabled: !!task.id && !isDemoTask(task.id),
+  });
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    setUploading(true);
-    try {
+  const uploadMutation = useMutation({
+    mutationFn: async (file: File) => {
       const fileExt = file.name.split('.').pop();
       const fileName = `${task.id}/${Date.now()}.${fileExt}`;
 
       const { error: uploadError } = await supabase.storage
         .from('task-documents')
         .upload(fileName, file);
+      if (uploadError) throw uploadError;
 
-      if (uploadError) {
-        console.error('Storage upload error:', uploadError);
-        throw uploadError;
-      }
-
-
-      // Récupérer l'utilisateur actuel
       const {
         data: { user },
       } = await supabase.auth.getUser();
-      if (!user) {
-        throw new Error('Utilisateur non authentifié');
-      }
-
-      if (!currentTenant?.id) {
-        throw new Error('Aucun tenant actif');
-      }
+      if (!user) throw new Error('Utilisateur non authentifié');
+      if (!currentTenant?.id) throw new Error('Aucun tenant actif');
 
       const { error: dbError } = await supabase.from('task_documents').insert({
         task_id: task.id,
@@ -101,34 +83,29 @@ export const DocumentCellColumn = ({ task, isSubtask }: DocumentCellProps) => {
         tenant_id: currentTenant.id,
         uploader_id: user.id,
       });
-
       if (dbError) throw dbError;
-
-      toast({
-        title: 'Succès',
-        description: 'Document uploadé',
-      });
-
-      loadDocuments();
-    } catch (error) {
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['task-documents', task.id] });
+      toast({ title: 'Succès', description: 'Document uploadé' });
+    },
+    onError: (error) => {
       console.error('Error uploading file:', error);
-      toast({
-        title: 'Erreur',
-        description: "Échec de l'upload",
-        variant: 'destructive',
-      });
-    } finally {
-      setUploading(false);
-      event.target.value = '';
-    }
+      toast({ title: 'Erreur', description: "Échec de l'upload", variant: 'destructive' });
+    },
+  });
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    uploadMutation.mutate(file);
+    event.target.value = '';
   };
 
   const downloadDocument = async (doc: TaskDocument) => {
     try {
       const { data, error } = await supabase.storage.from('task-documents').download(doc.file_path);
-
       if (error) throw error;
-
       const url = URL.createObjectURL(data);
       const a = document.createElement('a');
       a.href = url;
@@ -137,17 +114,9 @@ export const DocumentCellColumn = ({ task, isSubtask }: DocumentCellProps) => {
       URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Error downloading file:', error);
-      toast({
-        title: 'Erreur',
-        description: 'Échec du téléchargement',
-        variant: 'destructive',
-      });
+      toast({ title: 'Erreur', description: 'Échec du téléchargement', variant: 'destructive' });
     }
   };
-
-  useEffect(() => {
-    loadDocuments();
-  }, [task.id]);
 
   return (
     <div className="flex items-center gap-1">
@@ -155,14 +124,14 @@ export const DocumentCellColumn = ({ task, isSubtask }: DocumentCellProps) => {
         <Input
           type="file"
           onChange={handleFileUpload}
-          disabled={uploading}
+          disabled={uploadMutation.isPending}
           className="hidden"
           id={`file-${task.id}`}
         />
         <Button
           variant="ghost"
           size="sm"
-          disabled={uploading}
+          disabled={uploadMutation.isPending}
           className={`${isSubtask ? 'h-6 w-6 p-0' : 'h-8 w-8 p-0'}`}
           onClick={() => document.getElementById(`file-${task.id}`)?.click()}
         >

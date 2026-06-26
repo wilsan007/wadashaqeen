@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
 interface Tenant {
@@ -45,34 +45,109 @@ export const TenantProvider: React.FC<{ children: ReactNode }> = ({ children }) 
   const [userMembership, setUserMembership] = useState<TenantMember | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // 🔒 SÉCURITÉ: Vider le cache à CHAQUE changement d'auth
+  // Ref stable pour éviter les closures périmées depuis onAuthStateChange
+  const isMountedRef = useRef(true);
+
+  const fetchUserTenant = async () => {
+    try {
+      setLoading(true);
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        if (isMountedRef.current) setLoading(false);
+        return;
+      }
+
+      // ✅ maybeSingle() — renvoie null si aucun profil, sans lever HTTP 406
+      // ✅ user_id — colonne correcte pour filtrer par l'id Auth de l'utilisateur
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('user_id', user.id)
+        .maybeSingle();
+
+      if (profileError) {
+        console.error('Error fetching profile:', profileError);
+        if (isMountedRef.current) setLoading(false);
+        return;
+      }
+
+      if (profile && profile.tenant_id) {
+        let { data: tenantData, error: tenantError } = await supabase
+          .from('tenants')
+          .select('*')
+          .eq('id', profile.tenant_id)
+          .single();
+
+        if (tenantError || !tenantData) {
+          console.error('Error fetching tenant:', tenantError);
+          tenantData = {
+            id: profile.tenant_id,
+            name: 'Mon Entreprise',
+            slug: 'default',
+            status: 'active',
+          } as any;
+        }
+
+        const membership = {
+          id: profile.id,
+          tenant_id: profile.tenant_id,
+          user_id: profile.user_id,
+          role: profile.role || 'admin',
+          status: 'active',
+          permissions: { admin: true, manage_all: true },
+          tenant: tenantData as Tenant,
+        };
+
+        tenantCache = {
+          currentTenant: tenantData as Tenant,
+          userMembership: membership,
+          tenantId: profile.tenant_id,
+          loading: false,
+        };
+
+        if (isMountedRef.current) {
+          setCurrentTenant(tenantData as Tenant);
+          setUserMembership(membership);
+        }
+      }
+    } catch (error) {
+      console.error('Error in TenantProvider:', error);
+    } finally {
+      if (isMountedRef.current) setLoading(false);
+    }
+  };
+
+  // 🔒 Réagit aux changements d'authentification
   useEffect(() => {
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
-      // Auth event tracking
-
-      // 🚨 CRITIQUE: Vider le cache pour TOUT événement
+      // Vider le cache pour TOUT événement d'auth
       tenantCache = null;
 
       if (event === 'SIGNED_OUT') {
-        // Nettoyage immédiat des états
         setCurrentTenant(null);
         setUserMembership(null);
         setLoading(false);
       }
 
-      if (event === 'SIGNED_IN' && session) {
-        // Nouvelle session: forcer le refetch
-        setLoading(true);
+      // ✅ CORRECTION CRITIQUE : déclencher un vrai re-fetch au lieu de juste
+      // mettre loading=true sans jamais appeler fetchUserTenant
+      if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session) {
+        fetchUserTenant();
       }
     });
 
     return () => {
       authListener.subscription.unsubscribe();
     };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Chargement initial (si une session est déjà active au montage du composant)
   useEffect(() => {
-    // Si on a déjà les données en cache, les utiliser
+    isMountedRef.current = true;
+
     if (tenantCache && !tenantCache.loading) {
       setCurrentTenant(tenantCache.currentTenant);
       setUserMembership(tenantCache.userMembership);
@@ -80,106 +155,18 @@ export const TenantProvider: React.FC<{ children: ReactNode }> = ({ children }) 
       return;
     }
 
-    let isMounted = true; // Éviter les updates si le composant est démonté
-
-    const fetchUserTenant = async () => {
-      try {
-        // console.log('🏢 TenantProvider: Fetching tenant data...');
-        setLoading(true);
-
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-        if (!user) {
-          setLoading(false);
-          return;
-        }
-
-        // Vérifier le profil directement
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('user_id', user.id)
-          .single();
-
-        if (profileError) {
-          // Si pas de profil trouvé, c'est peut-être un nouveau tenant owner
-          if (profileError.code === 'PGRST116') {
-            setLoading(false);
-            return;
-          }
-          console.error('Error fetching profile:', profileError);
-          setLoading(false);
-          return;
-        }
-
-        if (profile && profile.tenant_id) {
-          // Récupérer les vraies données du tenant
-          let { data: tenantData, error: tenantError } = await supabase
-            .from('tenants')
-            .select('*')
-            .eq('id', profile.tenant_id)
-            .single();
-
-          if (tenantError || !tenantData) {
-            console.error('Error fetching tenant:', tenantError);
-            // Fallback sur données par défaut
-            tenantData = {
-              id: profile.tenant_id,
-              name: 'Mon Entreprise',
-              slug: 'default',
-              status: 'active',
-            } as any;
-          }
-
-          const membership = {
-            id: profile.id,
-            tenant_id: profile.tenant_id,
-            user_id: profile.user_id,
-            role: profile.role || 'admin',
-            status: 'active',
-            permissions: { admin: true, manage_all: true },
-            tenant: tenantData as Tenant,
-          };
-
-          // Mettre en cache
-          tenantCache = {
-            currentTenant: tenantData as Tenant,
-            userMembership: membership,
-            tenantId: profile.tenant_id,
-            loading: false,
-          };
-
-          if (isMounted) {
-            setCurrentTenant(tenantData as Tenant);
-            setUserMembership(membership);
-            // Tenant loaded
-          }
-        }
-      } catch (error) {
-        console.error('Error in TenantProvider:', error);
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
-    };
-
     fetchUserTenant();
 
     return () => {
-      isMounted = false; // Cleanup
+      isMountedRef.current = false;
     };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const tenantId = currentTenant?.id || null;
 
-  // Fonction pour rafraîchir les données du tenant
+  // ✅ maybeSingle() dans refreshTenant pour la même raison
   const refreshTenant = async () => {
-    // Refresh tenant demandé
-    // Vider le cache
     tenantCache = null;
-    // Recharger
     setLoading(true);
 
     try {
@@ -192,10 +179,10 @@ export const TenantProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         .from('profiles')
         .select('*')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
       if (profile && profile.tenant_id) {
-        let { data: tenantData } = await supabase
+        const { data: tenantData } = await supabase
           .from('tenants')
           .select('*')
           .eq('id', profile.tenant_id)

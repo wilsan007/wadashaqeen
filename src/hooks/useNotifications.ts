@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { useUserFilterContext } from '@/hooks/useUserAuth';
+import { useAuth } from '@/contexts/AuthContext';
 import { applyRoleFilters } from '@/lib/roleBasedFiltering';
+import { CACHE_TTL } from '@/lib/queryConfig';
 
 export interface Notification {
   id: string;
@@ -29,23 +31,29 @@ export interface NotificationPreference {
 }
 
 export const useNotifications = () => {
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [preferences, setPreferences] = useState<NotificationPreference[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [unviewedCount, setUnviewedCount] = useState(0); // Nouvelles notifications non vues
-  const [lastViewedAt, setLastViewedAt] = useState<string | null>(null); // Dernière consultation
+  const queryClient = useQueryClient();
   const { toast } = useToast();
 
   // 🔒 Contexte utilisateur pour le filtrage
-  const { userContext } = useUserFilterContext();
+  const { userContext } = useAuth();
 
-  const fetchNotifications = async () => {
-    if (!userContext) return;
+  // Local state for unviewed tracking (localStorage-based, not server state)
+  const [lastViewedAt, setLastViewedAt] = useState<string | null>(() =>
+    localStorage.getItem('notifications_last_viewed')
+  );
 
-    try {
+  // --- Fetch notifications ---
+  const {
+    data: notifications = [],
+    isLoading: loadingNotifications,
+    refetch: refetchNotifications,
+  } = useQuery<Notification[]>({
+    queryKey: ['notifications', userContext?.userId],
+    queryFn: async () => {
+      if (!userContext) return [];
+
       const { data: user } = await supabase.auth.getUser();
-      if (!user.user) return;
+      if (!user.user) return [];
 
       let query = supabase
         .from('notifications')
@@ -53,73 +61,73 @@ export const useNotifications = () => {
         .order('created_at', { ascending: false })
         .limit(50);
 
-      // 🔒 Appliquer le filtrage par rôle (notifications sont déjà filtrées par user_id dans roleBasedFiltering)
+      // 🔒 Appliquer le filtrage par rôle
       query = applyRoleFilters(query, userContext, 'notifications');
 
       const { data, error } = await query;
-
       if (error) throw error;
+      return (data || []) as Notification[];
+    },
+    enabled: !!userContext,
+    ...CACHE_TTL.realtime,
+  });
 
-      const notificationData = (data || []) as Notification[];
-      setNotifications(notificationData);
-      setUnreadCount(notificationData.filter(n => !n.read_at).length);
-
-      // Calculer les notifications non vues (nouvelles depuis la dernière consultation)
-      const storedLastViewed = localStorage.getItem('notifications_last_viewed');
-      if (storedLastViewed) {
-        setLastViewedAt(storedLastViewed);
-        const lastViewedDate = new Date(storedLastViewed);
-        setUnviewedCount(
-          notificationData.filter(n => new Date(n.created_at) > lastViewedDate && !n.dismissed_at)
-            .length
-        );
-      } else {
-        setUnviewedCount(notificationData.filter(n => !n.dismissed_at).length);
-      }
-    } catch (error: any) {
-      console.error('Error fetching notifications:', error);
-      toast({
-        title: 'Erreur',
-        description: 'Impossible de charger les notifications',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const fetchPreferences = async () => {
-    try {
+  // --- Fetch preferences ---
+  const { data: preferences = [] } = useQuery<NotificationPreference[]>({
+    queryKey: ['notification-preferences', userContext?.userId],
+    queryFn: async () => {
       const { data, error } = await supabase.from('notification_preferences').select('*');
-
       if (error) throw error;
-      setPreferences(data || []);
-    } catch (error: any) {
-      console.error('Error fetching preferences:', error);
-    }
-  };
+      return data || [];
+    },
+    enabled: !!userContext,
+    ...CACHE_TTL.semiStatic,
+  });
 
-  const markAsRead = async (notificationIds: string[]) => {
-    try {
+  // Derived counts
+  const unreadCount = notifications.filter(n => !n.read_at).length;
+  const unviewedCount = (() => {
+    const storedLastViewed = lastViewedAt;
+    if (storedLastViewed) {
+      const lastViewedDate = new Date(storedLastViewed);
+      return notifications.filter(n => new Date(n.created_at) > lastViewedDate && !n.dismissed_at)
+        .length;
+    }
+    return notifications.filter(n => !n.dismissed_at).length;
+  })();
+
+  const loading = loadingNotifications;
+
+  // --- Mutation: mark as read ---
+  const markAsReadMutation = useMutation({
+    mutationFn: async (notificationIds: string[]) => {
       const { error } = await supabase.rpc('mark_notifications_read', {
         notification_ids: notificationIds,
       });
-
       if (error) throw error;
-
-      // Update local state
-      setNotifications(prev =>
-        prev.map(n =>
-          notificationIds.includes(n.id) ? { ...n, read_at: new Date().toISOString() } : n
-        )
+      return notificationIds;
+    },
+    onSuccess: (notificationIds) => {
+      // Optimistic update in cache
+      queryClient.setQueryData<Notification[]>(
+        ['notifications', userContext?.userId],
+        prev =>
+          (prev || []).map(n =>
+            notificationIds.includes(n.id) ? { ...n, read_at: new Date().toISOString() } : n
+          )
       );
-      setUnreadCount(prev => Math.max(0, prev - notificationIds.length));
-    } catch (error: any) {
-      console.error('Error marking notifications as read:', error);
+    },
+    onError: () => {
       toast({
         title: 'Erreur',
         description: 'Impossible de marquer les notifications comme lues',
         variant: 'destructive',
       });
-    }
+    },
+  });
+
+  const markAsRead = async (notificationIds: string[]) => {
+    return markAsReadMutation.mutateAsync(notificationIds);
   };
 
   const markAllAsRead = async () => {
@@ -134,9 +142,8 @@ export const useNotifications = () => {
     const now = new Date().toISOString();
     localStorage.setItem('notifications_last_viewed', now);
     setLastViewedAt(now);
-    setUnviewedCount(0);
 
-    // Mettre à jour en base de données avec une requête directe
+    // Mettre à jour en base de données
     try {
       const unviewedIds = notifications
         .filter(n => !lastViewedAt || new Date(n.created_at) > new Date(lastViewedAt))
@@ -155,49 +162,57 @@ export const useNotifications = () => {
     }
   };
 
-  // Marquer des notifications comme fermées/ignorées
-  const markAsDismissed = async (notificationIds: string[]) => {
-    try {
+  // --- Mutation: mark as dismissed ---
+  const markAsDismissedMutation = useMutation({
+    mutationFn: async (notificationIds: string[]) => {
       const now = new Date().toISOString();
-
       const { error } = await supabase
         .from('notifications')
         .update({ dismissed_at: now } as any)
         .in('id', notificationIds);
-
       if (error) throw error;
-
-      // Mettre à jour l'état local
-      setNotifications(prev =>
-        prev.map(n => (notificationIds.includes(n.id) ? { ...n, dismissed_at: now } : n))
+      return { notificationIds, now };
+    },
+    onSuccess: ({ notificationIds, now }) => {
+      queryClient.setQueryData<Notification[]>(
+        ['notifications', userContext?.userId],
+        prev =>
+          (prev || []).map(n =>
+            notificationIds.includes(n.id) ? { ...n, dismissed_at: now } : n
+          )
       );
-
-      // Recalculer les compteurs
       localStorage.setItem('notifications_last_viewed', now);
       setLastViewedAt(now);
-      setUnviewedCount(0);
-
       toast({
         title: '✅ Notifications fermées',
         description: 'Les notifications ont été marquées comme vues.',
         variant: 'default',
       });
-    } catch (error: any) {
-      console.error('Error dismissing notifications:', error);
+    },
+    onError: () => {
       toast({
         title: 'Erreur',
         description: 'Impossible de fermer les notifications',
         variant: 'destructive',
       });
-    }
+    },
+  });
+
+  const markAsDismissed = async (notificationIds: string[]) => {
+    return markAsDismissedMutation.mutateAsync(notificationIds);
   };
 
-  const updatePreference = async (
-    notificationType: string,
-    enabled: boolean,
-    emailEnabled?: boolean
-  ) => {
-    try {
+  // --- Mutation: update preference ---
+  const updatePreferenceMutation = useMutation({
+    mutationFn: async ({
+      notificationType,
+      enabled,
+      emailEnabled,
+    }: {
+      notificationType: string;
+      enabled: boolean;
+      emailEnabled?: boolean;
+    }) => {
       const { data: user } = await supabase.auth.getUser();
       if (!user.user) throw new Error('User not authenticated');
 
@@ -208,48 +223,59 @@ export const useNotifications = () => {
         email_enabled: emailEnabled ?? false,
         in_app_enabled: enabled,
       });
-
       if (error) throw error;
-
-      setPreferences(prev => {
-        const existing = prev.find(p => p.notification_type === notificationType);
-        if (existing) {
-          return prev.map(p =>
-            p.notification_type === notificationType
-              ? {
-                  ...p,
-                  enabled,
-                  in_app_enabled: enabled,
-                  email_enabled: emailEnabled ?? p.email_enabled,
-                }
-              : p
-          );
-        } else {
-          return [
-            ...prev,
-            {
-              id: crypto.randomUUID(),
-              notification_type: notificationType,
-              enabled,
-              email_enabled: emailEnabled ?? false,
-              in_app_enabled: enabled,
-            },
-          ];
+      return { notificationType, enabled, emailEnabled };
+    },
+    onSuccess: ({ notificationType, enabled, emailEnabled }) => {
+      queryClient.setQueryData<NotificationPreference[]>(
+        ['notification-preferences', userContext?.userId],
+        prev => {
+          const existing = (prev || []).find(p => p.notification_type === notificationType);
+          if (existing) {
+            return (prev || []).map(p =>
+              p.notification_type === notificationType
+                ? {
+                    ...p,
+                    enabled,
+                    in_app_enabled: enabled,
+                    email_enabled: emailEnabled ?? p.email_enabled,
+                  }
+                : p
+            );
+          } else {
+            return [
+              ...(prev || []),
+              {
+                id: crypto.randomUUID(),
+                notification_type: notificationType,
+                enabled,
+                email_enabled: emailEnabled ?? false,
+                in_app_enabled: enabled,
+              },
+            ];
+          }
         }
-      });
-
+      );
       toast({
         title: 'Succès',
         description: 'Préférences de notification mises à jour',
       });
-    } catch (error: any) {
-      console.error('Error updating preference:', error);
+    },
+    onError: () => {
       toast({
         title: 'Erreur',
         description: 'Impossible de mettre à jour les préférences',
         variant: 'destructive',
       });
-    }
+    },
+  });
+
+  const updatePreference = async (
+    notificationType: string,
+    enabled: boolean,
+    emailEnabled?: boolean
+  ) => {
+    return updatePreferenceMutation.mutateAsync({ notificationType, enabled, emailEnabled });
   };
 
   const getNotificationsByType = (type: string) => {
@@ -278,14 +304,10 @@ export const useNotifications = () => {
     return notifications.filter(n => n.priority === 'urgent' || n.priority === 'high');
   };
 
-  // Real-time subscription and auto-popup for unread notifications
+  // Real-time subscription — MUST stay as useEffect, do NOT migrate to useQuery
   useEffect(() => {
-    fetchNotifications();
-    fetchPreferences();
-
     let channel: any = null;
 
-    // Subscribe to new notifications for current user
     const setupSubscription = async () => {
       const { data: user } = await supabase.auth.getUser();
       if (!user.user) return;
@@ -301,12 +323,13 @@ export const useNotifications = () => {
             filter: `recipient_id=eq.${user.user.id}`,
           },
           payload => {
-            // console.log('New notification received:', payload);
             const newNotification = payload.new as Notification;
 
-            setNotifications(prev => [newNotification, ...prev]);
-            setUnreadCount(prev => prev + 1);
-            setUnviewedCount(prev => prev + 1); // Nouvelle notification = non vue
+            // Inject into query cache
+            queryClient.setQueryData<Notification[]>(
+              ['notifications', user.user!.id],
+              prev => [newNotification, ...(prev || [])]
+            );
 
             // Show toast for high priority notifications
             if (newNotification.priority === 'urgent' || newNotification.priority === 'high') {
@@ -322,9 +345,7 @@ export const useNotifications = () => {
     };
 
     setupSubscription();
-    setLoading(false);
 
-    // Cleanup function
     return () => {
       if (channel) {
         supabase.removeChannel(channel);
@@ -332,23 +353,27 @@ export const useNotifications = () => {
     };
   }, []);
 
+  const fetchNotifications = async () => {
+    await refetchNotifications();
+  };
+
   return {
     notifications,
     preferences,
     loading,
     unreadCount,
-    unviewedCount, // Nouvelles notifications non vues
+    unviewedCount,
     lastViewedAt,
     fetchNotifications,
     markAsRead,
     markAllAsRead,
-    markAsViewed, // Marquer comme vu lors de l'ouverture
-    markAsDismissed, // Marquer comme fermé
+    markAsViewed,
+    markAsDismissed,
     updatePreference,
     getNotificationsByType,
     getUnreadNotifications,
-    getUnviewedNotifications, // Nouvelles notifications
-    getActiveNotifications, // Notifications non fermées
+    getUnviewedNotifications,
+    getActiveNotifications,
     getPriorityNotifications,
   };
 };

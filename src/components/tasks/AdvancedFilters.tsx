@@ -38,6 +38,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { useScrollDirection } from '@/hooks/use-scroll-direction';
 import { useIsMobileLayout } from '@/hooks/use-mobile';
+import { useTranslation } from '@/hooks/useTranslation';
 
 export interface TaskFilters {
   search: string;
@@ -67,19 +68,7 @@ const defaultFilters: TaskFilters = {
   dateTo: '',
 };
 
-const STATUS_OPTIONS = [
-  { value: 'todo', label: 'À faire', icon: Clock, color: 'text-gray-500' },
-  { value: 'doing', label: 'En cours', icon: AlertCircle, color: 'text-blue-500' },
-  { value: 'blocked', label: 'Bloqué', icon: AlertCircle, color: 'text-orange-500' },
-  { value: 'done', label: 'Terminé', icon: CheckCircle2, color: 'text-green-500' },
-];
 
-const PRIORITY_OPTIONS = [
-  { value: 'low', label: 'Basse', color: 'bg-gray-200 text-gray-700' },
-  { value: 'medium', label: 'Moyenne', color: 'bg-blue-200 text-blue-700' },
-  { value: 'high', label: 'Haute', color: 'bg-orange-200 text-orange-700' },
-  { value: 'urgent', label: 'Urgente', color: 'bg-red-200 text-red-700' },
-];
 
 export const AdvancedFilters = ({
   onFiltersChange,
@@ -88,7 +77,22 @@ export const AdvancedFilters = ({
   totalTasks,
   filteredCount,
 }: AdvancedFiltersProps) => {
+  const { t } = useTranslation();
   const [filters, setFilters] = useState<TaskFilters>(defaultFilters);
+
+  const STATUS_OPTIONS = [
+    { value: 'todo', label: t('tasks.status.todo'), icon: Clock, color: 'text-gray-500' },
+    { value: 'doing', label: t('tasks.status.in_progress'), icon: AlertCircle, color: 'text-blue-500' },
+    { value: 'blocked', label: t('tasks.status.blocked'), icon: AlertCircle, color: 'text-orange-500' },
+    { value: 'done', label: t('tasks.status.done'), icon: CheckCircle2, color: 'text-green-500' },
+  ];
+
+  const PRIORITY_OPTIONS = [
+    { value: 'low', label: t('tasks.priority.low'), color: 'bg-gray-200 text-gray-700' },
+    { value: 'medium', label: t('tasks.priority.medium'), color: 'bg-blue-200 text-blue-700' },
+    { value: 'high', label: t('tasks.priority.high'), color: 'bg-orange-200 text-orange-700' },
+    { value: 'urgent', label: t('tasks.priority.urgent'), color: 'bg-red-200 text-red-700' },
+  ];
   const [isOpen, setIsOpen] = useState(false);
 
   // Détection du scroll et du layout mobile pour cacher les filtres

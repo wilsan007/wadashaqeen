@@ -1,11 +1,12 @@
 /**
- * Page: Operations (Activités Opérationnelles)
+ * Page: Operations ({t('operations.pageTitle')})
  * Pattern: Linear/Monday.com Dashboard
  *
  * Gestion des activités récurrentes et ponctuelles hors projet
  */
 
 import React, { useState } from 'react';
+import { useTranslation } from '@/hooks/useTranslation';
 import {
   CalendarClock,
   CalendarDays,
@@ -36,6 +37,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 
 export const OperationsPage: React.FC = () => {
+  const { t } = useTranslation();
   // États
   const [searchTerm, setSearchTerm] = useState('');
   const [filterKind, setFilterKind] = useState<'all' | 'recurring' | 'one_off'>('all');
@@ -115,7 +117,7 @@ export const OperationsPage: React.FC = () => {
                   <div className="rounded-lg bg-white/20 p-2 backdrop-blur-sm">
                     <CalendarClock className="h-6 w-6 md:h-7 md:w-7" />
                   </div>
-                  Activités Opérationnelles
+                  {t('operations.pageTitle')}
                 </h1>
                 <p className="mt-1 text-sm text-white/90 md:text-base">
                   Gérez vos tâches récurrentes et ponctuelles hors projet
@@ -163,14 +165,14 @@ export const OperationsPage: React.FC = () => {
               className="w-full gap-2 bg-gradient-to-r from-cyan-600 to-purple-600 text-white shadow-lg shadow-cyan-500/30 transition-all duration-300 hover:from-cyan-700 hover:to-purple-700 hover:shadow-xl hover:shadow-cyan-500/40 sm:w-auto"
             >
               <CalendarClock className="h-4 w-4" />
-              <span className="sm:inline">{isMobile ? 'Récurrente' : 'Nouvelle Récurrente'}</span>
+              <span className="hidden sm:inline">{isMobile ? t('operations.newRecurringBtnMobile') : t('operations.newRecurringBtn')}</span>
             </Button>
             <Button
               onClick={() => handleCreateClick('one_off')}
               className="w-full gap-2 bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow-lg shadow-purple-500/30 transition-all duration-300 hover:from-purple-700 hover:to-blue-700 hover:shadow-xl hover:shadow-purple-500/40 sm:w-auto"
             >
               <CalendarDays className="h-4 w-4" />
-              <span className="sm:inline">{isMobile ? 'Ponctuelle' : 'Nouvelle Ponctuelle'}</span>
+              <span className="sm:inline">{isMobile ? t('operations.newOneOffBtnMobile') : t('operations.newOneOffBtn')}</span>
             </Button>
           </div>
         </div>
@@ -203,7 +205,7 @@ export const OperationsPage: React.FC = () => {
             </CardHeader>
             <CardContent className="relative z-10">
               <div className="text-xl font-bold text-gray-600 md:text-2xl">{todoCount}</div>
-              <p className="text-muted-foreground mt-1 text-xs">Non commencées</p>
+              <p className="text-muted-foreground mt-1 text-xs">{t('operations.metricTodoDesc')}</p>
             </CardContent>
           </Card>
 
@@ -216,7 +218,7 @@ export const OperationsPage: React.FC = () => {
             </CardHeader>
             <CardContent className="relative z-10">
               <div className="text-xl font-bold text-blue-600 md:text-2xl">{inProgressCount}</div>
-              <p className="text-muted-foreground mt-1 text-xs">Actives</p>
+              <p className="text-muted-foreground mt-1 text-xs">{t('operations.filterActive')}</p>
             </CardContent>
           </Card>
 
@@ -229,7 +231,7 @@ export const OperationsPage: React.FC = () => {
             </CardHeader>
             <CardContent className="relative z-10">
               <div className="text-xl font-bold text-green-600 md:text-2xl">{completedCount}</div>
-              <p className="text-muted-foreground mt-1 text-xs">Complétées</p>
+              <p className="text-muted-foreground mt-1 text-xs">{t('operations.metricCompletedDesc')}</p>
             </CardContent>
           </Card>
         </div>
@@ -242,7 +244,7 @@ export const OperationsPage: React.FC = () => {
               <div className="relative flex-1">
                 <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform" />
                 <Input
-                  placeholder="Rechercher une activité..."
+                  placeholder={t('operations.searchPlaceholder')}
                   value={searchTerm}
                   onChange={e => setSearchTerm(e.target.value)}
                   className="pl-10"
@@ -254,24 +256,24 @@ export const OperationsPage: React.FC = () => {
                 {/* Filtre Type */}
                 <Select value={filterKind} onValueChange={(value: any) => setFilterKind(value)}>
                   <SelectTrigger className="w-full md:w-48">
-                    <SelectValue placeholder="Type" />
+                    <SelectValue placeholder={t('operations.filterType')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">Tous les types</SelectItem>
-                    <SelectItem value="recurring">Récurrentes</SelectItem>
-                    <SelectItem value="one_off">Ponctuelles</SelectItem>
+                    <SelectItem value="all">{t('operations.filterAllTypes')}</SelectItem>
+                    <SelectItem value="recurring">{t('operations.filterRecurring')}</SelectItem>
+                    <SelectItem value="one_off">{t('operations.filterOneOff')}</SelectItem>
                   </SelectContent>
                 </Select>
 
                 {/* Filtre Statut */}
                 <Select value={filterStatus} onValueChange={(value: any) => setFilterStatus(value)}>
                   <SelectTrigger className="w-full md:w-48">
-                    <SelectValue placeholder="Statut" />
+                    <SelectValue placeholder={t('operations.filterStatus')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">Tous les statuts</SelectItem>
-                    <SelectItem value="active">Actives</SelectItem>
-                    <SelectItem value="inactive">Inactives</SelectItem>
+                    <SelectItem value="all">{t('operations.filterAllStatus')}</SelectItem>
+                    <SelectItem value="active">{t('operations.filterActive')}</SelectItem>
+                    <SelectItem value="inactive">{t('operations.filterInactive')}</SelectItem>
                   </SelectContent>
                 </Select>
 
@@ -293,13 +295,13 @@ export const OperationsPage: React.FC = () => {
         {loading && tasks.length === 0 ? (
           <div className="py-12 text-center">
             <div className="border-primary mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-4 border-t-transparent"></div>
-            <p className="text-muted-foreground">Chargement des activités...</p>
+            <p className="text-muted-foreground">{t('operations.loading')}</p>
           </div>
         ) : error ? (
           <Card className="border-destructive">
             <CardContent className="pt-6">
               <div className="text-destructive text-center">
-                <p className="font-semibold">Erreur lors du chargement</p>
+                <p className="font-semibold">{t('operations.loadError')}</p>
                 <p className="mt-2 text-sm">{error}</p>
                 <Button onClick={() => refresh()} className="mt-4">
                   Réessayer
@@ -312,9 +314,9 @@ export const OperationsPage: React.FC = () => {
             <CardContent className="pt-6">
               <div className="py-8 text-center md:py-12">
                 <CalendarClock className="text-muted-foreground mx-auto mb-4 h-10 w-10 md:h-12 md:w-12" />
-                <p className="text-base font-semibold md:text-lg">Aucune activité trouvée</p>
+                <p className="text-base font-semibold md:text-lg">{t('operations.noActivity')}</p>
                 <p className="text-muted-foreground mt-2 text-sm">
-                  Créez votre première activité récurrente ou ponctuelle
+                  {t('operations.createFirstActivity')}
                 </p>
                 <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-center">
                   <Button
@@ -350,10 +352,10 @@ export const OperationsPage: React.FC = () => {
               <div className="py-8 text-center md:py-12">
                 <CalendarClock className="text-muted-foreground mx-auto mb-4 h-10 w-10 md:h-12 md:w-12" />
                 <p className="text-base font-semibold md:text-lg">
-                  Mode Cards temporairement désactivé
+                  {t('operations.cardsDisabledTitle')}
                 </p>
                 <p className="text-muted-foreground mt-2 text-sm">
-                  Utilisez le mode Tableau pour gérer vos tâches opérationnelles
+                  {t('operations.cardsDisabledDesc')}
                 </p>
                 <Button onClick={() => setViewMode('table')} className="mt-4">
                   Basculer en mode Tableau

@@ -30,7 +30,7 @@
  *    - Exemples de rôles :
  *      * 'super_admin' - Administrateur système
  *      * 'tenant_admin' - Administrateur de tenant
- *      * 'manager_hr' - Manager RH
+ *      * 'hr_manager' - Manager RH
  *      * 'project_manager' - Chef de projet
  *      * 'employee' - Employé standard
  *
@@ -86,7 +86,7 @@
  *    - Peut gérer les utilisateurs de son tenant
  *    - Peut créer des projets et tâches
  *
- * 3. manager_hr (Manager RH)
+ * 3. hr_manager (Manager RH)
  *    - Gestion des employés
  *    - Gestion des absences
  *    - Rapports RH
@@ -134,9 +134,13 @@ export interface UserPermission {
 export enum RoleNames {
   SUPER_ADMIN = 'super_admin',
   TENANT_ADMIN = 'tenant_admin',
-  MANAGER_HR = 'manager_hr',
+  HR_MANAGER = 'hr_manager',
   PROJECT_MANAGER = 'project_manager',
+  TEAM_LEAD = 'team_lead',
   EMPLOYEE = 'employee',
+  CONTRACTOR = 'contractor',
+  INTERN = 'intern',
+  VIEWER = 'viewer',
 }
 
 // Énumération des permissions communes

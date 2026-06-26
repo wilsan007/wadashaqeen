@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -33,49 +33,47 @@ export interface UserRole {
 }
 
 export const useRoleManagement = () => {
-  const [roles, setRoles] = useState<Role[]>([]);
-  const [permissions, setPermissions] = useState<Permission[]>([]);
-  const [userRoles, setUserRoles] = useState<UserRole[]>([]);
-  const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
-  const fetchRoles = async () => {
-    try {
+  const { data: roles = [], isLoading: rolesLoading } = useQuery<Role[]>({
+    queryKey: ['roles'],
+    queryFn: async () => {
       const { data, error } = await supabase.from('roles').select('*').order('hierarchy_level');
+      if (error) {
+        toast({
+          title: 'Erreur',
+          description: 'Impossible de charger les rôles',
+          variant: 'destructive',
+        });
+        throw error;
+      }
+      return data || [];
+    },
+  });
 
-      if (error) throw error;
-      setRoles(data || []);
-    } catch (error: any) {
-      console.error('Error fetching roles:', error);
-      toast({
-        title: 'Erreur',
-        description: 'Impossible de charger les rôles',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const fetchPermissions = async () => {
-    try {
+  const { data: permissions = [], isLoading: permissionsLoading } = useQuery<Permission[]>({
+    queryKey: ['permissions'],
+    queryFn: async () => {
       const { data, error } = await supabase
         .from('permissions')
         .select('*')
         .order('resource, action');
+      if (error) {
+        toast({
+          title: 'Erreur',
+          description: 'Impossible de charger les permissions',
+          variant: 'destructive',
+        });
+        throw error;
+      }
+      return data || [];
+    },
+  });
 
-      if (error) throw error;
-      setPermissions(data || []);
-    } catch (error: any) {
-      console.error('Error fetching permissions:', error);
-      toast({
-        title: 'Erreur',
-        description: 'Impossible de charger les permissions',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const fetchUserRoles = async () => {
-    try {
+  const { data: userRoles = [], isLoading: userRolesLoading } = useQuery<UserRole[]>({
+    queryKey: ['user-roles'],
+    queryFn: async () => {
       const { data, error } = await supabase
         .from('user_roles')
         .select(
@@ -86,18 +84,84 @@ export const useRoleManagement = () => {
         )
         .eq('is_active', true)
         .order('created_at', { ascending: false });
+      if (error) {
+        toast({
+          title: 'Erreur',
+          description: 'Impossible de charger les rôles utilisateurs',
+          variant: 'destructive',
+        });
+        throw error;
+      }
+      return data || [];
+    },
+  });
 
+  const loading = rolesLoading || permissionsLoading || userRolesLoading;
+
+  const assignUserRoleMutation = useMutation({
+    mutationFn: async ({
+      userId,
+      roleId,
+      contextType,
+      contextId,
+      expiresAt,
+    }: {
+      userId: string;
+      roleId: string;
+      contextType?: string;
+      contextId?: string;
+      expiresAt?: string;
+    }) => {
+      const { error } = await supabase.from('user_roles').insert({
+        user_id: userId,
+        role_id: roleId,
+        context_type: contextType,
+        context_id: contextId,
+        expires_at: expiresAt,
+      });
       if (error) throw error;
-      setUserRoles(data || []);
-    } catch (error: any) {
-      console.error('Error fetching user roles:', error);
+    },
+    onSuccess: () => {
+      toast({
+        title: 'Succès',
+        description: 'Rôle assigné avec succès',
+      });
+      queryClient.invalidateQueries({ queryKey: ['user-roles'] });
+    },
+    onError: (error: any) => {
+      console.error('Error assigning role:', error);
       toast({
         title: 'Erreur',
-        description: 'Impossible de charger les rôles utilisateurs',
+        description: "Impossible d'assigner le rôle",
         variant: 'destructive',
       });
-    }
-  };
+    },
+  });
+
+  const removeUserRoleMutation = useMutation({
+    mutationFn: async (userRoleId: string) => {
+      const { error } = await supabase
+        .from('user_roles')
+        .update({ is_active: false })
+        .eq('id', userRoleId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({
+        title: 'Succès',
+        description: 'Rôle retiré avec succès',
+      });
+      queryClient.invalidateQueries({ queryKey: ['user-roles'] });
+    },
+    onError: (error: any) => {
+      console.error('Error removing role:', error);
+      toast({
+        title: 'Erreur',
+        description: 'Impossible de retirer le rôle',
+        variant: 'destructive',
+      });
+    },
+  });
 
   const assignUserRole = async (
     userId: string,
@@ -106,56 +170,11 @@ export const useRoleManagement = () => {
     contextId?: string,
     expiresAt?: string
   ) => {
-    try {
-      const { error } = await supabase.from('user_roles').insert({
-        user_id: userId,
-        role_id: roleId,
-        context_type: contextType,
-        context_id: contextId,
-        expires_at: expiresAt,
-      });
-
-      if (error) throw error;
-
-      toast({
-        title: 'Succès',
-        description: 'Rôle assigné avec succès',
-      });
-
-      fetchUserRoles();
-    } catch (error: any) {
-      console.error('Error assigning role:', error);
-      toast({
-        title: 'Erreur',
-        description: "Impossible d'assigner le rôle",
-        variant: 'destructive',
-      });
-    }
+    return assignUserRoleMutation.mutateAsync({ userId, roleId, contextType, contextId, expiresAt });
   };
 
   const removeUserRole = async (userRoleId: string) => {
-    try {
-      const { error } = await supabase
-        .from('user_roles')
-        .update({ is_active: false })
-        .eq('id', userRoleId);
-
-      if (error) throw error;
-
-      toast({
-        title: 'Succès',
-        description: 'Rôle retiré avec succès',
-      });
-
-      fetchUserRoles();
-    } catch (error: any) {
-      console.error('Error removing role:', error);
-      toast({
-        title: 'Erreur',
-        description: 'Impossible de retirer le rôle',
-        variant: 'destructive',
-      });
-    }
+    return removeUserRoleMutation.mutateAsync(userRoleId);
   };
 
   const getUserPermissions = async (userId?: string) => {
@@ -184,7 +203,7 @@ export const useRoleManagement = () => {
       } = await supabase.auth.getUser();
       if (!user) return false;
 
-      const { data: userRoles, error } = await supabase
+      const { data: userRolesData, error } = await supabase
         .from('user_roles')
         .select(
           `
@@ -199,7 +218,7 @@ export const useRoleManagement = () => {
 
       // Les admins ont toutes les permissions
       return (
-        userRoles?.some(role => ['admin', 'tenant_admin', 'owner'].includes(role.roles.name)) ||
+        userRolesData?.some(role => ['admin', 'tenant_admin', 'owner'].includes(role.roles.name)) ||
         false
       );
     } catch (error: any) {
@@ -280,16 +299,6 @@ export const useRoleManagement = () => {
     return grouped;
   };
 
-  useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      await Promise.all([fetchRoles(), fetchPermissions(), fetchUserRoles()]);
-      setLoading(false);
-    };
-
-    loadData();
-  }, []);
-
   return {
     roles,
     permissions,
@@ -304,9 +313,9 @@ export const useRoleManagement = () => {
     updateRolePermissions,
     getPermissionsByResource,
     refetch: () => {
-      fetchRoles();
-      fetchPermissions();
-      fetchUserRoles();
+      queryClient.invalidateQueries({ queryKey: ['roles'] });
+      queryClient.invalidateQueries({ queryKey: ['permissions'] });
+      queryClient.invalidateQueries({ queryKey: ['user-roles'] });
     },
   };
 };

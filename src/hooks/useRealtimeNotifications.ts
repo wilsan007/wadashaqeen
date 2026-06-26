@@ -1,16 +1,18 @@
 /**
- * 🎯 useRealtimeNotifications - Notifications temps réel avec Supabase Realtime
+ * useRealtimeNotifications - Notifications temps réel avec Supabase Realtime
  * Pattern: Linear, Slack, Discord
  *
  * Fonctionnalités:
- * - Écoute des changements en temps réel
+ * - Fetch initial via useQuery
+ * - Écoute des changements en temps réel (supabase.channel → useEffect, non migré)
  * - Notifications pour: congés, tâches, approbations
  * - Badge compteur non-lues
- * - Marquage lu/non-lu
+ * - Marquage lu/non-lu via useMutation
  * - Persistence des notifications
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useTenant } from '@/contexts/TenantContext';
@@ -45,76 +47,91 @@ interface UseRealtimeNotificationsReturn {
   refresh: () => Promise<void>;
 }
 
+// ── Fetch function used by useQuery ───────────────────────────────────────────
+
+async function fetchNotificationsForTenant(
+  tenantId: string
+): Promise<Notification[]> {
+  const { data: session } = await supabase.auth.getSession();
+  if (!session?.session?.user) {
+    throw new Error('Non authentifié');
+  }
+
+  const { data, error } = await supabase
+    .from('notifications')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .eq('user_id', session.session.user.id)
+    .order('created_at', { ascending: false })
+    .limit(50);
+
+  if (error) throw error;
+
+  return (data as Notification[]) || [];
+}
+
+// ── Hook ──────────────────────────────────────────────────────────────────────
+
 export const useRealtimeNotifications = (): UseRealtimeNotificationsReturn => {
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [loading, setLoading] = useState(true);
   const { toast } = useToast();
   const { currentTenant } = useTenant();
+  const queryClient = useQueryClient();
   const channelRef = useRef<RealtimeChannel | null>(null);
 
-  /**
-   * Charger les notifications existantes
-   */
-  const fetchNotifications = useCallback(async () => {
-    if (!currentTenant?.id) {
-      setNotifications([]);
-      setLoading(false);
-      return;
-    }
+  // Realtime overlay: notifications pushed via channel that are not yet in the query cache
+  const [realtimeItems, setRealtimeItems] = useState<Notification[]>([]);
 
-    try {
-      setLoading(true);
+  const tenantId = currentTenant?.id;
 
-      const { data: session } = await supabase.auth.getSession();
-      if (!session?.session?.user) {
-        throw new Error('Non authentifié');
-      }
+  // ── useQuery: fetch initial des notifications ──────────────────────────────
 
-      // Récupérer les 50 dernières notifications
-      const { data, error } = await supabase
-        .from('notifications')
-        .select('*')
-        .eq('tenant_id', currentTenant.id)
-        .eq('user_id', session.session.user.id)
-        .order('created_at', { ascending: false })
-        .limit(50);
+  const notifQuery = useQuery({
+    queryKey: ['realtime-notifications', tenantId],
+    queryFn: () => fetchNotificationsForTenant(tenantId!),
+    enabled: !!tenantId,
+    staleTime: 30_000,
+  });
 
-      if (error) throw error;
+  // ── Merge server + realtime overlay ───────────────────────────────────────
 
-      setNotifications((data as Notification[]) || []);
-    } catch (err) {
-      console.error('Erreur chargement notifications:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, [currentTenant?.id]);
+  const serverNotifications = notifQuery.data ?? [];
+  const newRealtimeItems = realtimeItems.filter(
+    rt => !serverNotifications.some(s => s.id === rt.id)
+  );
+  const notifications: Notification[] = [...newRealtimeItems, ...serverNotifications];
 
-  /**
-   * Configurer l'écoute en temps réel
-   */
+  const loading = notifQuery.isLoading;
+  const unreadCount = notifications.filter(n => !n.is_read).length;
+
+  // ── Realtime channel (intentionally kept as useEffect — RULE: no migration) ─
+
   useEffect(() => {
-    if (!currentTenant?.id) return;
+    if (!tenantId) return;
 
     const setupRealtime = async () => {
       const { data: session } = await supabase.auth.getSession();
       if (!session?.session?.user) return;
 
-      // Créer un canal pour écouter les nouvelles notifications
+      const userId = session.session.user.id;
+
       const channel = supabase
-        .channel(`notifications:${session.session.user.id}`)
+        .channel(`notifications:${userId}`)
         .on(
           'postgres_changes',
           {
             event: 'INSERT',
             schema: 'public',
             table: 'notifications',
-            filter: `user_id=eq.${session.session.user.id}`,
+            filter: `user_id=eq.${userId}`,
           },
           payload => {
             const newNotification = payload.new as Notification;
 
-            // Ajouter la notification à la liste
-            setNotifications(prev => [newNotification, ...prev].slice(0, 50));
+            // Add to realtime overlay (capped at 50)
+            setRealtimeItems(prev => [newNotification, ...prev].slice(0, 50));
+
+            // Invalidate the query cache so a background refetch stays in sync
+            queryClient.invalidateQueries({ queryKey: ['realtime-notifications', tenantId] });
 
             // Afficher un toast
             toast({
@@ -138,70 +155,117 @@ export const useRealtimeNotifications = (): UseRealtimeNotificationsReturn => {
     };
 
     setupRealtime();
-    fetchNotifications();
 
     // Nettoyage
     return () => {
       if (channelRef.current) {
         channelRef.current.unsubscribe();
+        channelRef.current = null;
       }
     };
-  }, [currentTenant?.id, fetchNotifications, toast]);
+  }, [tenantId, queryClient, toast]);
 
-  /**
-   * Marquer une notification comme lue
-   */
-  const markAsRead = useCallback(async (id: string) => {
-    try {
-      const { error } = await supabase.from('notifications').update({ is_read: true }).eq('id', id);
+  // ── useMutation: markAsRead ────────────────────────────────────────────────
 
-      if (error) throw error;
-
-      setNotifications(prev => prev.map(n => (n.id === id ? { ...n, is_read: true } : n)));
-    } catch (err) {
-      console.error('Erreur marquage notification:', err);
-    }
-  }, []);
-
-  /**
-   * Marquer toutes les notifications comme lues
-   */
-  const markAllAsRead = useCallback(async () => {
-    try {
-      const { data: session } = await supabase.auth.getSession();
-      if (!session?.session?.user || !currentTenant?.id) return;
-
+  const markAsReadMutation = useMutation({
+    mutationFn: async (id: string) => {
       const { error } = await supabase
         .from('notifications')
         .update({ is_read: true })
-        .eq('tenant_id', currentTenant.id)
-        .eq('user_id', session.session.user.id)
+        .eq('id', id);
+      if (error) throw error;
+    },
+    onMutate: async (id: string) => {
+      // Optimistic update in overlay
+      setRealtimeItems(prev => prev.map(n => (n.id === id ? { ...n, is_read: true } : n)));
+      // Optimistic update in cache
+      queryClient.setQueryData<Notification[]>(
+        ['realtime-notifications', tenantId],
+        old => (old ? old.map(n => (n.id === id ? { ...n, is_read: true } : n)) : old)
+      );
+    },
+    onError: (err) => {
+      console.error('Erreur marquage notification:', err);
+      queryClient.invalidateQueries({ queryKey: ['realtime-notifications', tenantId] });
+    },
+  });
+
+  const markAsRead = async (id: string) => {
+    await markAsReadMutation.mutateAsync(id);
+  };
+
+  // ── useMutation: markAllAsRead ─────────────────────────────────────────────
+
+  const markAllAsReadMutation = useMutation({
+    mutationFn: async ({
+      userId,
+      tId,
+    }: {
+      userId: string;
+      tId: string;
+    }) => {
+      const { error } = await supabase
+        .from('notifications')
+        .update({ is_read: true })
+        .eq('tenant_id', tId)
+        .eq('user_id', userId)
         .eq('is_read', false);
-
       if (error) throw error;
-
-      setNotifications(prev => prev.map(n => ({ ...n, is_read: true })));
-    } catch (err) {
+    },
+    onMutate: async () => {
+      setRealtimeItems(prev => prev.map(n => ({ ...n, is_read: true })));
+      queryClient.setQueryData<Notification[]>(
+        ['realtime-notifications', tenantId],
+        old => (old ? old.map(n => ({ ...n, is_read: true })) : old)
+      );
+    },
+    onError: (err) => {
       console.error('Erreur marquage toutes notifications:', err);
-    }
-  }, [currentTenant?.id]);
+      queryClient.invalidateQueries({ queryKey: ['realtime-notifications', tenantId] });
+    },
+  });
 
-  /**
-   * Supprimer une notification
-   */
-  const deleteNotification = useCallback(async (id: string) => {
-    try {
+  const markAllAsRead = async () => {
+    const { data: session } = await supabase.auth.getSession();
+    if (!session?.session?.user || !tenantId) return;
+    await markAllAsReadMutation.mutateAsync({
+      userId: session.session.user.id,
+      tId: tenantId,
+    });
+  };
+
+  // ── useMutation: deleteNotification ───────────────────────────────────────
+
+  const deleteNotificationMutation = useMutation({
+    mutationFn: async (id: string) => {
       const { error } = await supabase.from('notifications').delete().eq('id', id);
-
       if (error) throw error;
-
-      setNotifications(prev => prev.filter(n => n.id !== id));
-    } catch (err) {
+    },
+    onMutate: async (id: string) => {
+      setRealtimeItems(prev => prev.filter(n => n.id !== id));
+      queryClient.setQueryData<Notification[]>(
+        ['realtime-notifications', tenantId],
+        old => (old ? old.filter(n => n.id !== id) : old)
+      );
+    },
+    onError: (err) => {
       console.error('Erreur suppression notification:', err);
-    }
-  }, []);
+      queryClient.invalidateQueries({ queryKey: ['realtime-notifications', tenantId] });
+    },
+  });
 
-  const unreadCount = notifications.filter(n => !n.is_read).length;
+  const deleteNotification = async (id: string) => {
+    await deleteNotificationMutation.mutateAsync(id);
+  };
+
+  // ── refresh ────────────────────────────────────────────────────────────────
+
+  const refresh = async () => {
+    setRealtimeItems([]);
+    await queryClient.invalidateQueries({ queryKey: ['realtime-notifications', tenantId] });
+  };
+
+  // ── Return ─────────────────────────────────────────────────────────────────
 
   return {
     notifications,
@@ -210,6 +274,6 @@ export const useRealtimeNotifications = (): UseRealtimeNotificationsReturn => {
     markAsRead,
     markAllAsRead,
     deleteNotification,
-    refresh: fetchNotifications,
+    refresh,
   };
 };

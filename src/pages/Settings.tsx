@@ -8,6 +8,7 @@ import { useTenant } from '@/contexts/TenantContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { useTranslation } from '@/hooks/useTranslation';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Sous-composant : section logo de l'entreprise
@@ -15,6 +16,7 @@ import { cn } from '@/lib/utils';
 const CompanyLogoSection = () => {
   const { currentTenant, refreshTenant } = useTenant();
   const { toast } = useToast();
+  const { t } = useTranslation();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [uploading, setUploading] = useState(false);
@@ -31,11 +33,11 @@ const CompanyLogoSection = () => {
     // Validation locale
     const ALLOWED = ['image/jpeg', 'image/png', 'image/jpg', 'image/webp', 'image/svg+xml', 'image/gif'];
     if (!ALLOWED.includes(file.type)) {
-      toast({ title: 'Format invalide', description: 'Formats acceptés : JPG, PNG, WEBP, SVG, GIF', variant: 'destructive' });
+      toast({ title: t('common.invalidFormat'), description: t('settings.invalidFormat'), variant: 'destructive' });
       return;
     }
     if (file.size > 2 * 1024 * 1024) {
-      toast({ title: 'Fichier trop volumineux', description: 'Taille maximum : 2 Mo', variant: 'destructive' });
+      toast({ title: t('common.fileTooLarge'), description: t('settings.fileTooLarge'), variant: 'destructive' });
       return;
     }
 
@@ -75,13 +77,13 @@ const CompanyLogoSection = () => {
       setUploadStatus('success');
       await refreshTenant();
 
-      toast({ title: 'Logo mis à jour', description: 'Le logo de votre entreprise a été enregistré avec succès.' });
+      toast({ title: t('settings.logoUpdated'), description: t('settings.logoUpdatedDesc') });
     } catch (err: any) {
       setPreview(currentTenant?.logo_url ?? null);
       setUploadStatus('error');
       toast({
-        title: "Erreur lors de l'upload",
-        description: err.message ?? 'Une erreur inattendue est survenue.',
+        title: t('settings.uploadError'),
+        description: err.message ?? t('settings.unexpectedError'),
         variant: 'destructive',
       });
     } finally {
@@ -96,10 +98,10 @@ const CompanyLogoSection = () => {
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Building2 className="h-5 w-5 text-blue-500" />
-          Logo de l&apos;entreprise
+          {t('settings.companyLogo')}
         </CardTitle>
         <CardDescription>
-          Téléchargez le logo de votre organisation (JPG, PNG, WEBP, SVG, GIF — max 2 Mo)
+          {t('settings.companyLogoDesc')}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -109,7 +111,7 @@ const CompanyLogoSection = () => {
             {currentLogoUrl ? (
               <img
                 src={currentLogoUrl}
-                alt="Logo entreprise"
+                alt={t('settings.companyLogoAlt')}
                 className="h-full w-full object-contain"
               />
             ) : (
@@ -129,16 +131,16 @@ const CompanyLogoSection = () => {
               ) : (
                 <Upload className="h-4 w-4" />
               )}
-              {uploading ? 'Envoi en cours…' : 'Choisir un fichier'}
+              {uploading ? t('common.uploading') : t('common.fileChoose')}
             </Button>
             {uploadStatus === 'success' && (
               <p className="flex items-center gap-1 text-xs text-green-600">
-                <CheckCircle className="h-3.5 w-3.5" /> Logo enregistré
+                <CheckCircle className="h-3.5 w-3.5" /> {t('settings.logoSaved')}
               </p>
             )}
             {uploadStatus === 'error' && (
               <p className="flex items-center gap-1 text-xs text-destructive">
-                <AlertCircle className="h-3.5 w-3.5" /> Échec de l&apos;upload
+                <AlertCircle className="h-3.5 w-3.5" /> {t('common.uploadFailed')}
               </p>
             )}
           </div>
@@ -159,13 +161,14 @@ const CompanyLogoSection = () => {
 // Page principale Paramètres
 // ─────────────────────────────────────────────────────────────────────────────
 export const Settings = () => {
+  const { t } = useTranslation();
   return (
     <div className="container mx-auto px-4 py-4 sm:py-8">
       <div className="mx-auto max-w-4xl">
         <div className="mb-6 sm:mb-8">
-          <h1 className="text-2xl font-bold sm:text-3xl">Paramètres</h1>
+          <h1 className="text-2xl font-bold sm:text-3xl">{t('settings.title')}</h1>
           <p className="mt-2 text-sm text-muted-foreground sm:text-base">
-            Gérez vos paramètres de compte et de sécurité
+            {t('settings.subtitle')}
           </p>
         </div>
 
@@ -177,21 +180,21 @@ export const Settings = () => {
               className="flex items-center gap-1 py-2.5 text-xs sm:gap-2 sm:py-2 sm:text-sm"
             >
               <Shield className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" />
-              <span className="truncate">Sécurité</span>
+              <span className="truncate">{t('settings.security')}</span>
             </TabsTrigger>
             <TabsTrigger
               value="profile"
               className="flex items-center gap-1 py-2.5 text-xs sm:gap-2 sm:py-2 sm:text-sm"
             >
               <User className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" />
-              <span className="truncate">Profil</span>
+              <span className="truncate">{t('settings.profile')}</span>
             </TabsTrigger>
             <TabsTrigger
               value="notifications"
               className="flex items-center gap-1 py-2.5 text-xs sm:gap-2 sm:py-2 sm:text-sm"
             >
               <Bell className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" />
-              <span className="truncate">Notifs</span>
+              <span className="truncate">{t('settings.notifs')}</span>
             </TabsTrigger>
             <TabsTrigger
               value="password"
@@ -199,8 +202,8 @@ export const Settings = () => {
             >
               <Key className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" />
               <span className="truncate">
-                <span className="hidden sm:inline">Mot de passe</span>
-                <span className="sm:hidden">MDP</span>
+                <span className="hidden sm:inline">{t('settings.password')}</span>
+                <span className="sm:hidden">{t('settings.mdp')}</span>
               </span>
             </TabsTrigger>
             <TabsTrigger
@@ -208,7 +211,7 @@ export const Settings = () => {
               className="flex items-center gap-1 py-2.5 text-xs sm:gap-2 sm:py-2 sm:text-sm"
             >
               <Building2 className="h-3.5 w-3.5 shrink-0 sm:h-4 sm:w-4" />
-              <span className="truncate">Société</span>
+              <span className="truncate">{t('settings.company')}</span>
             </TabsTrigger>
           </TabsList>
 
@@ -219,11 +222,11 @@ export const Settings = () => {
           <TabsContent value="profile" className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>Informations du profil</CardTitle>
-                <CardDescription>Gérez vos informations personnelles</CardDescription>
+                <CardTitle>{t('settings.profileInfo')}</CardTitle>
+                <CardDescription>{t('settings.profileInfoDesc')}</CardDescription>
               </CardHeader>
               <CardContent>
-                <p className="text-muted-foreground">Cette section sera bientôt disponible</p>
+                <p className="text-muted-foreground">{t('common.comingSoon')}</p>
               </CardContent>
             </Card>
           </TabsContent>
@@ -231,11 +234,11 @@ export const Settings = () => {
           <TabsContent value="notifications" className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>Préférences de notifications</CardTitle>
-                <CardDescription>Gérez vos préférences de notifications</CardDescription>
+                <CardTitle>{t('settings.notifPrefs')}</CardTitle>
+                <CardDescription>{t('settings.notifPrefsDesc')}</CardDescription>
               </CardHeader>
               <CardContent>
-                <p className="text-muted-foreground">Cette section sera bientôt disponible</p>
+                <p className="text-muted-foreground">{t('common.comingSoon')}</p>
               </CardContent>
             </Card>
           </TabsContent>
@@ -243,11 +246,11 @@ export const Settings = () => {
           <TabsContent value="password" className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>Changer le mot de passe</CardTitle>
-                <CardDescription>Mettez à jour votre mot de passe</CardDescription>
+                <CardTitle>{t('settings.changePassword')}</CardTitle>
+                <CardDescription>{t('settings.changePasswordDesc')}</CardDescription>
               </CardHeader>
               <CardContent>
-                <p className="text-muted-foreground">Cette section sera bientôt disponible</p>
+                <p className="text-muted-foreground">{t('common.comingSoon')}</p>
               </CardContent>
             </Card>
           </TabsContent>
@@ -256,11 +259,11 @@ export const Settings = () => {
             <CompanyLogoSection />
             <Card>
               <CardHeader>
-                <CardTitle>Informations de l&apos;entreprise</CardTitle>
-                <CardDescription>Paramètres généraux de votre organisation</CardDescription>
+                <CardTitle>{t('settings.companyInfo')}</CardTitle>
+                <CardDescription>{t('settings.companyInfoDesc')}</CardDescription>
               </CardHeader>
               <CardContent>
-                <p className="text-muted-foreground">Cette section sera bientôt disponible</p>
+                <p className="text-muted-foreground">{t('common.comingSoon')}</p>
               </CardContent>
             </Card>
           </TabsContent>

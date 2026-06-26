@@ -19,6 +19,7 @@ import { getUniqueActions } from '@/lib/taskHelpers';
 import { supabase } from '@/integrations/supabase/client';
 import { useTenant } from '@/contexts/TenantContext';
 import { toast } from 'sonner';
+import { useTaskEditPermissions } from '@/hooks/useTaskEditPermissions';
 
 interface TaskActionColumnsProps {
   tasks: Task[];
@@ -27,6 +28,121 @@ interface TaskActionColumnsProps {
   scrollRef?: React.RefObject<HTMLDivElement>;
   onScroll?: () => void;
 }
+
+/**
+ * Sous-composant par tâche permettant d'appeler useTaskEditPermissions
+ * dans le contexte d'une tâche spécifique (les hooks ne peuvent pas être
+ * appelés dans des boucles).
+ */
+const TaskActionRow = ({
+  task,
+  orderedActions,
+  selectedTaskId,
+  attachmentCounts,
+  onToggleActionWithValidation,
+  onAttachmentClick,
+}: {
+  task: Task;
+  orderedActions: string[];
+  selectedTaskId?: string;
+  attachmentCounts: Record<string, number>;
+  onToggleActionWithValidation: (taskId: string, actionId: string) => void;
+  onAttachmentClick: (taskId: string, actionId: string, actionTitle: string) => void;
+}) => {
+  // 🔒 Vérifier si l'utilisateur peut uploader des preuves sur cette tâche
+  const taskPermissions = useTaskEditPermissions({ task });
+  const canUploadAttachment = taskPermissions.canEdit;
+
+  const isSubtask = (task.task_level || 0) > 0;
+  const isSelectedTask = selectedTaskId === task.id;
+  const isGhost = task.id.startsWith('ghost-task-');
+
+  return (
+    <TableRow
+      key={task.id}
+      className={`border-b transition-colors ${isSelectedTask ? 'border-primary/30 bg-primary/10' : ''} ${isGhost ? 'border-dashed opacity-60' : ''}`}
+      style={{
+        height: isSubtask ? '51px' : '64px',
+        minHeight: isSubtask ? '51px' : '64px',
+        maxHeight: isSubtask ? '51px' : '64px',
+      }}
+    >
+      {orderedActions.map(actionTitle => {
+        const action = task.task_actions?.find(a => a.title === actionTitle);
+        const isSelectedTaskAction = isSelectedTask && action;
+
+        return (
+          <TableCell
+            key={actionTitle}
+            className={`text-center transition-colors ${isSubtask ? 'py-0 text-xs' : 'py-0'} ${isSelectedTaskAction ? 'bg-primary/5' : ''}`}
+            style={{ height: isSubtask ? '51px' : '64px' }}
+          >
+            {action ? (
+              <div
+                className={`flex items-center justify-center gap-2 ${isSelectedTaskAction ? 'scale-110 transform' : ''} transition-transform`}
+              >
+                {/* Cercle avec pourcentage */}
+                <div className="flex flex-col items-center gap-1">
+                  <Checkbox
+                    checked={action.is_done}
+                    disabled={
+                      !action.is_done &&
+                      (attachmentCounts[`${task.id}-${action.id}`] || 0) === 0
+                    }
+                    onCheckedChange={() => {
+                      onToggleActionWithValidation(task.id, action.id);
+                    }}
+                    className={`${isSubtask ? 'scale-75' : ''} ${isSelectedTaskAction ? 'border-primary data-[state=checked]:bg-primary' : ''} ${(attachmentCounts[`${task.id}-${action.id}`] || 0) === 0 && !action.is_done ? 'cursor-not-allowed opacity-50' : ''}`}
+                  />
+                  <span
+                    className={`text-muted-foreground font-medium ${isSubtask ? 'text-xs' : 'text-xs'} ${isSelectedTaskAction ? 'text-primary font-bold' : ''}`}
+                  >
+                    {action.weight_percentage}%
+                  </span>
+                </div>
+
+                {/* Bouton + avec compteur — visible seulement si l'utilisateur peut uploader */}
+                {canUploadAttachment && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          onClick={() => onAttachmentClick(task.id, action.id, action.title)}
+                          size="sm"
+                          variant="ghost"
+                          className="h-6 w-6 p-0 hover:bg-green-500/20"
+                        >
+                          <Plus className="h-4 w-4 text-green-600" />
+                          {attachmentCounts[`${task.id}-${action.id}`] > 0 && (
+                            <Badge
+                              variant="secondary"
+                              className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center bg-green-600 p-0 text-[9px] text-white"
+                            >
+                              {attachmentCounts[`${task.id}-${action.id}`]}
+                            </Badge>
+                          )}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p className="text-xs">
+                          {attachmentCounts[`${task.id}-${action.id}`] > 0
+                            ? `${attachmentCounts[`${task.id}-${action.id}`]} fichier(s) • Cliquez pour ajouter`
+                            : 'Ajouter un document de preuve (requis)'}
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+              </div>
+            ) : (
+              <span className="text-muted-foreground">-</span>
+            )}
+          </TableCell>
+        );
+      })}
+    </TableRow>
+  );
+};
 
 export const TaskActionColumns = ({
   tasks,
@@ -187,7 +303,7 @@ export const TaskActionColumns = ({
   return (
     <div ref={scrollRef} className="h-[600px] overflow-auto" onScroll={onScroll}>
       <Table>
-        <TableHeader className="sticky top-0 z-20 border-b-2 border-slate-300 bg-gradient-to-r from-cyan-500 to-cyan-600 shadow-md">
+        <TableHeader className="sticky top-0 z-20 border-b border-border/60 bg-gradient-to-r from-primary to-violet-600 shadow-md">
           <TableRow className="h-16 border-0 hover:bg-transparent">
             {orderedActions.map(actionTitle => {
               const isSelectedTaskAction =
@@ -199,9 +315,8 @@ export const TaskActionColumns = ({
               return (
                 <TableHead
                   key={actionTitle}
-                  className={`h-16 max-w-[140px] min-w-[140px] text-center font-bold text-white transition-colors ${
-                    isSelectedTaskAction ? 'ring-2 ring-yellow-400/50' : ''
-                  }`}
+                  className={`h-16 max-w-[140px] min-w-[140px] text-center font-bold text-white transition-colors ${isSelectedTaskAction ? 'ring-2 ring-yellow-400/50' : ''
+                    }`}
                   title={actionTitle} // Tooltip avec le titre complet
                 >
                   <div className="flex flex-col items-center gap-0.5">
@@ -230,114 +345,17 @@ export const TaskActionColumns = ({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {allTasks.map(task => {
-            const isSubtask = (task.task_level || 0) > 0;
-            const isSelectedTask = selectedTaskId === task.id;
-            const isGhost = task.id.startsWith('ghost-task-');
-
-            return (
-              <TableRow
-                key={task.id}
-                className={`border-b transition-colors ${
-                  isSelectedTask ? 'border-primary/30 bg-primary/10' : ''
-                } ${isGhost ? 'border-dashed opacity-60' : ''}`}
-                style={{
-                  height: isSubtask ? '51px' : '64px',
-                  minHeight: isSubtask ? '51px' : '64px',
-                  maxHeight: isSubtask ? '51px' : '64px',
-                }}
-              >
-                {orderedActions.map(actionTitle => {
-                  const action = task.task_actions?.find(a => a.title === actionTitle);
-                  const isSelectedTaskAction = isSelectedTask && action;
-
-                  return (
-                    <TableCell
-                      key={actionTitle}
-                      className={`text-center transition-colors ${
-                        isSubtask ? 'py-0 text-xs' : 'py-0'
-                      } ${isSelectedTaskAction ? 'bg-primary/5' : ''}`}
-                      style={{ height: isSubtask ? '51px' : '64px' }}
-                    >
-                      {action ? (
-                        <div
-                          className={`flex items-center justify-center gap-2 ${
-                            isSelectedTaskAction ? 'scale-110 transform' : ''
-                          } transition-transform`}
-                        >
-                          {/* Cercle avec pourcentage */}
-                          <div className="flex flex-col items-center gap-1">
-                            <Checkbox
-                              checked={action.is_done}
-                              disabled={
-                                !action.is_done &&
-                                (attachmentCounts[`${task.id}-${action.id}`] || 0) === 0
-                              }
-                              onCheckedChange={() => {
-                                  'Checkbox clicked - Task ID:',
-                                  task.id,
-                                  'Action ID:',
-                                  action.id
-                                );
-                                handleToggleActionWithValidation(task.id, action.id);
-                              }}
-                              className={`${isSubtask ? 'scale-75' : ''} ${
-                                isSelectedTaskAction
-                                  ? 'border-primary data-[state=checked]:bg-primary'
-                                  : ''
-                              } ${(attachmentCounts[`${task.id}-${action.id}`] || 0) === 0 && !action.is_done ? 'cursor-not-allowed opacity-50' : ''}`}
-                            />
-                            <span
-                              className={`text-muted-foreground font-medium ${
-                                isSubtask ? 'text-xs' : 'text-xs'
-                              } ${isSelectedTaskAction ? 'text-primary font-bold' : ''}`}
-                            >
-                              {action.weight_percentage}%
-                            </span>
-                          </div>
-
-                          {/* Bouton + avec compteur */}
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  onClick={() =>
-                                    handleAttachmentClick(task.id, action.id, action.title)
-                                  }
-                                  size="sm"
-                                  variant="ghost"
-                                  className="h-6 w-6 p-0 hover:bg-green-500/20"
-                                >
-                                  <Plus className="h-4 w-4 text-green-600" />
-                                  {attachmentCounts[`${task.id}-${action.id}`] > 0 && (
-                                    <Badge
-                                      variant="secondary"
-                                      className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center bg-green-600 p-0 text-[9px] text-white"
-                                    >
-                                      {attachmentCounts[`${task.id}-${action.id}`]}
-                                    </Badge>
-                                  )}
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p className="text-xs">
-                                  {attachmentCounts[`${task.id}-${action.id}`] > 0
-                                    ? `${attachmentCounts[`${task.id}-${action.id}`]} fichier(s) • Cliquez pour ajouter`
-                                    : 'Ajouter un document de preuve (requis)'}
-                                </p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        </div>
-                      ) : (
-                        <span className="text-muted-foreground">-</span>
-                      )}
-                    </TableCell>
-                  );
-                })}
-              </TableRow>
-            );
-          })}
+          {allTasks.map(task => (
+            <TaskActionRow
+              key={task.id}
+              task={task}
+              orderedActions={orderedActions}
+              selectedTaskId={selectedTaskId}
+              attachmentCounts={attachmentCounts}
+              onToggleActionWithValidation={handleToggleActionWithValidation}
+              onAttachmentClick={handleAttachmentClick}
+            />
+          ))}
         </TableBody>
       </Table>
 

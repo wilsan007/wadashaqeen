@@ -5,6 +5,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { z } from 'zod';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -22,6 +23,17 @@ import { CalendarIcon, Info } from 'lucide-react';
 import { format, addDays, addWeeks, addMonths } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import type { OperationalSchedule } from '@/hooks/useOperationalSchedules';
+
+const scheduleOutputSchema = z.object({
+  activity_id: z.string().optional(),
+  rrule: z.string().nullable(),
+  start_date: z.string(),
+  until: z.string().nullable(),
+  timezone: z.string(),
+  generate_window_days: z.number().int().min(1).max(365),
+});
+
+export type ScheduleOutput = z.infer<typeof scheduleOutputSchema>;
 
 interface ScheduleFormProps {
   value: Partial<OperationalSchedule>;

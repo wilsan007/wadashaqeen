@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/select';
 import { useSkillsTraining } from '@/hooks/useSkillsTraining';
 import { CreateSkillDialog, CreateSkillAssessmentDialog } from './HRActionDialogs';
+import { useTranslation } from '@/hooks/useTranslation';
 
 export const SkillsTraining = () => {
   const [activeView, setActiveView] = useState('skills');
@@ -42,26 +43,26 @@ export const SkillsTraining = () => {
     return 'bg-red-100 text-red-800';
   };
 
+  const { t } = useTranslation();
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-foreground text-2xl font-bold">Compétences & Formations</h2>
-          <p className="text-muted-foreground">
-            Développement des compétences et gestion de la formation
-          </p>
+          <h2 className="text-foreground text-2xl font-bold">{t('skillsTraining.title')}</h2>
+          <p className="text-muted-foreground">{t('skillsTraining.subtitle')}</p>
         </div>
         <div className="flex gap-2">
           <CreateSkillDialog>
             <Button variant="outline">
               <BookOpen className="mr-2 h-4 w-4" />
-              Nouvelle compétence
+              {t('skillsTraining.newSkill')}
             </Button>
           </CreateSkillDialog>
           <CreateSkillAssessmentDialog>
             <Button>
               <TrendingUp className="mr-2 h-4 w-4" />
-              Évaluer compétences
+              {t('skillsTraining.evaluateSkills')}
             </Button>
           </CreateSkillAssessmentDialog>
         </div>
@@ -73,7 +74,7 @@ export const SkillsTraining = () => {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-muted-foreground text-sm font-medium">Compétences</p>
+                <p className="text-muted-foreground text-sm font-medium">{t('skillsTraining.skills')}</p>
                 <p className="text-2xl font-bold">{skillsStats.totalSkills}</p>
               </div>
               <Target className="h-8 w-8 text-blue-600" />
@@ -85,7 +86,7 @@ export const SkillsTraining = () => {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-muted-foreground text-sm font-medium">Évaluations</p>
+                <p className="text-muted-foreground text-sm font-medium">{t('skillsTraining.evaluations')}</p>
                 <p className="text-2xl font-bold">{skillsStats.totalAssessments}</p>
               </div>
               <CheckCircle className="h-8 w-8 text-green-600" />
@@ -97,7 +98,7 @@ export const SkillsTraining = () => {
           <CardContent className="p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-muted-foreground text-sm font-medium">Niveau moyen</p>
+                <p className="text-muted-foreground text-sm font-medium">{t('skillsTraining.averageLevel')}</p>
                 <p className="text-2xl font-bold">{skillsStats.averageLevel.toFixed(1)}/5</p>
               </div>
               <Star className="h-8 w-8 text-yellow-600" />
@@ -110,11 +111,11 @@ export const SkillsTraining = () => {
         <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="skills" className="flex items-center gap-2">
             <TrendingUp className="h-4 w-4" />
-            Matrice Compétences
+            {t('skillsTraining.skillsMatrix')}
           </TabsTrigger>
           <TabsTrigger value="catalog" className="flex items-center gap-2">
             <BookOpen className="h-4 w-4" />
-            Catalogue Compétences
+            {t('skillsTraining.skillsCatalog')}
           </TabsTrigger>
         </TabsList>
 
@@ -125,12 +126,12 @@ export const SkillsTraining = () => {
                 <CardContent className="p-8 text-center">
                   <TrendingUp className="text-muted-foreground mx-auto mb-4 h-12 w-12" />
                   <p className="text-muted-foreground">
-                    Aucune évaluation de compétence disponible
+                    {t('skillsTraining.noSkillEvaluation')}
                   </p>
                   <CreateSkillAssessmentDialog>
                     <Button className="mt-4">
                       <TrendingUp className="mr-2 h-4 w-4" />
-                      Créer une évaluation
+                      {t('skillsTraining.createEvaluation')}
                     </Button>
                   </CreateSkillAssessmentDialog>
                 </CardContent>
@@ -173,14 +174,14 @@ export const SkillsTraining = () => {
                                   {skill.currentLevel}/5
                                 </Badge>
                                 <span className="text-muted-foreground text-xs">
-                                  → Cible: {skill.targetLevel}/5
+                                  → {t('skillsTraining.target')} {skill.targetLevel}/5
                                 </span>
                               </div>
                             </div>
                             <div className="space-y-1">
                               <Progress value={(skill.currentLevel / 5) * 100} className="h-2" />
                               <p className="text-muted-foreground text-xs">
-                                Évalué le {skill.lastAssessed} par {skill.assessor}
+                                {t('skillsTraining.evaluatedOn').replace('%s', skill.lastAssessed).replace('%s', skill.assessor)}
                               </p>
                             </div>
                           </div>
@@ -200,11 +201,11 @@ export const SkillsTraining = () => {
               <Card className="md:col-span-2 lg:col-span-3">
                 <CardContent className="p-8 text-center">
                   <Target className="text-muted-foreground mx-auto mb-4 h-12 w-12" />
-                  <p className="text-muted-foreground">Aucune compétence définie</p>
+                  <p className="text-muted-foreground">{t('skillsTraining.noDefinedSkill')}</p>
                   <CreateSkillDialog>
                     <Button className="mt-4">
                       <Target className="mr-2 h-4 w-4" />
-                      Ajouter une compétence
+                      {t('skillsTraining.addSkill')}
                     </Button>
                   </CreateSkillDialog>
                 </CardContent>
@@ -226,9 +227,9 @@ export const SkillsTraining = () => {
                     )}
 
                     <div className="text-sm">
-                      <p className="text-muted-foreground">Évaluations:</p>
+                      <p className="text-muted-foreground">{t('skillsTraining.evaluations')}:</p>
                       <p className="text-lg font-bold">
-                        {skillAssessments.filter(a => a.skill_id === skill.id).length}
+                        {skillAssessments.filter((a: any) => a.skill_id === skill.id).length}
                       </p>
                     </div>
                   </CardContent>

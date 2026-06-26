@@ -19,7 +19,7 @@ import {
   Filter,
   Sparkles,
 } from 'lucide-react';
-import { useTasks, type Task } from '@/hooks/optimized';
+import { useTasks, type Task, useProjects } from '@/hooks/optimized';
 import { useEmployees } from '@/hooks/useEmployees';
 import {
   Select,
@@ -55,12 +55,14 @@ import {
   endOfWeek,
   getDay,
 } from 'date-fns';
-import { fr } from 'date-fns/locale';
+import { fr, enUS } from 'date-fns/locale';
 import { generateICal } from '@/utils/calendar';
 import { GoogleCalendarSync } from '@/components/calendar/GoogleCalendarSync';
+import { assignProjectColors, getTaskColor } from '@/lib/ganttColors';
+import { useTranslation } from '@/hooks/useTranslation';
 
 // Composant Draggable Task (Point)
-const DraggableTaskDot = ({ task, colorClass }: { task: Task; colorClass: string }) => {
+const DraggableTaskDot = ({ task, priorityColorClass, projectColor }: { task: Task; priorityColorClass: string; projectColor?: string }) => {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: task.id,
     data: { task },
@@ -71,9 +73,9 @@ const DraggableTaskDot = ({ task, colorClass }: { task: Task; colorClass: string
       ref={setNodeRef}
       {...listeners}
       {...attributes}
-      className={`h-2 w-2 cursor-grab rounded-full active:cursor-grabbing ${colorClass} ${
-        isDragging ? 'opacity-50' : ''
-      }`}
+      className={`h-3 w-3 flex-shrink-0 cursor-grab rounded-full active:cursor-grabbing shadow-sm border border-black/10 dark:border-white/10 ${!projectColor ? priorityColorClass : ''} ${isDragging ? 'opacity-50' : ''
+        }`}
+      style={projectColor ? { backgroundColor: projectColor } : undefined}
       title={task.title}
     />
   );
@@ -86,6 +88,7 @@ const DroppableDay = ({
   isCurrentMonth,
   isSelected,
   isTodayDay,
+  hasEvents,
   onClick,
 }: {
   day: Date;
@@ -93,6 +96,7 @@ const DroppableDay = ({
   isCurrentMonth: boolean;
   isSelected: boolean;
   isTodayDay: boolean;
+  hasEvents: boolean;
   onClick: () => void;
 }) => {
   const { setNodeRef, isOver } = useDroppable({
@@ -104,15 +108,12 @@ const DroppableDay = ({
     <button
       ref={setNodeRef}
       onClick={onClick}
-      className={`group relative min-h-[80px] rounded-2xl p-2 text-left transition-all duration-300 ${
-        !isCurrentMonth ? 'opacity-30 grayscale' : 'opacity-100'
-      } ${
-        isSelected
-          ? 'bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 shadow-lg ring-2 shadow-violet-500/10 ring-violet-500'
-          : 'hover:scale-[1.02] hover:bg-white/5'
-      } ${isTodayDay && !isSelected ? 'bg-white/10 ring-1 ring-white/20' : ''} ${
-        isOver ? 'scale-105 bg-violet-500/30 ring-2 ring-violet-400' : ''
-      }`}
+      className={`group relative min-h-[90px] rounded-xl p-2 text-left transition-all duration-300 border ${hasEvents && !isSelected ? 'bg-primary/10 border-primary/20' : 'bg-background/40 border-border/40'} ${!isCurrentMonth ? 'opacity-40 grayscale' : 'opacity-100 font-medium text-foreground'
+        } ${isSelected
+          ? 'bg-gradient-to-br from-violet-500/20 to-fuchsia-500/20 shadow-lg ring-2 shadow-violet-500/20 ring-violet-500 border-transparent'
+          : 'hover:scale-[1.02] hover:bg-foreground/5'
+        } ${isTodayDay && !isSelected ? 'bg-primary/5 ring-1 ring-primary/30 border-transparent' : ''} ${isOver ? 'scale-105 bg-violet-500/30 ring-2 ring-violet-400 border-transparent' : ''
+        }`}
     >
       {children}
     </button>
@@ -123,12 +124,17 @@ type ViewMode = 'month' | 'week' | 'day';
 
 export const TaskCalendar: React.FC = () => {
   const { tasks, loading, updateTask } = useTasks();
+  const { projects } = useProjects();
   const { employees, loading: employeesLoading } = useEmployees();
+  const projectColorMap = useMemo(() => assignProjectColors(projects || []), [projects]);
   const [viewMode, setViewMode] = useState<ViewMode>('month');
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
   const [selectedAssignee, setSelectedAssignee] = useState<string>('all');
   const [activeId, setActiveId] = useState<string | null>(null);
+
+  const { t, locale } = useTranslation();
+  const dateLocale = locale === 'en' ? enUS : fr;
 
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 10 } }),
@@ -219,13 +225,6 @@ export const TaskCalendar: React.FC = () => {
     }
   };
 
-  const getProjectColor = (projectId?: string) => {
-    // Logique de couleur par projet (simulée pour l'instant)
-    if (!projectId) return 'bg-slate-500';
-    const colors = ['bg-blue-500', 'bg-green-500', 'bg-yellow-500', 'bg-pink-500', 'bg-indigo-500'];
-    const index = projectId.charCodeAt(0) % colors.length;
-    return colors[index];
-  };
 
   const handleDragStart = (event: DragStartEvent) => {
     setActiveId(event.active.id as string);
@@ -263,10 +262,10 @@ export const TaskCalendar: React.FC = () => {
         <div className="relative flex flex-col gap-6 p-6 md:flex-row md:items-center md:justify-between">
           <div>
             <h2 className="bg-gradient-to-r from-violet-400 to-fuchsia-400 bg-clip-text text-3xl font-bold text-transparent">
-              Calendrier
+              {t('taskCalendar.title')}
             </h2>
             <p className="text-muted-foreground mt-1 font-medium capitalize">
-              {format(currentDate, 'MMMM yyyy', { locale: fr })}
+              {format(currentDate, 'MMMM yyyy', { locale: dateLocale })}
             </p>
           </div>
 
@@ -277,13 +276,12 @@ export const TaskCalendar: React.FC = () => {
                 <button
                   key={mode}
                   onClick={() => setViewMode(mode)}
-                  className={`rounded-full px-4 py-1.5 text-sm font-medium transition-all duration-300 ${
-                    viewMode === mode
-                      ? 'bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white shadow-lg shadow-violet-500/25'
-                      : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
-                  }`}
+                  className={`rounded-full px-4 py-1.5 text-sm font-medium transition-all duration-300 ${viewMode === mode
+                    ? 'bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white shadow-lg shadow-violet-500/25'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-white/5'
+                    }`}
                 >
-                  {mode === 'month' ? 'Mois' : mode === 'week' ? 'Semaine' : 'Jour'}
+                  {mode === 'month' ? t('taskCalendar.month') : mode === 'week' ? t('taskCalendar.week') : t('taskCalendar.day')}
                 </button>
               ))}
             </div>
@@ -306,7 +304,7 @@ export const TaskCalendar: React.FC = () => {
                 }}
                 className="rounded-full border-white/10 hover:bg-white/10"
               >
-                Aujourd'hui
+                {t('taskCalendar.today')}
               </Button>
               <Button
                 variant="outline"
@@ -324,7 +322,7 @@ export const TaskCalendar: React.FC = () => {
               size="icon"
               onClick={() => generateICal(tasks)}
               className="ml-2 rounded-full border-white/10 hover:bg-white/10"
-              title="Exporter iCal"
+              title={t('taskCalendar.exportICal')}
             >
               <CalendarIcon className="h-4 w-4" />
             </Button>
@@ -334,7 +332,7 @@ export const TaskCalendar: React.FC = () => {
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
         {/* Calendrier Principal */}
-        <Card className="border-none bg-white/5 shadow-xl backdrop-blur-xl lg:col-span-2 dark:bg-slate-900/50">
+        <Card className="border border-border/50 bg-background/60 shadow-xl backdrop-blur-xl lg:col-span-2">
           <CardContent className="p-6">
             <DndContext
               sensors={sensors}
@@ -344,10 +342,18 @@ export const TaskCalendar: React.FC = () => {
             >
               {/* Jours Semaine */}
               <div className="mb-4 grid grid-cols-7">
-                {['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'].map(day => (
+                {[
+                  t('calendar.days.mon'),
+                  t('calendar.days.tue'),
+                  t('calendar.days.wed'),
+                  t('calendar.days.thu'),
+                  t('calendar.days.fri'),
+                  t('calendar.days.sat'),
+                  t('calendar.days.sun')
+                ].map(day => (
                   <div
                     key={day}
-                    className="text-muted-foreground py-2 text-center text-sm font-semibold"
+                    className="text-foreground/80 py-2 text-center text-sm font-bold uppercase tracking-wider"
                   >
                     {day}
                   </div>
@@ -369,18 +375,18 @@ export const TaskCalendar: React.FC = () => {
                       isCurrentMonth={isCurrentMonth}
                       isSelected={!!isSelected}
                       isTodayDay={isTodayDay}
+                      hasEvents={dayTasks.length > 0}
                       onClick={() => setSelectedDate(day)}
                     >
-                      <div className="mb-1 flex items-start justify-between">
+                      <div className="mb-2 flex items-start justify-between">
                         <span
-                          className={`text-sm font-bold ${isTodayDay ? 'text-violet-400' : ''}`}
+                          className={`text-lg font-extrabold ${isTodayDay ? 'text-violet-500 dark:text-violet-400' : 'text-foreground'}`}
                         >
                           {format(day, 'd')}
                         </span>
                         {dayTasks.length > 0 && (
                           <Badge
-                            variant="secondary"
-                            className="h-5 min-w-[1.25rem] bg-white/10 px-1 text-[10px] backdrop-blur-sm"
+                            className="h-6 min-w-[1.5rem] px-2 text-sm font-extrabold shadow-md flex items-center justify-center bg-violet-500 hover:bg-violet-600 text-white"
                           >
                             {dayTasks.length}
                           </Badge>
@@ -388,16 +394,17 @@ export const TaskCalendar: React.FC = () => {
                       </div>
 
                       {/* Indicateurs de tâches (Points Draggable) */}
-                      <div className="flex flex-wrap gap-1">
+                      <div className="flex flex-wrap gap-1.5 mt-1">
                         {dayTasks.slice(0, 6).map(task => (
                           <DraggableTaskDot
                             key={task.id}
                             task={task}
-                            colorClass={getPriorityColor(task.priority)}
+                            priorityColorClass={getPriorityColor(task.priority)}
+                            projectColor={task.project_id ? projectColorMap[task.project_id] : undefined}
                           />
                         ))}
                         {dayTasks.length > 6 && (
-                          <div className="bg-muted-foreground h-1.5 w-1.5 rounded-full" />
+                          <div className="bg-muted-foreground h-2 w-2 rounded-full self-center" />
                         )}
                       </div>
                     </DroppableDay>
@@ -426,15 +433,15 @@ export const TaskCalendar: React.FC = () => {
               <CardTitle className="flex items-center gap-2 text-lg">
                 <CalendarIcon className="h-5 w-5 text-violet-500" />
                 {selectedDate
-                  ? format(selectedDate, 'EEEE d MMMM', { locale: fr })
-                  : 'Sélectionnez un jour'}
+                  ? format(selectedDate, 'EEEE d MMMM', { locale: dateLocale })
+                  : t('taskCalendar.selectDay')}
               </CardTitle>
             </CardHeader>
 
             <CardContent className="custom-scrollbar max-h-[400px] overflow-y-auto pr-2">
               {selectedDayTasks.length === 0 ? (
                 <div className="text-muted-foreground py-8 text-center">
-                  <p>Aucune tâche prévue 😴</p>
+                  <p>{t('taskCalendar.noTasks')}</p>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -444,18 +451,33 @@ export const TaskCalendar: React.FC = () => {
                       className="group rounded-xl border border-white/10 bg-white/40 p-3 backdrop-blur-md transition-all hover:translate-x-1 hover:border-violet-500/30 dark:bg-black/20"
                     >
                       <div className="mb-1 flex items-start justify-between">
-                        <h4 className="line-clamp-1 text-sm font-semibold">{task.title}</h4>
+                        <h4
+                          className="line-clamp-1 text-sm font-semibold"
+                          style={task.project_id && projectColorMap[task.project_id] ? { color: projectColorMap[task.project_id] } : undefined}
+                        >
+                          {task.title}
+                        </h4>
                         <div
-                          className={`h-2 w-2 rounded-full ${getPriorityColor(task.priority)}`}
+                          className={`flex-shrink-0 h-2 w-2 rounded-full ${!task.project_id ? getPriorityColor(task.priority) : ''}`}
+                          style={task.project_id && projectColorMap[task.project_id] ? { backgroundColor: projectColorMap[task.project_id] } : undefined}
                         />
                       </div>
-                      <div className="text-muted-foreground flex items-center gap-2 text-xs">
+                      <div className="text-muted-foreground flex flex-wrap items-center gap-2 text-xs">
                         <Badge
                           variant="outline"
                           className="h-5 border-white/20 bg-transparent px-1.5 text-[10px]"
                         >
                           {task.status}
                         </Badge>
+                        {task.project_name && (
+                          <Badge
+                            variant="outline"
+                            className="h-5 px-1.5 text-[10px]"
+                            style={task.project_id && projectColorMap[task.project_id] ? { backgroundColor: `${projectColorMap[task.project_id]}1A`, color: projectColorMap[task.project_id] } : undefined}
+                          >
+                            📁 {task.project_name}
+                          </Badge>
+                        )}
                         {task.due_date && (
                           <span className="flex items-center gap-1">
                             <Clock className="h-3 w-3" />
@@ -475,7 +497,7 @@ export const TaskCalendar: React.FC = () => {
             <Card className="border-none bg-emerald-500/10 backdrop-blur-md">
               <CardContent className="p-4 text-center">
                 <div className="text-2xl font-bold text-emerald-500">{tasks.length}</div>
-                <div className="text-muted-foreground text-xs font-medium">Total Tâches</div>
+                <div className="text-muted-foreground text-xs font-medium">{t('taskCalendar.totalTasks')}</div>
               </CardContent>
             </Card>
             <Card className="border-none bg-rose-500/10 backdrop-blur-md">
@@ -483,7 +505,7 @@ export const TaskCalendar: React.FC = () => {
                 <div className="text-2xl font-bold text-rose-500">
                   {tasks.filter(t => t.priority === 'high').length}
                 </div>
-                <div className="text-muted-foreground text-xs font-medium">Urgentes</div>
+                <div className="text-muted-foreground text-xs font-medium">{t('taskCalendar.urgent')}</div>
               </CardContent>
             </Card>
           </div>

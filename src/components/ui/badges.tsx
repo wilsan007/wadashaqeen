@@ -213,6 +213,29 @@ export const EmployeeBadge: React.FC<EmployeeBadgeProps> = ({
 // METRIC CARD (Dashboard Analytics style)
 // ============================================
 
+// Icon gradient palette — mirrors KPICard's colorConfig for visual coherence
+const metricCardGradients: Record<BadgeColor, string> = {
+  blue: 'from-blue-500 to-indigo-600',
+  green: 'from-emerald-500 to-teal-600',
+  orange: 'from-orange-500 to-amber-600',
+  red: 'from-rose-500 to-red-600',
+  purple: 'from-violet-500 to-purple-700',
+  yellow: 'from-yellow-500 to-amber-500',
+  gray: 'from-slate-400 to-slate-500',
+  pink: 'from-pink-500 to-rose-600',
+};
+
+const metricCardProgressColors: Record<BadgeColor, string> = {
+  blue: 'bg-blue-500',
+  green: 'bg-emerald-500',
+  orange: 'bg-orange-500',
+  red: 'bg-rose-500',
+  purple: 'bg-violet-500',
+  yellow: 'bg-yellow-500',
+  gray: 'bg-slate-400',
+  pink: 'bg-pink-500',
+};
+
 interface MetricCardProps {
   label: string;
   value: string | number;
@@ -220,6 +243,14 @@ interface MetricCardProps {
   icon?: React.ReactNode;
   color?: BadgeColor;
   trend?: 'up' | 'down' | 'neutral';
+  /**
+   * Optional progress bar (0–100).
+   */
+  progress?: number;
+  /**
+   * Optional delta pill: e.g. { value: 12, isPositive: true } renders "+12%"
+   */
+  delta?: { value: number; isPositive: boolean };
   className?: string;
 }
 
@@ -230,44 +261,83 @@ export const MetricCard: React.FC<MetricCardProps> = ({
   icon,
   color = 'blue',
   trend,
+  progress,
+  delta,
   className,
 }) => {
-  const colorStyles: Record<BadgeColor, string> = {
-    blue: 'bg-badge-blue/10 text-badge-blue',
-    purple: 'bg-badge-purple/10 text-badge-purple',
-    pink: 'bg-badge-pink/10 text-badge-pink',
-    green: 'bg-badge-green/10 text-badge-green',
-    yellow: 'bg-badge-yellow/10 text-badge-yellow',
-    orange: 'bg-badge-orange/10 text-badge-orange',
-    red: 'bg-badge-red/10 text-badge-red',
-    gray: 'bg-badge-gray/10 text-badge-gray',
-  };
-
   const trendIcons = {
     up: '↗',
     down: '↘',
     neutral: '→',
   };
 
+  const clampedProgress =
+    progress !== undefined ? Math.min(Math.max(Math.round(progress), 0), 100) : undefined;
+
   return (
     <div className={cn('modern-card rounded-lg p-4', className)}>
-      <div className="flex items-center gap-3">
-        {icon && <div className={cn('rounded-lg p-3', colorStyles[color])}>{icon}</div>}
-        <div className="flex-1">
+      <div className="flex items-start gap-3">
+        {/* Gradient icon container */}
+        {icon && (
+          <div
+            className={cn(
+              'flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br shadow-sm',
+              metricCardGradients[color]
+            )}
+            aria-hidden="true"
+          >
+            <span className="[&>svg]:h-5 [&>svg]:w-5 [&>svg]:text-white">{icon}</span>
+          </div>
+        )}
+
+        <div className="min-w-0 flex-1">
           <p className="text-muted-foreground text-xs">{label}</p>
-          <p className="text-2xl font-bold">{value}</p>
+
+          {/* Value + delta pill */}
+          <div className="mt-0.5 flex items-baseline gap-2">
+            <p className="text-3xl font-bold tabular-nums">{value}</p>
+            {delta && (
+              <span
+                className={cn(
+                  'inline-flex items-center rounded-full px-1.5 py-0.5 text-xs font-semibold',
+                  delta.isPositive
+                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
+                    : 'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300'
+                )}
+                aria-label={`${delta.isPositive ? 'Hausse' : 'Baisse'} de ${delta.value}%`}
+              >
+                {delta.isPositive ? '+' : '-'}{delta.value}%
+              </span>
+            )}
+          </div>
+
+          {/* Subtitle with trend arrow */}
           {subtitle && (
-            <p
-              className={cn(
-                'text-xs',
-                color === 'green' && 'text-badge-green',
-                color === 'red' && 'text-badge-red',
-                color === 'orange' && 'text-badge-orange',
-                color === 'blue' && 'text-badge-blue'
-              )}
-            >
+            <p className="text-muted-foreground mt-1 text-xs">
               {trend && trendIcons[trend]} {subtitle}
             </p>
+          )}
+
+          {/* Optional progress bar */}
+          {clampedProgress !== undefined && (
+            <div className="mt-2">
+              <div
+                className="bg-muted h-1.5 w-full overflow-hidden rounded-full"
+                role="progressbar"
+                aria-valuenow={clampedProgress}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-label={`Progression : ${clampedProgress}%`}
+              >
+                <div
+                  className={cn(
+                    'h-full rounded-full transition-all duration-500',
+                    metricCardProgressColors[color]
+                  )}
+                  style={{ width: `${clampedProgress}%` }}
+                />
+              </div>
+            </div>
           )}
         </div>
       </div>

@@ -3,22 +3,37 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { toast } from 'sonner';
-import { Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { Loader2, CheckCircle2, AlertCircle, Eye, EyeOff, Lock } from 'lucide-react';
+import { BrandedLoadingScreen } from '@/components/layout/BrandedLoadingScreen';
+
+interface InvitationData {
+  id: string;
+  email: string;
+  full_name: string;
+  tenant_id: string;
+  tenant_name: string;
+  invitation_type: string;
+  status: string;
+  expires_at: string;
+}
 
 export default function AcceptInvitation() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { toast } = useToast();
+
   const token = searchParams.get('token');
 
   const [loading, setLoading] = useState(true);
-  const [invitation, setInvitation] = useState<any>(null);
+  const [invitation, setInvitation] = useState<InvitationData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // 1. Validate Token on Mount
   useEffect(() => {
     if (!token) {
       setError("Token d'invitation manquant");
@@ -28,25 +43,18 @@ export default function AcceptInvitation() {
 
     const fetchInvitation = async () => {
       try {
-        // Use a direct fetch to the edge function URL to ensure query params are passed correctly
-        const functionUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/accept-invitation?token=${token}`;
-
-        const response = await fetch(functionUrl, {
-          method: 'GET',
-          headers: {
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          },
+        const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/accept-invitation?token=${encodeURIComponent(token)}`;
+        const resp = await fetch(url, {
+          headers: { Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}` },
         });
 
-        if (!response.ok) {
-          const errData = await response.json();
-          throw new Error(errData.error || 'Invitation invalide');
+        if (!resp.ok) {
+          const err = await resp.json().catch(() => ({ error: resp.statusText }));
+          throw new Error(err.error ?? 'Invitation invalide');
         }
 
-        const dataInv = await response.json();
-        setInvitation(dataInv);
+        setInvitation(await resp.json());
       } catch (err: any) {
-        console.error('Error fetching invitation:', err);
         setError(err.message);
       } finally {
         setLoading(false);
@@ -56,29 +64,19 @@ export default function AcceptInvitation() {
     fetchInvitation();
   }, [token]);
 
-  // 2. Handle Account Creation & Acceptance
   const handleAccept = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!invitation || !password) return;
+    if (!invitation || password.length < 8) return;
 
     setIsSubmitting(true);
     try {
-      // A. Sign Up (Create Auth User)
-      // DEBUG: Log invitation data
-        invitation_type: invitation.invitation_type,
-        invitation_id: invitation.id,
-        tenant_id: invitation.tenant_id,
-        full_name: invitation.full_name,
-        company_name: invitation.tenant_name,
-      });
-
-      const { data: authData, error: authError } = await supabase.auth.signUp({
+      const { data: authData, error: signUpError } = await supabase.auth.signUp({
         email: invitation.email,
-        password: password,
+        password,
         options: {
           data: {
             invitation_type: invitation.invitation_type,
-            invitation_id: invitation.id, // CRITICAL: Required for collaborator lookup
+            invitation_id: invitation.id,
             tenant_id: invitation.tenant_id,
             full_name: invitation.full_name,
             company_name: invitation.tenant_name,
@@ -86,92 +84,59 @@ export default function AcceptInvitation() {
         },
       });
 
-      if (authError) throw authError;
+      if (signUpError) {
+        if (signUpError.message.includes('already registered')) {
+          toast({
+            title: 'Compte existant',
+            description: 'Cet email est déjà enregistré. Connectez-vous.',
+            variant: 'destructive',
+          });
+          navigate(`/login?email=${encodeURIComponent(invitation.email)}`);
+          return;
+        }
+        throw signUpError;
+      }
+
       if (!authData.user) throw new Error('Erreur lors de la création du compte');
 
-      // B. Call Backend to Link (Accept Invitation)
-      // We need the session to be active. signUp might return a session if auto-confirm is on,
-      // OR if email confirmation is required, we can't proceed yet.
-      // BUT, since we are in a trusted invite flow, we might want to auto-confirm?
-      // Wait, standard flow requires email confirmation.
-      // If email confirmation is ON in Supabase, the user won't have a session yet.
-
-      // CRITICAL DECISION:
-      // If we want "Gold Standard", the user should confirm their email.
-      // BUT, they just clicked a link sent to their email! So we know they own it.
-      // Ideally, we should auto-confirm them.
-      // We can't auto-confirm from the client.
-
-      // Workaround:
-      // The `accept-invitation` function should ideally be called with a Service Role key if we trust this flow,
-      // OR we ask the user to confirm their email first.
-
-      // Let's assume for now we want a smooth flow.
-      // If `signUp` returns a session (because email confirm is off or we are lucky), we proceed.
-      // If not, we tell them to check their email.
-
       if (authData.session) {
-        // User is logged in, call accept-invitation
+        // Email confirmation disabled — accept immediately
         const { error: acceptError } = await supabase.functions.invoke('accept-invitation', {
           method: 'POST',
           body: { token },
         });
-
         if (acceptError) throw acceptError;
 
-        toast.success('Compte créé et invitation acceptée !');
-        navigate('/'); // Redirect to dashboard
+        toast({ title: 'Bienvenue !', description: 'Compte créé et invitation acceptée.' });
+        navigate('/accueil');
       } else {
-        // Email confirmation required
-        toast.info('Compte créé ! Veuillez vérifier vos emails pour confirmer votre adresse.');
-        // We can't link the tenant yet because we don't have a session.
-        // The linking will have to happen AFTER they click the confirmation link in the NEW email.
-        // This is the "Double Confirmation" problem.
-
-        // To fix this in "Gold Standard":
-        // The `accept-invitation` logic should probably be triggered by the Email Confirmation webhook we built earlier!
-        // Remember `handle-email-confirmation`? It can look up the pending invitation by email!
-
-        // YES! That's the robust way.
-        // 1. User signs up here.
-        // 2. Supabase sends "Confirm Email".
-        // 3. User clicks.
-        // 4. `handle-email-confirmation` runs, finds the pending invitation in `invitations` table, and links it.
-
-        // So for this page, we just need to Sign Up.
-        navigate('/login?message=check_email');
+        // Email confirmation required — the handle-email-confirmation webhook will link the invitation
+        toast({
+          title: 'Vérifiez votre boîte mail',
+          description: 'Un lien de confirmation vous a été envoyé pour activer votre compte.',
+        });
+        navigate('/login');
       }
     } catch (err: any) {
-      console.error('Error accepting:', err);
-      if (err.message.includes('already registered')) {
-        // If user exists, try to login?
-        toast.error('Cet email est déjà enregistré. Veuillez vous connecter.');
-        navigate(`/login?email=${invitation.email}`);
-      } else {
-        toast.error(err.message);
-      }
+      toast({ title: 'Erreur', description: err.message, variant: 'destructive' });
     } finally {
       setIsSubmitting(false);
     }
   };
 
   if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50">
-        <Loader2 className="text-primary h-8 w-8 animate-spin" />
-      </div>
-    );
+    return <BrandedLoadingScreen appName="Wadashaqayn" logoSrc="/logo-w.svg" />;
   }
 
   if (error) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
-        <Card className="w-full max-w-md">
+      <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+        <Card className="w-full max-w-md shadow-lg">
           <CardHeader>
             <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
               <AlertCircle className="h-6 w-6 text-red-600" />
             </div>
-            <CardTitle className="text-center text-red-600">Invitation Invalide</CardTitle>
+            <CardTitle className="text-center text-red-600">Invitation invalide</CardTitle>
             <CardDescription className="text-center">{error}</CardDescription>
           </CardHeader>
           <CardContent className="flex justify-center">
@@ -185,77 +150,95 @@ export default function AcceptInvitation() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 p-4">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
       <Card className="w-full max-w-md shadow-lg">
-        <CardHeader className="space-y-1">
+        <CardHeader className="space-y-1 p-5 text-center sm:p-6">
           <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-green-100">
-            <CheckCircle className="h-6 w-6 text-green-600" />
+            <CheckCircle2 className="h-6 w-6 text-green-600" />
           </div>
-          <CardTitle className="text-center text-2xl font-bold">Bienvenue !</CardTitle>
-          <CardDescription className="text-center text-base">
-            Vous avez été invité à rejoindre <strong>{invitation.tenant_name}</strong>
+          <CardTitle className="text-2xl font-bold">Bienvenue !</CardTitle>
+          <CardDescription className="text-base">
+            Vous avez été invité à rejoindre <strong>{invitation?.tenant_name}</strong>
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <div className="mb-6 rounded-lg bg-blue-50 p-4 text-sm text-blue-800">
-            <p className="font-medium">Bonjour {invitation.full_name},</p>
+
+        <CardContent className="space-y-5 p-5 sm:p-6">
+          <div className="rounded-lg border border-blue-200 bg-blue-50/50 p-4 text-sm text-blue-900">
+            <p className="font-medium">Bonjour {invitation?.full_name},</p>
             <p className="mt-1">
-              Créez votre mot de passe pour activer votre compte <strong>{invitation.email}</strong>
-              .
+              Choisissez votre mot de passe pour activer votre compte{' '}
+              <strong>{invitation?.email}</strong>.
             </p>
           </div>
 
           <form onSubmit={handleAccept} className="space-y-4">
-            <div className="space-y-2">
-              <label
-                htmlFor="email"
-                className="text-sm leading-none font-medium peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-              >
-                Email
-              </label>
+            {/* Email — read-only */}
+            <div className="space-y-1.5">
+              <Label htmlFor="email">Email</Label>
               <Input
                 id="email"
                 type="email"
-                value={invitation.email}
+                value={invitation?.email ?? ''}
                 disabled
-                className="bg-gray-100"
+                className="bg-muted"
               />
             </div>
-            <div className="space-y-2">
-              <label
-                htmlFor="password"
-                className="text-sm leading-none font-medium peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-              >
-                Mot de passe
-              </label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="Choisissez un mot de passe sécurisé"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                required
-                minLength={8}
-              />
+
+            {/* Password */}
+            <div className="space-y-1.5">
+              <Label htmlFor="password">Mot de passe *</Label>
+              <div className="relative">
+                <Lock className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
+                <Input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="8 caractères minimum"
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  required
+                  minLength={8}
+                  disabled={isSubmitting}
+                  className="h-11 pr-12 pl-10 text-base sm:h-10 sm:text-sm"
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute top-1/2 right-0 h-10 w-10 -translate-y-1/2 p-0 hover:bg-transparent sm:h-9 sm:w-9"
+                  onClick={() => setShowPassword(v => !v)}
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  <span className="sr-only">{showPassword ? 'Masquer' : 'Afficher'} mot de passe</span>
+                </Button>
+              </div>
+              {password.length > 0 && password.length < 8 && (
+                <p className="text-destructive text-xs">Minimum 8 caractères</p>
+              )}
             </div>
-            <Button className="w-full" type="submit" disabled={isSubmitting}>
+
+            <Button
+              className="h-11 w-full text-base font-semibold sm:h-10 sm:text-sm"
+              type="submit"
+              disabled={isSubmitting || password.length < 8}
+            >
               {isSubmitting ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Création du compte...
+                  Création du compte…
                 </>
               ) : (
-                'Accepter et Créer mon compte'
+                'Activer mon compte'
               )}
             </Button>
           </form>
 
-          <div className="mt-4 text-center text-sm text-gray-500">
+          <p className="text-muted-foreground text-center text-sm">
             Vous avez déjà un compte ?{' '}
-            <Button variant="link" className="p-0" onClick={() => navigate('/login')}>
+            <Button variant="link" className="h-auto p-0 text-sm" onClick={() => navigate('/login')}>
               Connectez-vous
             </Button>
-          </div>
+          </p>
         </CardContent>
       </Card>
     </div>

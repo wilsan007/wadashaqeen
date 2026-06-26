@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { AlertType, AlertSolution, AlertInstance } from './useAlerts';
+import { AlertSolution } from './useAlerts';
+import { CACHE_TTL } from '@/lib/queryConfig';
 
 export interface ComputedAlert {
   id: string;
@@ -19,121 +20,104 @@ export interface ComputedAlert {
   recommendations: AlertSolution[];
 }
 
+// --- Fetch whether current user can view HR data ---
+const fetchCanViewHRData = async (): Promise<boolean> => {
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return false;
+
+  const { data: userRoles, error } = await supabase
+    .from('user_roles')
+    .select(
+      `
+      *,
+      roles:role_id (name)
+    `
+    )
+    .eq('user_id', user.id)
+    .eq('is_active', true);
+
+  if (error) {
+    console.error('Error fetching user roles:', error);
+    return false;
+  }
+
+  return (
+    userRoles?.some(role => ['admin', 'tenant_admin', 'owner'].includes(role.roles.name)) || false
+  );
+};
+
+// --- Fetch and compute alerts from SQL view ---
+const fetchComputedAlerts = async (canViewHRData: boolean): Promise<ComputedAlert[]> => {
+  const { data: alerts, error } = await supabase.from('current_alerts_view').select('*');
+
+  if (error) {
+    console.error('Erreur lors de la récupération des alertes:', error);
+    throw error;
+  }
+
+  let filteredAlerts = alerts || [];
+
+  // Filtrer selon les permissions
+  if (!canViewHRData) {
+    filteredAlerts = filteredAlerts.filter(alert => alert.application_domain !== 'hr');
+  }
+
+  // Mapper les données de la vue vers le format ComputedAlert
+  // Trier par sévérité puis par date
+  const mapped: ComputedAlert[] = filteredAlerts.map(alert => ({
+    id: alert.id,
+    type: alert.type,
+    code: alert.code,
+    title: alert.title,
+    description: alert.description,
+    severity: alert.severity as 'low' | 'medium' | 'high' | 'critical',
+    category: alert.category,
+    entity_type: alert.entity_type,
+    entity_id: alert.entity_id,
+    entity_name: alert.entity_name,
+    context_data: alert.context_data,
+    triggered_at: alert.triggered_at,
+    application_domain: alert.application_domain as 'hr' | 'project',
+    recommendations: [], // À implémenter si nécessaire
+  }));
+
+  const severityOrder: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 };
+  return mapped.sort((a, b) => {
+    const severityDiff = (severityOrder[b.severity] ?? 0) - (severityOrder[a.severity] ?? 0);
+    if (severityDiff !== 0) return severityDiff;
+    return new Date(b.triggered_at).getTime() - new Date(a.triggered_at).getTime();
+  });
+};
+
 export const useComputedAlerts = () => {
-  const [computedAlerts, setComputedAlerts] = useState<ComputedAlert[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [canViewHRData, setCanViewHRData] = useState(false);
+  const queryClient = useQueryClient();
 
-  // Vérifier les permissions directement
-  useEffect(() => {
-    const checkPermissions = async () => {
-      try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-        if (!user) return;
+  // Query 1: check HR permissions
+  const { data: canViewHRData = false } = useQuery<boolean>({
+    queryKey: ['computed-alerts', 'permissions'],
+    queryFn: fetchCanViewHRData,
+    ...CACHE_TTL.semiStatic,
+  });
 
-        const { data: userRoles, error } = await supabase
-          .from('user_roles')
-          .select(
-            `
-            *,
-            roles:role_id (name)
-          `
-          )
-          .eq('user_id', user.id)
-          .eq('is_active', true);
+  // Query 2: fetch computed alerts (depends on permissions)
+  const {
+    data: computedAlerts = [],
+    isLoading: loading,
+    error: queryError,
+    refetch,
+  } = useQuery<ComputedAlert[]>({
+    queryKey: ['computed-alerts', canViewHRData],
+    queryFn: () => fetchComputedAlerts(canViewHRData),
+    ...CACHE_TTL.realtime,
+  });
 
-        if (error) {
-          console.error('Error fetching user roles:', error);
-          return;
-        }
-
-        // Les admins ont accès aux données RH
-        const hasAdminRole =
-          userRoles?.some(role => ['admin', 'tenant_admin', 'owner'].includes(role.roles.name)) ||
-          false;
-
-        setCanViewHRData(hasAdminRole);
-      } catch (error) {
-        console.error('Error checking permissions:', error);
-      }
-    };
-
-    checkPermissions();
-  }, []);
-
-  // Récupérer les alertes depuis la vue SQL avec filtrage par permissions
-  const calculateCurrentAlerts = async (): Promise<ComputedAlert[]> => {
-    try {
-      const { data: alerts, error } = await supabase.from('current_alerts_view').select('*');
-
-      if (error) {
-        console.error('Erreur lors de la récupération des alertes:', error);
-        throw error;
-      }
-
-      let filteredAlerts = alerts || [];
-
-      // Filtrer selon les permissions
-      if (!canViewHRData) {
-        filteredAlerts = filteredAlerts.filter(alert => alert.application_domain !== 'hr');
-      }
-
-      // Pour les admins, toutes les alertes sont accessibles
-      // Pour les non-admins, on pourrait ajouter une logique plus fine plus tard
-      const accessibleAlerts = filteredAlerts;
-
-      // Mapper les données de la vue vers le format ComputedAlert
-      return accessibleAlerts.map(alert => ({
-        id: alert.id,
-        type: alert.type,
-        code: alert.code,
-        title: alert.title,
-        description: alert.description,
-        severity: alert.severity as 'low' | 'medium' | 'high' | 'critical',
-        category: alert.category,
-        entity_type: alert.entity_type,
-        entity_id: alert.entity_id,
-        entity_name: alert.entity_name,
-        context_data: alert.context_data,
-        triggered_at: alert.triggered_at,
-        application_domain: alert.application_domain as 'hr' | 'project',
-        recommendations: [], // À implémenter si nécessaire
-      }));
-    } catch (error) {
-      console.error('Erreur lors du calcul des alertes:', error);
-      throw error;
-    }
-  };
+  const error = queryError ? (queryError as Error).message : null;
 
   const refreshAlerts = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const alerts = await calculateCurrentAlerts();
-
-      // Trier par sévérité puis par date
-      const sortedAlerts = alerts.sort((a, b) => {
-        const severityOrder = { critical: 4, high: 3, medium: 2, low: 1 };
-        const severityDiff = severityOrder[b.severity] - severityOrder[a.severity];
-        if (severityDiff !== 0) return severityDiff;
-
-        return new Date(b.triggered_at).getTime() - new Date(a.triggered_at).getTime();
-      });
-
-      setComputedAlerts(sortedAlerts);
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
+    await queryClient.invalidateQueries({ queryKey: ['computed-alerts'] });
   };
-
-  useEffect(() => {
-    refreshAlerts();
-  }, []);
 
   // Fonctions utilitaires
   const getActiveAlerts = () => computedAlerts;

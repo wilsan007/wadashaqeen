@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { MessageSquare, Send } from '@/lib/icons';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -12,6 +12,7 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
@@ -33,70 +34,59 @@ interface TaskComment {
   comment_type: string | null;
 }
 
+const isDemoTask = (id: string) =>
+  id.startsWith('00000000-0000-0000-0000') || id.startsWith('ghost-task-');
+
 export const CommentCellColumn = ({ task, isSubtask }: CommentCellProps) => {
-  const [comments, setComments] = useState<TaskComment[]>([]);
   const [newComment, setNewComment] = useState('');
-  const [posting, setPosting] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
-  const loadComments = async () => {
-    // Ne pas charger pour les tâches de démonstration (UUIDs fictifs) ou les tâches fantômes
-    if (task.id.startsWith('00000000-0000-0000-0000') || task.id.startsWith('ghost-task-')) {
-      setComments([]);
-      return;
-    }
-
-    try {
+  const { data: comments = [] } = useQuery<TaskComment[]>({
+    queryKey: ['task-comments', task.id],
+    queryFn: async () => {
+      if (isDemoTask(task.id)) return [];
       const { data, error } = await supabase
         .from('task_comments')
         .select('*')
         .eq('task_id', task.id)
         .order('created_at', { ascending: true });
-
       if (error) throw error;
-      setComments(data || []);
-    } catch (error) {
-      console.error('Error loading comments:', error);
-    }
-  };
+      return data ?? [];
+    },
+    enabled: !!task.id && !isDemoTask(task.id),
+  });
 
-  const addComment = async () => {
-    if (!newComment.trim()) return;
-
-    setPosting(true);
-    try {
+  const addCommentMutation = useMutation({
+    mutationFn: async (content: string) => {
       const { error } = await supabase.from('task_comments').insert({
         task_id: task.id,
-        content: newComment.trim(),
+        content,
         comment_type: 'general',
-        tenant_id: '00000000-0000-0000-0000-000000000001', // Default tenant for now
+        tenant_id: '00000000-0000-0000-0000-000000000001',
       });
-
       if (error) throw error;
-
+    },
+    onSuccess: () => {
       setNewComment('');
-      loadComments();
-
-      toast({
-        title: 'Succès',
-        description: 'Commentaire ajouté',
-      });
-    } catch (error) {
+      queryClient.invalidateQueries({ queryKey: ['task-comments', task.id] });
+      toast({ title: 'Succès', description: 'Commentaire ajouté' });
+    },
+    onError: (error) => {
       console.error('Error adding comment:', error);
       toast({
         title: 'Erreur',
         description: "Échec de l'ajout du commentaire",
         variant: 'destructive',
       });
-    } finally {
-      setPosting(false);
-    }
-  };
+    },
+  });
 
-  useEffect(() => {
-    loadComments();
-  }, [task.id]);
+  const handleAddComment = () => {
+    if (!newComment.trim()) return;
+    addCommentMutation.mutate(newComment.trim());
+  };
 
   return (
     <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -142,16 +132,16 @@ export const CommentCellColumn = ({ task, isSubtask }: CommentCellProps) => {
               value={newComment}
               onChange={e => setNewComment(e.target.value)}
               className="mb-2 min-h-[60px] resize-none"
-              disabled={posting}
+              disabled={addCommentMutation.isPending}
             />
             <Button
-              onClick={addComment}
-              disabled={!newComment.trim() || posting}
+              onClick={handleAddComment}
+              disabled={!newComment.trim() || addCommentMutation.isPending}
               size="sm"
               className="w-full"
             >
               <Send className="mr-1 h-3 w-3" />
-              {posting ? 'Envoi...' : 'Envoyer'}
+              {addCommentMutation.isPending ? 'Envoi...' : 'Envoyer'}
             </Button>
           </div>
         </div>

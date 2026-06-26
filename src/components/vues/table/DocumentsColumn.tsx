@@ -1,10 +1,9 @@
-import { useState } from 'react';
 import { Upload, FileText, Download, Trash2 } from '@/lib/icons';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Tables } from '@/integrations/supabase/types';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 interface Task {
   id: string;
@@ -26,48 +25,30 @@ interface TaskDocument {
 }
 
 export const DocumentsColumn = ({ task }: DocumentsColumnProps) => {
-  const [documents, setDocuments] = useState<TaskDocument[]>([]);
-  const [uploading, setUploading] = useState(false);
-  const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
-  const loadDocuments = async () => {
-    if (loading) return;
-    setLoading(true);
-
-    try {
+  const { data: documents = [], isLoading } = useQuery<TaskDocument[]>({
+    queryKey: ['task-documents', task.id],
+    queryFn: async () => {
       const { data, error } = await supabase
         .from('task_documents')
         .select('*')
         .eq('task_id', task.id);
-
       if (error) throw error;
-      setDocuments(data || []);
-    } catch (error) {
-      console.error('Error loading documents:', error);
-      toast({
-        title: 'Erreur',
-        description: 'Impossible de charger les documents',
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+      return data ?? [];
+    },
+    enabled: !!task.id,
+  });
 
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    setUploading(true);
-    try {
+  const uploadMutation = useMutation({
+    mutationFn: async (file: File) => {
       const fileExt = file.name.split('.').pop();
       const fileName = `${task.id}/${Date.now()}.${fileExt}`;
 
       const { error: uploadError } = await supabase.storage
         .from('task-documents')
         .upload(fileName, file);
-
       if (uploadError) throw uploadError;
 
       const { error: dbError } = await supabase.from('task_documents').insert({
@@ -79,34 +60,49 @@ export const DocumentsColumn = ({ task }: DocumentsColumnProps) => {
         mime_type: file.type,
         // Le tenant_id sera automatiquement rempli par le trigger
       });
-
       if (dbError) throw dbError;
-
-      toast({
-        title: 'Succès',
-        description: 'Document uploadé avec succès',
-      });
-
-      loadDocuments();
-    } catch (error) {
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['task-documents', task.id] });
+      toast({ title: 'Succès', description: 'Document uploadé avec succès' });
+    },
+    onError: (error) => {
       console.error('Error uploading file:', error);
-      toast({
-        title: 'Erreur',
-        description: "Échec de l'upload du document",
-        variant: 'destructive',
-      });
-    } finally {
-      setUploading(false);
-      event.target.value = '';
-    }
+      toast({ title: 'Erreur', description: "Échec de l'upload du document", variant: 'destructive' });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (doc: TaskDocument) => {
+      const { error: storageError } = await supabase.storage
+        .from('task-documents')
+        .remove([doc.file_path]);
+      if (storageError) throw storageError;
+
+      const { error: dbError } = await supabase.from('task_documents').delete().eq('id', doc.id);
+      if (dbError) throw dbError;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['task-documents', task.id] });
+      toast({ title: 'Succès', description: 'Document supprimé' });
+    },
+    onError: (error) => {
+      console.error('Error deleting file:', error);
+      toast({ title: 'Erreur', description: 'Échec de la suppression', variant: 'destructive' });
+    },
+  });
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    uploadMutation.mutate(file);
+    event.target.value = '';
   };
 
   const downloadDocument = async (doc: TaskDocument) => {
     try {
       const { data, error } = await supabase.storage.from('task-documents').download(doc.file_path);
-
       if (error) throw error;
-
       const url = URL.createObjectURL(data);
       const a = document.createElement('a');
       a.href = url;
@@ -115,39 +111,7 @@ export const DocumentsColumn = ({ task }: DocumentsColumnProps) => {
       URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Error downloading file:', error);
-      toast({
-        title: 'Erreur',
-        description: 'Échec du téléchargement',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const deleteDocument = async (doc: TaskDocument) => {
-    try {
-      const { error: storageError } = await supabase.storage
-        .from('task-documents')
-        .remove([doc.file_path]);
-
-      if (storageError) throw storageError;
-
-      const { error: dbError } = await supabase.from('task_documents').delete().eq('id', doc.id);
-
-      if (dbError) throw dbError;
-
-      toast({
-        title: 'Succès',
-        description: 'Document supprimé',
-      });
-
-      loadDocuments();
-    } catch (error) {
-      console.error('Error deleting file:', error);
-      toast({
-        title: 'Erreur',
-        description: 'Échec de la suppression',
-        variant: 'destructive',
-      });
+      toast({ title: 'Erreur', description: 'Échec du téléchargement', variant: 'destructive' });
     }
   };
 
@@ -163,31 +127,25 @@ export const DocumentsColumn = ({ task }: DocumentsColumnProps) => {
           <Input
             type="file"
             onChange={handleFileUpload}
-            disabled={uploading}
+            disabled={uploadMutation.isPending}
             className="hidden"
             id={`file-${task.id}`}
           />
           <Button
             variant="outline"
             size="sm"
-            disabled={uploading}
+            disabled={uploadMutation.isPending}
             className="w-full"
             onClick={() => document.getElementById(`file-${task.id}`)?.click()}
           >
             <Upload className="mr-1 h-3 w-3" />
-            {uploading ? 'Upload...' : 'Upload'}
+            {uploadMutation.isPending ? 'Upload...' : 'Upload'}
           </Button>
         </label>
 
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={loadDocuments}
-          disabled={loading}
-          className="w-full"
-        >
-          {loading ? 'Chargement...' : `Docs (${documents.length})`}
-        </Button>
+        <div className="text-muted-foreground text-center text-sm">
+          {isLoading ? 'Chargement...' : `Docs (${documents.length})`}
+        </div>
 
         {documents.length > 0 && (
           <div className="max-h-32 space-y-1 overflow-y-auto">
@@ -205,7 +163,8 @@ export const DocumentsColumn = ({ task }: DocumentsColumnProps) => {
                 <Button
                   variant="ghost"
                   size="sm"
-                  onClick={() => deleteDocument(doc)}
+                  onClick={() => deleteMutation.mutate(doc)}
+                  disabled={deleteMutation.isPending}
                   className="h-6 w-6 p-0"
                 >
                   <Trash2 className="h-3 w-3" />

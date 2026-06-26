@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useMutation } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -41,7 +42,7 @@ interface Department {
 }
 
 export function DepartmentManagement() {
-  const { departments, employees, loading, refreshData } = useHRMinimal();
+  const { departments, employees, loading, refresh } = useHRMinimal();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [selectedDepartment, setSelectedDepartment] = useState<Department | null>(null);
@@ -51,79 +52,60 @@ export function DepartmentManagement() {
   });
   const { toast } = useToast();
 
-  const handleCreateDepartment = async () => {
-    try {
-      const { error } = await supabase.from('departments').insert([newDepartment]).select();
-
+  const createDepartment = useMutation({
+    mutationFn: async (data: { name: string; description: string }) => {
+      const { error } = await supabase.from('departments').insert([data]).select();
       if (error) throw error;
-
-      toast({
-        title: 'Département créé',
-        description: 'Le département a été ajouté avec succès.',
-      });
+    },
+    onSuccess: () => {
+      toast({ title: 'Département créé', description: 'Le département a été ajouté avec succès.' });
       setIsAddDialogOpen(false);
-      refreshData();
+      refresh();
       setNewDepartment({ name: '', description: '' });
-    } catch (error) {
+    },
+    onError: (error) => {
       console.error('Error creating department:', error);
-      toast({
-        title: 'Erreur',
-        description: 'Impossible de créer le département.',
-        variant: 'destructive',
-      });
-    }
-  };
+      toast({ title: 'Erreur', description: 'Impossible de créer le département.', variant: 'destructive' });
+    },
+  });
 
-  const handleUpdateDepartment = async () => {
-    if (!selectedDepartment) return;
-
-    try {
+  const updateDepartment = useMutation({
+    mutationFn: async (dept: Department) => {
       const { error } = await supabase
         .from('departments')
-        .update({
-          name: selectedDepartment.name,
-          description: selectedDepartment.description,
-        })
-        .eq('id', selectedDepartment.id);
-
+        .update({ name: dept.name, description: dept.description })
+        .eq('id', dept.id);
       if (error) throw error;
-
-      toast({
-        title: 'Département mis à jour',
-        description: 'Les modifications ont été enregistrées.',
-      });
+    },
+    onSuccess: () => {
+      toast({ title: 'Département mis à jour', description: 'Les modifications ont été enregistrées.' });
       setIsEditDialogOpen(false);
-      refreshData();
-    } catch (error) {
+      refresh();
+    },
+    onError: (error) => {
       console.error('Error updating department:', error);
-      toast({
-        title: 'Erreur',
-        description: 'Impossible de mettre à jour le département.',
-        variant: 'destructive',
-      });
-    }
-  };
+      toast({ title: 'Erreur', description: 'Impossible de mettre à jour le département.', variant: 'destructive' });
+    },
+  });
 
-  const handleDeleteDepartment = async (id: string) => {
-    try {
+  const deleteDepartment = useMutation({
+    mutationFn: async (id: string) => {
       const { error } = await supabase.from('departments').delete().eq('id', id);
-
       if (error) throw error;
-
-      toast({
-        title: 'Département supprimé',
-        description: 'Le département a été supprimé avec succès.',
-      });
-      refreshData();
-    } catch (error) {
+    },
+    onSuccess: () => {
+      toast({ title: 'Département supprimé', description: 'Le département a été supprimé avec succès.' });
+      refresh();
+    },
+    onError: (error) => {
       console.error('Error deleting department:', error);
-      toast({
-        title: 'Erreur',
-        description: 'Impossible de supprimer le département.',
-        variant: 'destructive',
-      });
-    }
-  };
+      toast({ title: 'Erreur', description: 'Impossible de supprimer le département.', variant: 'destructive' });
+    },
+  });
+
+  const handleCreateDepartment = () => createDepartment.mutate(newDepartment);
+  const handleUpdateDepartment = () => { if (selectedDepartment) updateDepartment.mutate(selectedDepartment); };
+  const handleDeleteDepartment = (id: string) => deleteDepartment.mutate(id);
 
   // Calculate employee counts per department
   const departmentsWithCounts = (departments || []).map(dept => ({

@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthFilterContext } from '@/contexts/AuthContext';
 import { applyRoleFilters } from '@/lib/roleBasedFiltering';
 import { useToast } from '@/hooks/use-toast';
+import { CACHE_TTL } from '@/lib/queryConfig';
 
 export interface ExpenseReport {
   id: string;
@@ -48,28 +49,34 @@ export interface ExpenseCategory {
   tenant_id?: string;
 }
 
-export function useExpenseManagement() {
-  const [expenseReports, setExpenseReports] = useState<ExpenseReport[]>([]);
-  const [expenseItems, setExpenseItems] = useState<ExpenseItem[]>([]);
-  const [expenseCategories, setExpenseCategories] = useState<ExpenseCategory[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+interface ExpenseData {
+  expenseReports: ExpenseReport[];
+  expenseItems: ExpenseItem[];
+  expenseCategories: ExpenseCategory[];
+}
 
-  // 🔒 Contexte utilisateur pour le filtrage
+export function useExpenseManagement() {
   const { userContext } = useAuthFilterContext();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
-  const fetchData = useCallback(async () => {
+  const userId = userContext?.userId ?? null;
 
-    if (!userContext) {
-      return;
-    }
+  // ============================================================
+  // QUERY — chargement des 3 collections en parallèle
+  // ============================================================
+  const {
+    data,
+    isLoading: loading,
+    error: queryError,
+    refetch,
+  } = useQuery<ExpenseData>({
+    queryKey: ['expenses', userId],
+    queryFn: async () => {
+      if (!userContext) {
+        return { expenseReports: [], expenseItems: [], expenseCategories: [] };
+      }
 
-    try {
-      setLoading(true);
-      setError(null);
-
-      // 🔒 Construire les queries avec filtrage
       let reportsQuery = supabase
         .from('expense_reports')
         .select('*')
@@ -95,51 +102,59 @@ export function useExpenseManagement() {
       if (itemsRes.error) throw itemsRes.error;
       if (categoriesRes.error) throw categoriesRes.error;
 
-        reports: reportsRes.data?.length,
-        items: itemsRes.data?.length,
-      });
+      return {
+        expenseReports: (reportsRes.data as ExpenseReport[]) || [],
+        expenseItems: (itemsRes.data as ExpenseItem[]) || [],
+        expenseCategories: (categoriesRes.data as ExpenseCategory[]) || [],
+      };
+    },
+    enabled: !!userContext,
+    ...CACHE_TTL.realtime,
+  });
 
-      setExpenseReports((reportsRes.data as ExpenseReport[]) || []);
-      setExpenseItems((itemsRes.data as ExpenseItem[]) || []);
-      setExpenseCategories((categoriesRes.data as ExpenseCategory[]) || []);
-    } catch (err: any) {
-      console.error('❌ [useExpenseManagement] Error:', err);
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  }, [userContext]);
+  const expenseReports = data?.expenseReports ?? [];
+  const expenseItems = data?.expenseItems ?? [];
+  const expenseCategories = data?.expenseCategories ?? [];
+  const error = queryError ? (queryError as Error).message : null;
 
-  const createExpenseReport = async (
-    data: Omit<ExpenseReport, 'id' | 'created_at' | 'updated_at'>
-  ) => {
-    try {
-      const { error } = await supabase.from('expense_reports').insert(data);
-
+  // ============================================================
+  // MUTATION — créer un rapport de frais
+  // ============================================================
+  const createReportMutation = useMutation({
+    mutationFn: async (reportData: Omit<ExpenseReport, 'id' | 'created_at' | 'updated_at'>) => {
+      const { error } = await supabase.from('expense_reports').insert(reportData);
       if (error) throw error;
-
-      toast({
-        title: 'Succès',
-        description: 'Note de frais créée avec succès',
-      });
-
-      fetchData();
-    } catch (err: any) {
+    },
+    onSuccess: () => {
+      toast({ title: 'Succès', description: 'Note de frais créée avec succès' });
+      queryClient.invalidateQueries({ queryKey: ['expenses', userId] });
+    },
+    onError: (err: any) => {
       console.error('Error creating expense report:', err);
       toast({
         title: 'Erreur',
         description: 'Impossible de créer la note de frais',
         variant: 'destructive',
       });
-    }
-  };
+    },
+  });
 
-  const updateExpenseReportStatus = async (
-    reportId: string,
-    status: 'draft' | 'submitted' | 'approved' | 'rejected' | 'paid',
-    rejectionReason?: string
-  ) => {
-    try {
+  const createExpenseReport = (data: Omit<ExpenseReport, 'id' | 'created_at' | 'updated_at'>) =>
+    createReportMutation.mutate(data);
+
+  // ============================================================
+  // MUTATION — mettre à jour le statut d'un rapport
+  // ============================================================
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({
+      reportId,
+      status,
+      rejectionReason,
+    }: {
+      reportId: string;
+      status: 'draft' | 'submitted' | 'approved' | 'rejected' | 'paid';
+      rejectionReason?: string;
+    }) => {
       const updateData: any = {
         status,
         updated_at: new Date().toISOString(),
@@ -159,60 +174,62 @@ export function useExpenseManagement() {
         .eq('id', reportId);
 
       if (error) throw error;
-
-      toast({
-        title: 'Succès',
-        description: 'Statut de la note de frais mis à jour',
-      });
-
-      fetchData();
-    } catch (err: any) {
+    },
+    onSuccess: () => {
+      toast({ title: 'Succès', description: 'Statut de la note de frais mis à jour' });
+      queryClient.invalidateQueries({ queryKey: ['expenses', userId] });
+    },
+    onError: (err: any) => {
       console.error('Error updating expense report status:', err);
       toast({
         title: 'Erreur',
         description: 'Impossible de mettre à jour le statut',
         variant: 'destructive',
       });
-    }
-  };
+    },
+  });
 
-  const createExpenseCategory = async (data: Omit<ExpenseCategory, 'id' | 'created_at'>) => {
-    try {
-      const { error } = await supabase.from('expense_categories').insert(data);
+  const updateExpenseReportStatus = (
+    reportId: string,
+    status: 'draft' | 'submitted' | 'approved' | 'rejected' | 'paid',
+    rejectionReason?: string
+  ) => updateStatusMutation.mutate({ reportId, status, rejectionReason });
 
+  // ============================================================
+  // MUTATION — créer une catégorie
+  // ============================================================
+  const createCategoryMutation = useMutation({
+    mutationFn: async (categoryData: Omit<ExpenseCategory, 'id' | 'created_at'>) => {
+      const { error } = await supabase.from('expense_categories').insert(categoryData);
       if (error) throw error;
-
-      toast({
-        title: 'Succès',
-        description: 'Catégorie créée avec succès',
-      });
-
-      fetchData();
-    } catch (err: any) {
+    },
+    onSuccess: () => {
+      toast({ title: 'Succès', description: 'Catégorie créée avec succès' });
+      queryClient.invalidateQueries({ queryKey: ['expenses', userId] });
+    },
+    onError: (err: any) => {
       console.error('Error creating expense category:', err);
       toast({
         title: 'Erreur',
         description: 'Impossible de créer la catégorie',
         variant: 'destructive',
       });
-    }
-  };
+    },
+  });
 
-  const getTotalByStatus = (status: string) => {
-    return expenseReports
+  const createExpenseCategory = (data: Omit<ExpenseCategory, 'id' | 'created_at'>) =>
+    createCategoryMutation.mutate(data);
+
+  // ============================================================
+  // Helpers purs (pas de fetch)
+  // ============================================================
+  const getTotalByStatus = (status: string) =>
+    expenseReports
       .filter(report => report.status === status)
       .reduce((total, report) => total + report.total_amount, 0);
-  };
 
-  const getReportItems = (reportId: string) => {
-    return expenseItems.filter(item => item.report_id === reportId);
-  };
-
-  useEffect(() => {
-    if (userContext) {
-      fetchData();
-    }
-  }, [userContext]); // ✅ Only depend on userContext, not fetchData
+  const getReportItems = (reportId: string) =>
+    expenseItems.filter(item => item.report_id === reportId);
 
   return {
     expenseReports,
@@ -220,7 +237,7 @@ export function useExpenseManagement() {
     expenseCategories,
     loading,
     error,
-    refetch: fetchData,
+    refetch,
     createExpenseReport,
     updateExpenseReportStatus,
     createExpenseCategory,

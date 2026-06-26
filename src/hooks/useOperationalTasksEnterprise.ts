@@ -4,17 +4,19 @@
  *
  * Fonctionnalités:
  * - Query-level filtering (sécurité maximale)
- * - Cache intelligent avec invalidation
+ * - Cache intelligent via react-query
  * - Pagination et lazy loading
  * - Métriques de performance
  * - Gestion d'erreurs robuste
  */
 
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useTenant } from '@/hooks/useTenant';
 import { useRolesCompat as useUserRoles } from '@/contexts/RolesContext';
+import { CACHE_TTL } from '@/lib/queryConfig';
 
 // Type brut de la base de données
 interface OperationalActivityRaw {
@@ -103,26 +105,12 @@ export interface OperationalTasksData {
  * Hook Operational Tasks Enterprise - STABLE
  */
 export const useOperationalTasksEnterprise = (filters?: OperationalTaskFilters) => {
-  // États optimisés avec métriques
-  const [data, setData] = useState<OperationalTasksData>({
-    tasks: [],
-    totalCount: 0,
-    todoCount: 0,
-    inProgressCount: 0,
-    completedCount: 0,
-    recurringCount: 0,
-  });
+  const { toast } = useToast();
+  const { tenantId } = useTenant();
+  const { isLoading: rolesLoading, userRoles } = useUserRoles();
+  const queryClient = useQueryClient();
 
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [metrics, setMetrics] = useState<OperationalTaskMetrics>({
-    fetchTime: 0,
-    cacheHit: false,
-    dataSize: 0,
-    lastUpdate: new Date(),
-  });
-
-  // Pagination state
+  // Pagination state local (UI state — NE PAS migrer)
   const [pagination, setPagination] = useState<OperationalTaskPagination>({
     page: 1,
     limit: 50,
@@ -131,253 +119,174 @@ export const useOperationalTasksEnterprise = (filters?: OperationalTaskFilters) 
     totalPages: 0,
   });
 
-  // Hooks externes
-  const { toast } = useToast();
-  const { tenantId } = useTenant();
-  const { isLoading: rolesLoading, userRoles } = useUserRoles();
-
-  // ✅ Calcul stable de isSuperAdmin depuis userRoles
+  // Calcul stable de isSuperAdmin depuis userRoles
   const isSuperAdminValue = useMemo(() => {
     return userRoles.some(role => role.roles?.name === 'super_admin');
   }, [userRoles]);
 
-  // Refs pour optimisations
-  const fetchedRef = useRef(false);
-  const tenantIdRef = useRef<string | null>(null);
-  const cacheRef = useRef<Map<string, { data: OperationalTasksData; timestamp: number }>>(
-    new Map()
+  const enabled = !rolesLoading && (!!tenantId || isSuperAdminValue);
+
+  // queryKey incluant les filtres (reactive)
+  const queryKey = useMemo(
+    () => ['operational-tasks', { tenantId, isSuperAdmin: isSuperAdminValue, filters, limit: pagination.limit }],
+    [tenantId, isSuperAdminValue, filters, pagination.limit]
   );
-  const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Cache TTL (5 minutes)
-  const CACHE_TTL = 5 * 60 * 1000;
+  // useQuery principal
+  const query = useQuery<OperationalTasksData>({
+    queryKey,
+    queryFn: async () => {
+      const startTime = performance.now();
 
-  // Fonction de cache intelligent
-  const getCacheKey = useCallback(
-    (tenant: string | null, isSuper: boolean, filters?: OperationalTaskFilters) => {
-      const baseKey = `op_tasks_${isSuper ? 'super_admin' : tenant || 'no_tenant'}`;
-      const filterKey = filters ? `_${JSON.stringify(filters)}` : '';
-      return `${baseKey}${filterKey}`;
+      // Construire la requête - utiliser la vraie table
+      let q = supabase.from('operational_activities').select('*');
+
+      // Filtrage par tenant
+      if (!isSuperAdminValue && tenantId) {
+        q = q.eq('tenant_id', tenantId);
+      }
+
+      // Appliquer les filtres (colonnes réelles de la table)
+      if (filters?.search) {
+        q = q.ilike('name', `%${filters.search}%`);
+      }
+
+      if (filters?.isRecurring !== undefined) {
+        q = q.eq('kind', filters.isRecurring ? 'recurring' : 'one_off');
+      }
+
+      // Exécuter la requête
+      const { data: rawActivities, error: fetchError } = await q
+        .order('created_at', { ascending: false })
+        .limit(pagination.limit);
+
+      if (fetchError) throw fetchError;
+
+      // Mapper les activités
+      const tasksData: OperationalTask[] = (rawActivities || []).map(
+        (activity: OperationalActivityRaw) => ({
+          ...activity,
+          kind: activity.kind as 'recurring' | 'one_off',
+          scope: activity.scope as 'org' | 'department' | 'team' | 'person',
+          title: activity.name,
+          is_recurring: activity.kind === 'recurring',
+          status: activity.is_active ? 'active' : 'inactive',
+          assigned_to: activity.owner_name || null,
+          due_date: activity.one_off_date || undefined,
+        })
+      );
+
+      const newData: OperationalTasksData = {
+        tasks: tasksData,
+        totalCount: tasksData.length,
+        todoCount: tasksData.filter(t => !t.is_active).length,
+        inProgressCount: tasksData.filter(t => t.is_active && t.kind === 'recurring').length,
+        completedCount: 0,
+        recurringCount: tasksData.filter(t => t.kind === 'recurring').length,
+      };
+
+      // Mettre à jour la pagination après fetch
+      const endTime = performance.now();
+      const fetchTime = endTime - startTime;
+      const dataSize = JSON.stringify(newData).length;
+
+      // Mise à jour pagination côté state (les valeurs sont stables)
+      setPagination(prev => ({
+        ...prev,
+        total: newData.totalCount,
+        totalPages: Math.ceil(newData.totalCount / prev.limit),
+        hasMore: newData.totalCount > prev.limit,
+      }));
+
+      // Métriques attachées à la donnée retournée (accessible via query.data)
+      (newData as any)._metrics = {
+        fetchTime,
+        cacheHit: false,
+        dataSize,
+        lastUpdate: new Date(),
+      };
+
+      return newData;
     },
-    []
-  );
+    enabled,
+    ...CACHE_TTL.semiStatic,
+    placeholderData: (prev) => prev,
+  });
 
-  const getCachedData = useCallback(
-    (cacheKey: string): OperationalTasksData | null => {
-      const cached = cacheRef.current.get(cacheKey);
-      if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
-        return cached.data;
-      }
-      return null;
-    },
-    [CACHE_TTL]
-  );
-
-  const setCachedData = useCallback((cacheKey: string, data: OperationalTasksData) => {
-    cacheRef.current.set(cacheKey, { data, timestamp: Date.now() });
-  }, []);
-
-  // Fonction de fetch stable
-  useEffect(() => {
-    // Conditions de sortie
-    if (rolesLoading) {
-      return;
-    }
-
-    if (!tenantId && !isSuperAdminValue) {
-      setLoading(false);
-      return;
-    }
-
-    // Protection contre les refetch
-    const currentHash = `${tenantId || 'null'}-${isSuperAdminValue}-${JSON.stringify(filters)}`;
-    const lastHash = tenantIdRef.current || '';
-
-    if (fetchedRef.current && currentHash === lastHash) {
-      return;
-    }
-
-    // Vérifier le cache
-    const cacheKey = getCacheKey(tenantId, isSuperAdminValue, filters);
-    const cachedData = getCachedData(cacheKey);
-
-    if (cachedData && currentHash === lastHash) {
-      return;
-    }
-
-    // Marquer comme fetché
-    fetchedRef.current = true;
-    tenantIdRef.current = currentHash;
-
-    const fetchData = async () => {
-      // Annuler requête précédente
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-
-      const abortController = new AbortController();
-      abortControllerRef.current = abortController;
-
-      try {
-        const startTime = performance.now();
-        setLoading(true);
-        setError(null);
-
-        const cacheKey = getCacheKey(tenantId, isSuperAdminValue, filters);
-
-        // Vérifier le cache d'abord
-        const cachedData = getCachedData(cacheKey);
-        if (cachedData) {
-          setData(cachedData);
-          setMetrics(prev => ({
-            ...prev,
-            cacheHit: true,
-            fetchTime: performance.now() - startTime,
-            lastUpdate: new Date(),
-          }));
-          setLoading(false);
-          return;
-        }
-
-        // Construire la requête - utiliser la vraie table
-        let query = supabase.from('operational_activities').select('*');
-
-        // Filtrage par tenant
-        if (!isSuperAdminValue && tenantId) {
-          query = query.eq('tenant_id', tenantId);
-        }
-
-        // Appliquer les filtres (colonnes réelles de la table)
-        if (filters?.search) {
-          query = query.ilike('name', `%${filters.search}%`);
-        }
-
-        if (filters?.isRecurring !== undefined) {
-          query = query.eq('kind', filters.isRecurring ? 'recurring' : 'one_off');
-        }
-
-        // Exécuter la requête
-        const { data: rawActivities, error: fetchError } = await query
-          .order('created_at', { ascending: false })
-          .limit(pagination.limit);
-
-        if (fetchError) throw fetchError;
-
-        // Calculer les métriques (adapter aux vraies colonnes)
-        const tasksData: OperationalTask[] = (rawActivities || []).map(
-          (activity: OperationalActivityRaw) => ({
-            ...activity,
-            kind: activity.kind as 'recurring' | 'one_off', // Cast sûr
-            scope: activity.scope as 'org' | 'department' | 'team' | 'person', // Cast sûr
-            title: activity.name, // Alias pour compatibilité UI (toujours présent)
-            is_recurring: activity.kind === 'recurring',
-            status: activity.is_active ? 'active' : 'inactive', // Mapping status
-            assigned_to: activity.owner_name || null, // Mapping assigné
-            due_date: activity.one_off_date || undefined, // Mapping échéance
-          })
-        );
-
-        const newData: OperationalTasksData = {
-          tasks: tasksData,
-          totalCount: tasksData.length,
-          todoCount: tasksData.filter(t => !t.is_active).length, // Inactives = à faire
-          inProgressCount: tasksData.filter(t => t.is_active && t.kind === 'recurring').length,
-          completedCount: 0, // Pas de statut completed dans cette table
-          recurringCount: tasksData.filter(t => t.kind === 'recurring').length,
-        };
-
-        // Calculer les métriques de performance
-        const endTime = performance.now();
-        const fetchTime = endTime - startTime;
-        const dataSize = JSON.stringify(newData).length;
-
-        // Mettre en cache
-        setCachedData(cacheKey, newData);
-
-        // Mettre à jour les états
-        setData(newData);
-        setMetrics({
-          fetchTime,
-          cacheHit: false,
-          dataSize,
-          lastUpdate: new Date(),
-        });
-
-        // Pagination
-        setPagination(prev => ({
-          ...prev,
-          total: newData.totalCount,
-          totalPages: Math.ceil(newData.totalCount / prev.limit),
-          hasMore: newData.totalCount > prev.limit,
-        }));
-      } catch (error: any) {
-        console.error('❌ Error fetching operational tasks:', error);
-        setError(error.message || 'Erreur de chargement');
-      } finally {
-        setLoading(false);
-      }
+  // Dériver les métriques depuis les données ou des valeurs par défaut
+  const metrics: OperationalTaskMetrics = useMemo(() => {
+    const m = (query.data as any)?._metrics;
+    return m ?? {
+      fetchTime: 0,
+      cacheHit: false,
+      dataSize: 0,
+      lastUpdate: new Date(),
     };
+  }, [query.data]);
 
-    fetchData();
-  }, [
-    tenantId,
-    rolesLoading,
-    isSuperAdminValue,
-    filters,
-    getCacheKey,
-    getCachedData,
-    pagination.limit,
-    setCachedData,
-  ]);
+  // Mutation — mettre à jour une activité
+  const updateTaskMutation = useMutation({
+    mutationFn: async ({ taskId, updates }: { taskId: string; updates: Partial<OperationalTask> }) => {
+      // Mapper les updates vers les vraies colonnes
+      const activityUpdates: any = {};
+      if (updates.title) activityUpdates.name = updates.title;
+      if (updates.name) activityUpdates.name = updates.name;
+      if (updates.description !== undefined) activityUpdates.description = updates.description;
+      if (updates.kind) activityUpdates.kind = updates.kind;
+      if (updates.is_active !== undefined) activityUpdates.is_active = updates.is_active;
 
-  // Fonction de refresh
+      const { error } = await supabase
+        .from('operational_activities')
+        .update(activityUpdates)
+        .eq('id', taskId);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['operational-tasks'] });
+    },
+    onError: (error: any) => {
+      console.error('Error updating operational activity:', error);
+      toast({
+        title: 'Erreur',
+        description: 'Impossible de mettre à jour la tâche',
+        variant: 'destructive',
+      });
+    },
+  });
+
   const refresh = useCallback(() => {
-    const cacheKey = getCacheKey(tenantId, isSuperAdminValue, filters);
-    cacheRef.current.delete(cacheKey);
-    fetchedRef.current = false;
-    tenantIdRef.current = null;
-    setLoading(true);
-  }, [tenantId, isSuperAdminValue, filters, getCacheKey]);
+    queryClient.invalidateQueries({ queryKey: ['operational-tasks'] });
+  }, [queryClient]);
 
-  // Fonction pour mettre à jour une activité
   const updateTask = useCallback(
     async (taskId: string, updates: Partial<OperationalTask>) => {
-      try {
-        // Mapper les updates vers les vraies colonnes
-        const activityUpdates: any = {};
-        if (updates.title) activityUpdates.name = updates.title;
-        if (updates.name) activityUpdates.name = updates.name;
-        if (updates.description !== undefined) activityUpdates.description = updates.description;
-        if (updates.kind) activityUpdates.kind = updates.kind;
-        if (updates.is_active !== undefined) activityUpdates.is_active = updates.is_active;
-
-        const { error: updateError } = await supabase
-          .from('operational_activities')
-          .update(activityUpdates)
-          .eq('id', taskId);
-
-        if (updateError) throw updateError;
-
-        // Invalider le cache et refresh
-        refresh();
-      } catch (error: any) {
-        console.error('Error updating operational activity:', error);
-        throw error;
-      }
+      await updateTaskMutation.mutateAsync({ taskId, updates });
     },
-    [refresh]
+    [updateTaskMutation]
   );
 
   // Permissions
   const canAccess = isSuperAdminValue || !!tenantId;
+
+  const data = query.data ?? {
+    tasks: [],
+    totalCount: 0,
+    todoCount: 0,
+    inProgressCount: 0,
+    completedCount: 0,
+    recurringCount: 0,
+  };
+
+  const CACHE_TTL_MS = 5 * 60 * 1000;
 
   return {
     // Données
     ...data,
 
     // États
-    loading,
-    error,
+    loading: query.isLoading,
+    error: query.error ? (query.error as Error).message : null,
 
     // Métriques de performance
     metrics,
@@ -392,7 +301,7 @@ export const useOperationalTasksEnterprise = (filters?: OperationalTaskFilters) 
     updateTask,
 
     // Utilitaires
-    isDataStale: metrics.lastUpdate && Date.now() - metrics.lastUpdate.getTime() > CACHE_TTL,
-    cacheKey: getCacheKey(tenantId, isSuperAdminValue, filters),
+    isDataStale: metrics.lastUpdate && Date.now() - metrics.lastUpdate.getTime() > CACHE_TTL_MS,
+    cacheKey: JSON.stringify(queryKey),
   };
 };

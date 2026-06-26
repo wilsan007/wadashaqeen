@@ -24,6 +24,19 @@ export const useUserRoles = () => {
 
   useEffect(() => {
     fetchUserRolesAndPermissions();
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' || event === 'USER_UPDATED') {
+        fetchUserRolesAndPermissions();
+      } else if (event === 'SIGNED_OUT') {
+        setUserRoles([]);
+        setUserPermissions([]);
+      }
+    });
+
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
   }, []);
 
   // Fonctions de récupération des données (pour le cache)
@@ -172,7 +185,7 @@ export const useUserRoles = () => {
 
   // Vérifier si l'utilisateur est manager HR
   const isHRManager = (): boolean => {
-    return hasRole(RoleNames.MANAGER_HR);
+    return hasRole(RoleNames.HR_MANAGER);
   };
 
   // Vérifier si l'utilisateur est project manager

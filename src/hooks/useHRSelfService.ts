@@ -10,9 +10,9 @@
  * - Demandes de télétravail
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useUserFilterContext } from '@/hooks/useUserAuth';
+import { useAuth } from '@/contexts/AuthContext';
 import { applyRoleFilters } from '@/lib/roleBasedFiltering';
 import { useToast } from '@/hooks/use-toast';
 
@@ -136,474 +136,387 @@ export interface RemoteWorkRequest {
 // HOOK PRINCIPAL
 // ============================================================================
 export function useHRSelfService() {
-  const { userContext, profile, loading: authLoading } = useUserFilterContext();
+  const { userContext, profile, loading: authLoading } = useAuth();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
-  // États
-  const [expenseReports, setExpenseReports] = useState<ExpenseReport[]>([]);
-  const [absenceJustifications, setAbsenceJustifications] = useState<AbsenceJustification[]>([]);
-  const [administrativeRequests, setAdministrativeRequests] = useState<AdministrativeRequest[]>([]);
-  const [timesheets, setTimesheets] = useState<Timesheet[]>([]);
-  const [remoteWorkRequests, setRemoteWorkRequests] = useState<RemoteWorkRequest[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const userId = profile?.userId ?? null;
+  const enabled = !authLoading && !!userContext;
 
   // ============================================================================
-  // NOTES DE FRAIS
+  // QUERIES — SELECT
   // ============================================================================
 
-  const fetchExpenseReports = useCallback(async () => {
-    if (!userContext) return;
-
-    try {
+  const expenseReportsQuery = useQuery<ExpenseReport[], Error>({
+    queryKey: ['hr-self-service-expenses', userId],
+    enabled,
+    queryFn: async () => {
       let query = supabase
         .from('expense_reports')
         .select('*')
         .order('created_at', { ascending: false });
 
-      query = applyRoleFilters(query, userContext, 'expense_reports');
+      query = applyRoleFilters(query, userContext!, 'expense_reports');
 
-      const { data, error: fetchError } = await query;
-      if (fetchError) throw fetchError;
-
-      setExpenseReports(data || []);
-    } catch (err: any) {
-      console.error('Erreur chargement notes de frais:', err);
-      setError(err.message);
-    }
-  }, [userContext]);
-
-  const createExpenseReport = useCallback(
-    async (expense: Partial<ExpenseReport>) => {
-      if (!profile) return;
-
-      try {
-        const { data: employee } = await supabase
-          .from('employees')
-          .select('id')
-          .eq('user_id', profile.userId)
-          .single();
-
-        if (!employee) throw new Error('Employé non trouvé');
-
-        const { error: insertError } = await supabase.from('expense_reports').insert({
-          ...expense,
-          employee_id: employee.id,
-        });
-
-        if (insertError) throw insertError;
-
-        toast({
-          title: 'Note de frais créée',
-          description: 'Votre note de frais a été enregistrée',
-        });
-
-        fetchExpenseReports();
-      } catch (err: any) {
-        toast({
-          title: 'Erreur',
-          description: err.message,
-          variant: 'destructive',
-        });
-      }
+      const { data, error } = await query;
+      if (error) throw error;
+      return data ?? [];
     },
-    [profile, toast, fetchExpenseReports]
-  );
+  });
 
-  const submitExpenseReport = useCallback(
-    async (expenseId: string) => {
-      try {
-        const { error: updateError } = await supabase
-          .from('expense_reports')
-          .update({
-            status: 'submitted',
-            submitted_at: new Date().toISOString(),
-          })
-          .eq('id', expenseId);
-
-        if (updateError) throw updateError;
-
-        toast({
-          title: 'Note de frais soumise',
-          description: 'Votre manager recevra une notification',
-        });
-
-        fetchExpenseReports();
-      } catch (err: any) {
-        toast({
-          title: 'Erreur',
-          description: err.message,
-          variant: 'destructive',
-        });
-      }
-    },
-    [toast, fetchExpenseReports]
-  );
-
-  const approveExpenseReport = useCallback(
-    async (expenseId: string, approverId: string, approvalLevel: 'manager' | 'finance') => {
-      try {
-        const updates =
-          approvalLevel === 'manager'
-            ? {
-                status: 'approved_manager',
-                approved_by_manager: approverId,
-                approved_manager_at: new Date().toISOString(),
-              }
-            : {
-                status: 'approved_finance',
-                approved_by_finance: approverId,
-                approved_finance_at: new Date().toISOString(),
-              };
-
-        const { error: updateError } = await supabase
-          .from('expense_reports')
-          .update(updates)
-          .eq('id', expenseId);
-
-        if (updateError) throw updateError;
-
-        toast({
-          title: 'Note de frais approuvée',
-          description: `Approuvée par ${approvalLevel === 'manager' ? 'le manager' : 'la finance'}`,
-        });
-
-        fetchExpenseReports();
-      } catch (err: any) {
-        toast({
-          title: 'Erreur',
-          description: err.message,
-          variant: 'destructive',
-        });
-      }
-    },
-    [toast, fetchExpenseReports]
-  );
-
-  // ============================================================================
-  // JUSTIFICATIFS D'ABSENCE
-  // ============================================================================
-
-  const fetchAbsenceJustifications = useCallback(async () => {
-    if (!userContext) return;
-
-    try {
+  const absenceJustificationsQuery = useQuery<AbsenceJustification[], Error>({
+    queryKey: ['hr-self-service-absences', userId],
+    enabled,
+    queryFn: async () => {
       let query = supabase
         .from('absence_justifications')
         .select('*')
         .order('absence_date', { ascending: false });
 
-      query = applyRoleFilters(query, userContext, 'absence_justifications');
+      query = applyRoleFilters(query, userContext!, 'absence_justifications');
 
-      const { data, error: fetchError } = await query;
-      if (fetchError) throw fetchError;
-
-      setAbsenceJustifications(data || []);
-    } catch (err: any) {
-      console.error('Erreur chargement justificatifs:', err);
-      setError(err.message);
-    }
-  }, [userContext]);
-
-  const createAbsenceJustification = useCallback(
-    async (justification: Partial<AbsenceJustification>) => {
-      if (!profile) return;
-
-      try {
-        const { data: employee } = await supabase
-          .from('employees')
-          .select('id')
-          .eq('user_id', profile.userId)
-          .single();
-
-        if (!employee) throw new Error('Employé non trouvé');
-
-        const { error: insertError } = await supabase.from('absence_justifications').insert({
-          ...justification,
-          employee_id: employee.id,
-        });
-
-        if (insertError) throw insertError;
-
-        toast({
-          title: 'Justificatif soumis',
-          description: "Votre justificatif d'absence a été enregistré",
-        });
-
-        fetchAbsenceJustifications();
-      } catch (err: any) {
-        toast({
-          title: 'Erreur',
-          description: err.message,
-          variant: 'destructive',
-        });
-      }
+      const { data, error } = await query;
+      if (error) throw error;
+      return data ?? [];
     },
-    [profile, toast, fetchAbsenceJustifications]
-  );
+  });
 
-  // ============================================================================
-  // DEMANDES ADMINISTRATIVES
-  // ============================================================================
-
-  const fetchAdministrativeRequests = useCallback(async () => {
-    if (!userContext) return;
-
-    try {
+  const administrativeRequestsQuery = useQuery<AdministrativeRequest[], Error>({
+    queryKey: ['hr-self-service-admin-requests', userId],
+    enabled,
+    queryFn: async () => {
       let query = supabase
         .from('administrative_requests')
         .select('*')
         .order('created_at', { ascending: false });
 
-      query = applyRoleFilters(query, userContext, 'administrative_requests');
+      query = applyRoleFilters(query, userContext!, 'administrative_requests');
 
-      const { data, error: fetchError } = await query;
-      if (fetchError) throw fetchError;
-
-      setAdministrativeRequests(data || []);
-    } catch (err: any) {
-      console.error('Erreur chargement demandes admin:', err);
-      setError(err.message);
-    }
-  }, [userContext]);
-
-  const createAdministrativeRequest = useCallback(
-    async (request: Partial<AdministrativeRequest>) => {
-      if (!profile) return;
-
-      try {
-        const { data: employee } = await supabase
-          .from('employees')
-          .select('id')
-          .eq('user_id', profile.userId)
-          .single();
-
-        if (!employee) throw new Error('Employé non trouvé');
-
-        const { error: insertError } = await supabase.from('administrative_requests').insert({
-          ...request,
-          employee_id: employee.id,
-        });
-
-        if (insertError) throw insertError;
-
-        toast({
-          title: 'Demande envoyée',
-          description: 'Votre demande administrative a été enregistrée',
-        });
-
-        fetchAdministrativeRequests();
-      } catch (err: any) {
-        toast({
-          title: 'Erreur',
-          description: err.message,
-          variant: 'destructive',
-        });
-      }
+      const { data, error } = await query;
+      if (error) throw error;
+      return data ?? [];
     },
-    [profile, toast, fetchAdministrativeRequests]
-  );
+  });
 
-  // ============================================================================
-  // TIMESHEETS
-  // ============================================================================
-
-  const fetchTimesheets = useCallback(async () => {
-    if (!userContext) return;
-
-    try {
+  const timesheetsQuery = useQuery<Timesheet[], Error>({
+    queryKey: ['hr-self-service-timesheets', userId],
+    enabled,
+    queryFn: async () => {
       let query = supabase
         .from('timesheets')
         .select('*')
         .order('week_start_date', { ascending: false });
 
-      query = applyRoleFilters(query, userContext, 'timesheets');
+      query = applyRoleFilters(query, userContext!, 'timesheets');
 
-      const { data, error: fetchError } = await query;
-      if (fetchError) throw fetchError;
-
-      setTimesheets(data || []);
-    } catch (err: any) {
-      console.error('Erreur chargement timesheets:', err);
-      setError(err.message);
-    }
-  }, [userContext]);
-
-  const createTimesheet = useCallback(
-    async (timesheet: Partial<Timesheet>) => {
-      if (!profile) return;
-
-      try {
-        const { data: employee } = await supabase
-          .from('employees')
-          .select('id')
-          .eq('user_id', profile.userId)
-          .single();
-
-        if (!employee) throw new Error('Employé non trouvé');
-
-        const { error: insertError } = await supabase.from('timesheets').insert({
-          ...timesheet,
-          employee_id: employee.id,
-        });
-
-        if (insertError) throw insertError;
-
-        toast({
-          title: 'Timesheet créé',
-          description: 'Votre feuille de temps a été créée',
-        });
-
-        fetchTimesheets();
-      } catch (err: any) {
-        toast({
-          title: 'Erreur',
-          description: err.message,
-          variant: 'destructive',
-        });
-      }
+      const { data, error } = await query;
+      if (error) throw error;
+      return data ?? [];
     },
-    [profile, toast, fetchTimesheets]
-  );
+  });
 
-  // ============================================================================
-  // TÉLÉTRAVAIL
-  // ============================================================================
-
-  const fetchRemoteWorkRequests = useCallback(async () => {
-    if (!userContext) return;
-
-    try {
+  const remoteWorkRequestsQuery = useQuery<RemoteWorkRequest[], Error>({
+    queryKey: ['hr-self-service-remote', userId],
+    enabled,
+    queryFn: async () => {
       let query = supabase
         .from('remote_work_requests')
         .select('*')
         .order('created_at', { ascending: false });
 
-      query = applyRoleFilters(query, userContext, 'remote_work_requests');
+      query = applyRoleFilters(query, userContext!, 'remote_work_requests');
 
-      const { data, error: fetchError } = await query;
-      if (fetchError) throw fetchError;
-
-      setRemoteWorkRequests(data || []);
-    } catch (err: any) {
-      console.error('Erreur chargement demandes télétravail:', err);
-      setError(err.message);
-    }
-  }, [userContext]);
-
-  const createRemoteWorkRequest = useCallback(
-    async (request: Partial<RemoteWorkRequest>) => {
-      if (!profile) return;
-
-      try {
-        const { data: employee } = await supabase
-          .from('employees')
-          .select('id')
-          .eq('user_id', profile.userId)
-          .single();
-
-        if (!employee) throw new Error('Employé non trouvé');
-
-        const { error: insertError } = await supabase.from('remote_work_requests').insert({
-          ...request,
-          employee_id: employee.id,
-          request_date: new Date().toISOString(),
-        });
-
-        if (insertError) throw insertError;
-
-        toast({
-          title: 'Demande envoyée',
-          description: 'Votre demande de télétravail a été soumise',
-        });
-
-        fetchRemoteWorkRequests();
-      } catch (err: any) {
-        toast({
-          title: 'Erreur',
-          description: err.message,
-          variant: 'destructive',
-        });
-      }
+      const { data, error } = await query;
+      if (error) throw error;
+      return data ?? [];
     },
-    [profile, toast, fetchRemoteWorkRequests]
-  );
+  });
 
   // ============================================================================
-  // CHARGEMENT INITIAL
+  // HELPER — récupérer l'employee_id courant
   // ============================================================================
 
-  useEffect(() => {
-    if (authLoading || !userContext) return;
-
-    const loadAllData = async () => {
-      setLoading(true);
-      await Promise.all([
-        fetchExpenseReports(),
-        fetchAbsenceJustifications(),
-        fetchAdministrativeRequests(),
-        fetchTimesheets(),
-        fetchRemoteWorkRequests(),
-      ]);
-      setLoading(false);
-    };
-
-    loadAllData();
-  }, [
-    authLoading,
-    userContext,
-    fetchExpenseReports,
-    fetchAbsenceJustifications,
-    fetchAdministrativeRequests,
-    fetchTimesheets,
-    fetchRemoteWorkRequests,
-  ]);
+  const getEmployeeId = async (): Promise<string> => {
+    if (!profile) throw new Error('Utilisateur non connecté');
+    const { data: employee } = await supabase
+      .from('employees')
+      .select('id')
+      .eq('user_id', profile.userId)
+      .single();
+    if (!employee) throw new Error('Employé non trouvé');
+    return employee.id;
+  };
 
   // ============================================================================
-  // RETOUR API
+  // MUTATIONS — Notes de Frais
+  // ============================================================================
+
+  const createExpenseMutation = useMutation({
+    mutationFn: async (expense: Partial<ExpenseReport>) => {
+      const employeeId = await getEmployeeId();
+      const { error } = await supabase.from('expense_reports').insert({
+        ...expense,
+        employee_id: employeeId,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['hr-self-service-expenses', userId] });
+      toast({
+        title: 'Note de frais créée',
+        description: 'Votre note de frais a été enregistrée',
+      });
+    },
+    onError: (err: Error) => {
+      toast({ title: 'Erreur', description: err.message, variant: 'destructive' });
+    },
+  });
+
+  const submitExpenseMutation = useMutation({
+    mutationFn: async (expenseId: string) => {
+      const { error } = await supabase
+        .from('expense_reports')
+        .update({
+          status: 'submitted',
+          submitted_at: new Date().toISOString(),
+        })
+        .eq('id', expenseId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['hr-self-service-expenses', userId] });
+      toast({
+        title: 'Note de frais soumise',
+        description: 'Votre manager recevra une notification',
+      });
+    },
+    onError: (err: Error) => {
+      toast({ title: 'Erreur', description: err.message, variant: 'destructive' });
+    },
+  });
+
+  const approveExpenseMutation = useMutation({
+    mutationFn: async ({
+      expenseId,
+      approverId,
+      approvalLevel,
+    }: {
+      expenseId: string;
+      approverId: string;
+      approvalLevel: 'manager' | 'finance';
+    }) => {
+      const updates =
+        approvalLevel === 'manager'
+          ? {
+              status: 'approved_manager',
+              approved_by_manager: approverId,
+              approved_manager_at: new Date().toISOString(),
+            }
+          : {
+              status: 'approved_finance',
+              approved_by_finance: approverId,
+              approved_finance_at: new Date().toISOString(),
+            };
+
+      const { error } = await supabase
+        .from('expense_reports')
+        .update(updates)
+        .eq('id', expenseId);
+      if (error) throw error;
+      return approvalLevel;
+    },
+    onSuccess: (approvalLevel) => {
+      queryClient.invalidateQueries({ queryKey: ['hr-self-service-expenses', userId] });
+      toast({
+        title: 'Note de frais approuvée',
+        description: `Approuvée par ${approvalLevel === 'manager' ? 'le manager' : 'la finance'}`,
+      });
+    },
+    onError: (err: Error) => {
+      toast({ title: 'Erreur', description: err.message, variant: 'destructive' });
+    },
+  });
+
+  // ============================================================================
+  // MUTATIONS — Justificatifs d'Absence
+  // ============================================================================
+
+  const createAbsenceMutation = useMutation({
+    mutationFn: async (justification: Partial<AbsenceJustification>) => {
+      const employeeId = await getEmployeeId();
+      const { error } = await supabase.from('absence_justifications').insert({
+        ...justification,
+        employee_id: employeeId,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['hr-self-service-absences', userId] });
+      toast({
+        title: 'Justificatif soumis',
+        description: "Votre justificatif d'absence a été enregistré",
+      });
+    },
+    onError: (err: Error) => {
+      toast({ title: 'Erreur', description: err.message, variant: 'destructive' });
+    },
+  });
+
+  // ============================================================================
+  // MUTATIONS — Demandes Administratives
+  // ============================================================================
+
+  const createAdminRequestMutation = useMutation({
+    mutationFn: async (request: Partial<AdministrativeRequest>) => {
+      const employeeId = await getEmployeeId();
+      const { error } = await supabase.from('administrative_requests').insert({
+        ...request,
+        employee_id: employeeId,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['hr-self-service-admin-requests', userId] });
+      toast({
+        title: 'Demande envoyée',
+        description: 'Votre demande administrative a été enregistrée',
+      });
+    },
+    onError: (err: Error) => {
+      toast({ title: 'Erreur', description: err.message, variant: 'destructive' });
+    },
+  });
+
+  // ============================================================================
+  // MUTATIONS — Timesheets
+  // ============================================================================
+
+  const createTimesheetMutation = useMutation({
+    mutationFn: async (timesheet: Partial<Timesheet>) => {
+      const employeeId = await getEmployeeId();
+      const { error } = await supabase.from('timesheets').insert({
+        ...timesheet,
+        employee_id: employeeId,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['hr-self-service-timesheets', userId] });
+      toast({
+        title: 'Timesheet créé',
+        description: 'Votre feuille de temps a été créée',
+      });
+    },
+    onError: (err: Error) => {
+      toast({ title: 'Erreur', description: err.message, variant: 'destructive' });
+    },
+  });
+
+  // ============================================================================
+  // MUTATIONS — Télétravail
+  // ============================================================================
+
+  const createRemoteWorkMutation = useMutation({
+    mutationFn: async (request: Partial<RemoteWorkRequest>) => {
+      const employeeId = await getEmployeeId();
+      const { error } = await supabase.from('remote_work_requests').insert({
+        ...request,
+        employee_id: employeeId,
+        request_date: new Date().toISOString(),
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['hr-self-service-remote', userId] });
+      toast({
+        title: 'Demande envoyée',
+        description: 'Votre demande de télétravail a été soumise',
+      });
+    },
+    onError: (err: Error) => {
+      toast({ title: 'Erreur', description: err.message, variant: 'destructive' });
+    },
+  });
+
+  // ============================================================================
+  // ÉTAT CONSOLIDÉ
+  // ============================================================================
+
+  const isLoading =
+    expenseReportsQuery.isLoading ||
+    absenceJustificationsQuery.isLoading ||
+    administrativeRequestsQuery.isLoading ||
+    timesheetsQuery.isLoading ||
+    remoteWorkRequestsQuery.isLoading;
+
+  const errorMessage =
+    expenseReportsQuery.error?.message ??
+    absenceJustificationsQuery.error?.message ??
+    administrativeRequestsQuery.error?.message ??
+    timesheetsQuery.error?.message ??
+    remoteWorkRequestsQuery.error?.message ??
+    null;
+
+  // ============================================================================
+  // RETOUR API — interface identique à l'original
   // ============================================================================
 
   return {
     // Data
-    expenseReports,
-    absenceJustifications,
-    administrativeRequests,
-    timesheets,
-    remoteWorkRequests,
+    expenseReports: expenseReportsQuery.data ?? [],
+    absenceJustifications: absenceJustificationsQuery.data ?? [],
+    administrativeRequests: administrativeRequestsQuery.data ?? [],
+    timesheets: timesheetsQuery.data ?? [],
+    remoteWorkRequests: remoteWorkRequestsQuery.data ?? [],
 
     // States
-    loading,
-    error,
+    loading: isLoading,
+    error: errorMessage,
 
     // Actions - Notes de Frais
-    fetchExpenseReports,
-    createExpenseReport,
-    submitExpenseReport,
-    approveExpenseReport,
+    fetchExpenseReports: () =>
+      queryClient.invalidateQueries({ queryKey: ['hr-self-service-expenses', userId] }),
+    createExpenseReport: (expense: Partial<ExpenseReport>) =>
+      createExpenseMutation.mutateAsync(expense),
+    submitExpenseReport: (expenseId: string) =>
+      submitExpenseMutation.mutateAsync(expenseId),
+    approveExpenseReport: (
+      expenseId: string,
+      approverId: string,
+      approvalLevel: 'manager' | 'finance'
+    ) => approveExpenseMutation.mutateAsync({ expenseId, approverId, approvalLevel }),
 
     // Actions - Justificatifs
-    fetchAbsenceJustifications,
-    createAbsenceJustification,
+    fetchAbsenceJustifications: () =>
+      queryClient.invalidateQueries({ queryKey: ['hr-self-service-absences', userId] }),
+    createAbsenceJustification: (justification: Partial<AbsenceJustification>) =>
+      createAbsenceMutation.mutateAsync(justification),
 
     // Actions - Demandes Admin
-    fetchAdministrativeRequests,
-    createAdministrativeRequest,
+    fetchAdministrativeRequests: () =>
+      queryClient.invalidateQueries({ queryKey: ['hr-self-service-admin-requests', userId] }),
+    createAdministrativeRequest: (request: Partial<AdministrativeRequest>) =>
+      createAdminRequestMutation.mutateAsync(request),
 
     // Actions - Timesheets
-    fetchTimesheets,
-    createTimesheet,
+    fetchTimesheets: () =>
+      queryClient.invalidateQueries({ queryKey: ['hr-self-service-timesheets', userId] }),
+    createTimesheet: (timesheet: Partial<Timesheet>) =>
+      createTimesheetMutation.mutateAsync(timesheet),
 
     // Actions - Télétravail
-    fetchRemoteWorkRequests,
-    createRemoteWorkRequest,
+    fetchRemoteWorkRequests: () =>
+      queryClient.invalidateQueries({ queryKey: ['hr-self-service-remote', userId] }),
+    createRemoteWorkRequest: (request: Partial<RemoteWorkRequest>) =>
+      createRemoteWorkMutation.mutateAsync(request),
 
     // Utils
     refresh: () => {
-      fetchExpenseReports();
-      fetchAbsenceJustifications();
-      fetchAdministrativeRequests();
-      fetchTimesheets();
-      fetchRemoteWorkRequests();
+      queryClient.invalidateQueries({ queryKey: ['hr-self-service-expenses', userId] });
+      queryClient.invalidateQueries({ queryKey: ['hr-self-service-absences', userId] });
+      queryClient.invalidateQueries({ queryKey: ['hr-self-service-admin-requests', userId] });
+      queryClient.invalidateQueries({ queryKey: ['hr-self-service-timesheets', userId] });
+      queryClient.invalidateQueries({ queryKey: ['hr-self-service-remote', userId] });
     },
   };
 }

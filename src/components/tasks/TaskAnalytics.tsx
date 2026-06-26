@@ -11,8 +11,6 @@ import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
-  TrendingUp,
-  TrendingDown,
   AlertTriangle,
   Award,
   Clock,
@@ -28,14 +26,11 @@ import {
 import { useTasks } from '@/hooks/optimized';
 import { useHRMinimal } from '@/hooks/useHRMinimal';
 import {
-  startOfWeek,
-  endOfWeek,
-  isWithinInterval,
   isBefore,
   startOfDay,
   parseISO,
-  subDays,
 } from 'date-fns';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface TaskStats {
   created: number;
@@ -57,7 +52,7 @@ interface ContributorStats {
 }
 
 // Composant Carte Métrique Futuriste
-const FuturisticMetricCard = ({ label, value, subtitle, icon, gradient, trend }: any) => (
+const FuturisticMetricCard = ({ label, value, subtitle, icon, gradient }: any) => (
   <div
     className={`group relative overflow-hidden rounded-2xl p-6 transition-all duration-300 hover:scale-[1.02] hover:shadow-xl ${gradient}`}
   >
@@ -73,19 +68,7 @@ const FuturisticMetricCard = ({ label, value, subtitle, icon, gradient, trend }:
       </div>
     </div>
 
-    <div className="relative z-10 mt-4 flex items-center gap-2">
-      {trend && (
-        <span
-          className={`flex items-center rounded-full px-2 py-0.5 text-xs font-bold ${trend === 'up' ? 'bg-emerald-400/20 text-emerald-100' : 'bg-rose-400/20 text-rose-100'}`}
-        >
-          {trend === 'up' ? (
-            <TrendingUp className="mr-1 h-3 w-3" />
-          ) : (
-            <TrendingDown className="mr-1 h-3 w-3" />
-          )}
-          {trend === 'up' ? '+12%' : '-5%'}
-        </span>
-      )}
+    <div className="relative z-10 mt-4">
       <p className="text-xs font-medium text-white/60">{subtitle}</p>
     </div>
   </div>
@@ -93,6 +76,7 @@ const FuturisticMetricCard = ({ label, value, subtitle, icon, gradient, trend }:
 
 export const TaskAnalytics: React.FC = () => {
   const { tasks, loading } = useTasks();
+  const { t } = useTranslation();
   const { employees } = useHRMinimal({
     enabled: {
       employees: true,
@@ -107,24 +91,16 @@ export const TaskAnalytics: React.FC = () => {
     },
   });
 
-  // Stats de la semaine en cours
+  // Stats globales (toutes les tâches)
   const weekStats = useMemo((): TaskStats => {
     const now = new Date();
-    const weekStart = startOfWeek(now, { weekStartsOn: 1 });
-    const weekEnd = endOfWeek(now, { weekStartsOn: 1 });
 
-    const tasksThisWeek = tasks.filter(task => {
-      if (!task.created_at) return false;
-      const createdDate = parseISO(task.created_at);
-      return isWithinInterval(createdDate, { start: weekStart, end: weekEnd });
-    });
-
-    const created = tasksThisWeek.length;
-    const completed = tasksThisWeek.filter(t => t.status === 'done').length;
+    const created = tasks.length;
+    const completed = tasks.filter(t => t.status === 'done' || t.status === 'completed').length;
     const overdue = tasks.filter(task => {
       if (!task.due_date) return false;
       const dueDate = parseISO(task.due_date);
-      return isBefore(dueDate, startOfDay(now)) && task.status !== 'done';
+      return isBefore(dueDate, startOfDay(now)) && task.status !== 'done' && task.status !== 'completed';
     }).length;
 
     const completionRate = created > 0 ? Math.round((completed / created) * 100) : 0;
@@ -142,7 +118,7 @@ export const TaskAnalytics: React.FC = () => {
 
     tasks.forEach(task => {
       const priority = task.priority?.toLowerCase();
-      const isCompleted = task.status === 'done';
+      const isCompleted = task.status === 'done' || task.status === 'completed';
 
       if (priority === 'high' || priority === 'haute') {
         stats.high.total++;
@@ -181,7 +157,7 @@ export const TaskAnalytics: React.FC = () => {
           name:
             employee.full_name ||
             `${(employee as any).first_name || ''} ${(employee as any).last_name || ''}`.trim() ||
-            'Employé',
+            t('hrDashboard.unknownEmployee'),
           completedTasks,
         });
       }
@@ -197,14 +173,14 @@ export const TaskAnalytics: React.FC = () => {
     if (weekStats.overdue > 0) {
       result.push({
         type: 'error',
-        message: `${weekStats.overdue} tâche${weekStats.overdue > 1 ? 's' : ''} en retard`,
+        message: t('taskAnalytics.overdueAlert').replace('%s', String(weekStats.overdue)),
       });
     }
 
     if (weekStats.completionRate < 50 && weekStats.created > 5) {
       result.push({
         type: 'warning',
-        message: `Taux de complétion faible (${weekStats.completionRate}%)`,
+        message: t('taskAnalytics.lowCompletionAlert').replace('%s', String(weekStats.completionRate)),
       });
     }
 
@@ -231,14 +207,14 @@ export const TaskAnalytics: React.FC = () => {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="bg-gradient-to-r from-violet-600 to-indigo-600 bg-clip-text text-3xl font-bold text-transparent dark:from-violet-400 dark:to-indigo-400">
-            Analytics
+            {t('taskAnalytics.title')}
           </h2>
-          <p className="text-muted-foreground mt-1">Vue d'ensemble des performances</p>
+          <p className="text-muted-foreground mt-1">{t('taskAnalytics.subtitle')}</p>
         </div>
         <div className="flex gap-2">
           <Badge variant="outline" className="bg-background/50 px-3 py-1 backdrop-blur">
             <Calendar className="mr-2 h-3 w-3" />
-            Cette semaine
+            {t('taskAnalytics.allTasks')}
           </Badge>
         </div>
       </div>
@@ -246,36 +222,32 @@ export const TaskAnalytics: React.FC = () => {
       {/* KPIs Principaux */}
       <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
         <FuturisticMetricCard
-          label="Tâches Créées"
+          label={t('taskAnalytics.created')}
           value={weekStats.created}
-          subtitle="Nouvelles tâches"
+          subtitle={t('taskAnalytics.newTasks')}
           icon={<Zap />}
           gradient="bg-gradient-to-br from-violet-500 to-purple-600 shadow-violet-500/20"
-          trend="up"
         />
         <FuturisticMetricCard
-          label="Terminées"
+          label={t('taskAnalytics.completed')}
           value={weekStats.completed}
-          subtitle="Objectifs atteints"
+          subtitle={t('taskAnalytics.objectivesMet')}
           icon={<CheckCircle2 />}
           gradient="bg-gradient-to-br from-emerald-500 to-teal-600 shadow-emerald-500/20"
-          trend="up"
         />
         <FuturisticMetricCard
-          label="En Retard"
+          label={t('taskAnalytics.overdue')}
           value={weekStats.overdue}
-          subtitle="Action requise"
+          subtitle={t('taskAnalytics.actionRequired')}
           icon={<AlertTriangle />}
           gradient="bg-gradient-to-br from-rose-500 to-pink-600 shadow-rose-500/20"
-          trend={weekStats.overdue > 0 ? 'down' : undefined}
         />
         <FuturisticMetricCard
-          label="Efficacité"
+          label={t('taskAnalytics.efficiency')}
           value={`${weekStats.completionRate}%`}
-          subtitle="Taux de complétion"
+          subtitle={t('taskAnalytics.completionRate')}
           icon={<Activity />}
           gradient="bg-gradient-to-br from-blue-500 to-cyan-600 shadow-blue-500/20"
-          trend={weekStats.completionRate >= 70 ? 'up' : 'down'}
         />
       </div>
 
@@ -285,25 +257,25 @@ export const TaskAnalytics: React.FC = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
               <Target className="text-primary h-5 w-5" />
-              Performance par Priorité
+              {t('taskAnalytics.priorityPerformance')}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
             {[
               {
-                label: 'Haute Priorité',
+                label: t('taskAnalytics.highPriority'),
                 stats: priorityStats.high,
                 color: 'bg-rose-500',
                 track: 'bg-rose-100 dark:bg-rose-900/20',
               },
               {
-                label: 'Moyenne Priorité',
+                label: t('taskAnalytics.mediumPriority'),
                 stats: priorityStats.medium,
                 color: 'bg-amber-500',
                 track: 'bg-amber-100 dark:bg-amber-900/20',
               },
               {
-                label: 'Basse Priorité',
+                label: t('taskAnalytics.lowPriority'),
                 stats: priorityStats.low,
                 color: 'bg-emerald-500',
                 track: 'bg-emerald-100 dark:bg-emerald-900/20',
@@ -337,14 +309,14 @@ export const TaskAnalytics: React.FC = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
               <Award className="h-5 w-5 text-amber-500" />
-              Champions de la Semaine
+              {t('taskAnalytics.champions')}
             </CardTitle>
           </CardHeader>
           <CardContent>
             {topContributors.length === 0 ? (
               <div className="text-muted-foreground flex flex-col items-center justify-center py-8 text-center opacity-50">
                 <Award className="mb-2 h-12 w-12 stroke-1" />
-                <p>En attente de champions...</p>
+                <p>{t('taskAnalytics.waitingChampions')}</p>
               </div>
             ) : (
               <div className="space-y-4">
@@ -355,15 +327,14 @@ export const TaskAnalytics: React.FC = () => {
                   >
                     <div className="flex items-center gap-3">
                       <div
-                        className={`flex h-10 w-10 items-center justify-center rounded-full font-bold shadow-sm ${
-                          index === 0
+                        className={`flex h-10 w-10 items-center justify-center rounded-full font-bold shadow-sm ${index === 0
                             ? 'bg-gradient-to-br from-yellow-300 to-amber-500 text-white'
                             : index === 1
                               ? 'bg-gradient-to-br from-slate-300 to-slate-500 text-white'
                               : index === 2
                                 ? 'bg-gradient-to-br from-orange-300 to-orange-500 text-white'
                                 : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300'
-                        }`}
+                          }`}
                       >
                         {index + 1}
                       </div>
@@ -372,7 +343,7 @@ export const TaskAnalytics: React.FC = () => {
                           {contributor.name}
                         </p>
                         <p className="text-muted-foreground text-xs">
-                          {contributor.completedTasks} tâches terminées
+                          {contributor.completedTasks} {t('taskAnalytics.tasksCompleted')}
                         </p>
                       </div>
                     </div>
@@ -392,15 +363,14 @@ export const TaskAnalytics: React.FC = () => {
             <Alert
               key={index}
               variant={alert.type === 'error' ? 'destructive' : 'default'}
-              className={`${
-                alert.type === 'error'
+              className={`${alert.type === 'error'
                   ? 'border-red-200 bg-red-50 dark:border-red-900/50 dark:bg-red-900/20'
                   : 'border-amber-200 bg-amber-50 dark:border-amber-900/50 dark:bg-amber-900/20'
-              } shadow-sm`}
+                } shadow-sm`}
             >
               <AlertTriangle className="h-4 w-4" />
               <AlertTitle className="font-bold">
-                {alert.type === 'error' ? 'Action Requise' : 'Attention'}
+                {alert.type === 'error' ? t('taskAnalytics.alertRequired') : t('taskAnalytics.alertWarning')}
               </AlertTitle>
               <AlertDescription>{alert.message}</AlertDescription>
             </Alert>

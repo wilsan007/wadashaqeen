@@ -3,53 +3,119 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { sendEmail } from '../_shared/smtpClient.ts';
 import { validateWebhookSecret, corsHeaders } from '../_shared/validateWebhook.ts';
 
-serve(async req => {
-  // Handle CORS
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
-  }
+declare const Deno: any;
 
-  // Valider le secret webhook (protection sans JWT)
+// ─── Helper: lookup user by email via Admin REST API (O(1), no full scan) ────
+async function getUserByEmail(supabaseUrl: string, serviceKey: string, email: string) {
+  const resp = await fetch(
+    `${supabaseUrl}/auth/v1/admin/users?email=${encodeURIComponent(email.toLowerCase())}`,
+    { headers: { Authorization: `Bearer ${serviceKey}`, apikey: serviceKey } }
+  );
+  if (!resp.ok) return null;
+  const { users = [] } = await resp.json();
+  return users[0] ?? null;
+}
+
+// ─── Helper: safely extract OTP token from magic link ────────────────────────
+function extractToken(actionLink: string): string {
+  try {
+    return new URL(actionLink).searchParams.get('token') ?? 'MAGIC_LINK';
+  } catch {
+    return 'MAGIC_LINK';
+  }
+}
+
+// ─── Email template ───────────────────────────────────────────────────────────
+function buildInviteEmail(fullName: string, companyName: string, actionLink: string): string {
+  const year = new Date().getFullYear();
+  return `<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Votre invitation Wadashaqayn</title>
+  <style>
+    body{font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;line-height:1.6;color:#333;margin:0;padding:0;background-color:#f4f4f4}
+    .container{max-width:600px;margin:20px auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 4px 6px rgba(0,0,0,.1)}
+    .header{background:linear-gradient(135deg,#2563eb 0%,#0ea5e9 100%);color:#fff;padding:40px 30px;text-align:center}
+    .header h1{margin:0;font-size:24px;font-weight:600;letter-spacing:.5px}
+    .header-slogan{margin-top:10px;font-size:14px;font-weight:400;opacity:.9}
+    .content{padding:40px 30px}
+    p,li{font-size:16px;color:#334155;margin-bottom:20px;line-height:1.6}
+    h3{font-size:18px;color:#0f172a;margin-top:0}
+    .feature-list{list-style:none;padding:0;margin:20px 0}
+    .feature-item{margin-bottom:18px;padding-left:18px;border-left:3px solid #3b82f6}
+    .feature-title{font-weight:600;color:#1e40af;display:block;font-size:16px}
+    .cta-wrapper{text-align:center;margin:30px 0}
+    .action-button{display:inline-block;background-color:#2563eb;color:#fff!important;padding:14px 32px;text-decoration:none;border-radius:6px;font-weight:600;font-size:16px}
+    .notice{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:16px 20px;font-size:14px;color:#166534;margin-top:24px}
+    .footer{background-color:#f1f5f9;padding:24px 30px;text-align:center;font-size:13px;color:#64748b;border-top:1px solid #e2e8f0}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Bienvenue sur Wadashaqayn</h1>
+      <div class="header-slogan">Gérez mieux. Centralisez tout. Accomplissez plus.</div>
+    </div>
+    <div class="content">
+      <h3>Bonjour ${fullName},</h3>
+      <p>Vous êtes invité à créer votre espace de pilotage pour <strong>${companyName}</strong> sur Wadashaqayn — la plateforme qui centralise :</p>
+      <ul class="feature-list">
+        <li class="feature-item">
+          <span class="feature-title">Suivi des Tâches &amp; Projets</span>
+          Vision complète de l'avancement de vos équipes.
+        </li>
+        <li class="feature-item">
+          <span class="feature-title">Gestion RH</span>
+          Ressources humaines et processus administratifs en un seul endroit.
+        </li>
+      </ul>
+      <div class="cta-wrapper">
+        <a href="${actionLink}" class="action-button">Activer mon espace</a>
+      </div>
+      <div class="notice">
+        Ce lien est personnel et valide <strong>7 jours</strong>. Vous définirez votre mot de passe lors de la première connexion.
+      </div>
+      <p style="margin-top:28px">Cordialement,<br><strong>L'équipe Wadashaqayn</strong></p>
+    </div>
+    <div class="footer">
+      <p>© ${year} Wadashaqayn. Tous droits réservés.</p>
+      <p>Si vous n'êtes pas à l'origine de cette demande, ignorez cet email.</p>
+    </div>
+  </div>
+</body>
+</html>`;
+}
+
+// ─── Main handler ─────────────────────────────────────────────────────────────
+serve(async req => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+
   const authError = validateWebhookSecret(req);
   if (authError) return authError;
 
   try {
-    console.log('🚀 Edge Function: send-invitation (GOLD STANDARD) started');
+    const SUPABASE_URL = Deno.env.get('SUPABASE_URL') ?? '';
+    const SERVICE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
 
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-        },
-      }
-    );
+    const admin = createClient(SUPABASE_URL, SERVICE_KEY, {
+      auth: { autoRefreshToken: false, persistSession: false },
+    });
 
     const { email, fullName, invitedBy, companyName: providedCompanyName } = await req.json();
 
     if (!email || !fullName) {
-      return new Response(JSON.stringify({ error: 'Email and fullName are required' }), {
+      return new Response(JSON.stringify({ error: 'email et fullName sont requis' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    console.log(`📝 Processing invitation for: ${email}`);
-
-    // 1. Prepare Data
     const tenantId = crypto.randomUUID();
-    const companyName = providedCompanyName || `${fullName.split(' ')[0]}'s Company`;
-    const tempPassword = Math.random().toString(36).slice(-8) + 'Aa1!';
-
-    // 2. Create or Update User
-    console.log('👤 Creating/Updating Auth User...');
-    let userId;
-
-    // Check if user exists
-    const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
-    const existingUser = existingUsers.users.find(u => u.email === email.toLowerCase());
+    const companyName = providedCompanyName?.trim() || `${fullName.split(' ')[0]}'s Company`;
+    // Temp password used only to satisfy Supabase createUser requirement — never stored, never emailed
+    const tempPassword = crypto.randomUUID().slice(0, 12) + 'Aa1!';
 
     const userMetadata = {
       full_name: fullName,
@@ -59,59 +125,53 @@ serve(async req => {
       role: 'tenant_admin',
     };
 
+    // 1. Create or update Auth user (no listUsers() full scan)
+    const existingUser = await getUserByEmail(SUPABASE_URL, SERVICE_KEY, email);
+    let userId: string;
+
     if (existingUser) {
-      console.log('ℹ️ User already exists, updating metadata...');
-      const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
-        existingUser.id,
-        { user_metadata: { ...existingUser.user_metadata, ...userMetadata } }
-      );
-      if (updateError) throw updateError;
+      const { error } = await admin.auth.admin.updateUserById(existingUser.id, {
+        user_metadata: { ...existingUser.user_metadata, ...userMetadata },
+      });
+      if (error) throw error;
       userId = existingUser.id;
     } else {
-      console.log('🆕 Creating new user...');
-      const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
+      const { data: newUser, error } = await admin.auth.admin.createUser({
         email,
         password: tempPassword,
-        email_confirm: false, // We will confirm via the magic link
+        email_confirm: false,
         user_metadata: userMetadata,
       });
-      if (createError) throw createError;
+      if (error) throw error;
       userId = newUser.user.id;
     }
 
-    // 3. Generate Magic Link
-    console.log('🔗 Generating Magic Link...');
-    const siteUrl =
-      Deno.env.get('SITE_URL') || req.headers.get('origin') || 'https://wadashaqayn.org';
-    const baseUrl = siteUrl.replace(/\/$/, '');
-
-    const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
+    // 2. Generate magic link
+    const siteUrl = (Deno.env.get('SITE_URL') ?? req.headers.get('origin') ?? 'https://wadashaqayn.org').replace(/\/$/, '');
+    const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
       type: 'invite',
-      email: email,
+      email,
       options: {
-        redirectTo: `${baseUrl}/auth/callback?email=${encodeURIComponent(email)}&type=invite&invitation=tenant_owner`,
+        redirectTo: `${siteUrl}/auth/callback?email=${encodeURIComponent(email)}&type=invite&invitation=tenant_owner`,
         data: userMetadata,
       },
     });
-
     if (linkError) throw linkError;
 
     const actionLink = linkData.properties.action_link;
-    // Extract token from link for database record (optional but good for tracking)
-    const token = actionLink.match(/token=([^&]+)/)?.[1] || 'MAGIC_LINK';
+    const token = extractToken(actionLink);
 
-    // 4. Insert into 'invitations' table (for tracking purposes)
-    console.log('💾 Saving invitation record...');
-    const { data: invitation, error: insertError } = await supabaseAdmin
+    // 3. Persist invitation record
+    const { data: invitation, error: insertError } = await admin
       .from('invitations')
       .insert({
-        token: token,
-        email: email,
+        token,
+        email,
         full_name: fullName,
         tenant_id: tenantId,
         tenant_name: companyName,
         invitation_type: 'tenant_owner',
-        invited_by: invitedBy || null,
+        invited_by: invitedBy ?? null,
         status: 'pending',
         expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
         metadata: {
@@ -120,149 +180,28 @@ serve(async req => {
           supabase_user_id: userId,
         },
       })
-      .select()
+      .select('id')
       .single();
 
     if (insertError) throw insertError;
 
-    // 5. Send Email via SMTP
-    console.log(`📧 Sending email to ${email}`);
-
-    const emailHtml = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Votre centre de pilotage unique</title>
-        <style>
-        <style>
-          body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f4f4f4; }
-          .container { max-width: 600px; margin: 20px auto; background: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-          /* Lighter blue gradient matching site primary theme */
-          .header { background: linear-gradient(135deg, #2563eb 0%, #0ea5e9 100%); color: white; padding: 40px 30px; text-align: center; }
-          .header h1 { margin: 0; font-size: 24px; font-weight: 600; letter-spacing: 0.5px; }
-          .header-slogan { margin-top: 10px; font-size: 14px; font-weight: 400; opacity: 0.9; letter-spacing: 0.5px; }
-          .content { padding: 40px 30px; }
-          /* Unify font size to 16px for all main text */
-          p, li, .welcome-text { font-size: 16px; color: #334155; margin-bottom: 25px; line-height: 1.6; }
-          h3 { font-size: 18px; color: #0f172a; margin-top: 0; }
-          
-          .feature-list { list-style: none; padding: 0; margin: 25px 0; }
-          .feature-item { margin-bottom: 20px; padding-left: 20px; border-left: 3px solid #3b82f6; }
-          .feature-title { font-weight: 600; color: #1e40af; display: block; font-size: 16px; }
-          
-          .action-button { display: inline-block; background-color: #2563eb; color: white !important; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px; margin: 30px 0; transition: background-color 0.2s; width: 80%; text-align: center; }
-          .action-button:hover { background-color: #1d4ed8; }
-          
-          /* Refined Credentials Box - clearer, cleaner */
-          .credentials-box { background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 25px; margin: 30px 0; }
-          .credentials-title { font-size: 16px; font-weight: 600; color: #334155; margin-bottom: 15px; margin-top: 0; }
-          .credential-item { margin-bottom: 12px; font-size: 16px; display: flex; flex-direction: column; }
-          .credential-item:last-child { margin-bottom: 0; }
-          .credential-label { color: #64748b; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; font-weight: 600; }
-          .credential-value { color: #0f172a; font-family: 'Consolas', monospace; font-size: 16px; background: white; padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 4px; }
-          
-          /* Refined Important Note - Integrated */
-          .important-note { background-color: #fffbeb; border: 1px solid #fcd34d; border-radius: 8px; padding: 20px; margin-top: 25px; font-size: 16px; color: #92400e; display: flex; align-items: start; gap: 10px; }
-          .important-icon { font-size: 20px; line-height: 1; }
-          
-          .footer { background-color: #f1f5f9; padding: 30px; text-align: center; font-size: 13px; color: #64748b; border-top: 1px solid #e2e8f0; }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="header">
-            <h1>Bienvenue sur Wadashaqayn</h1>
-            <div class="header-slogan">Gérez mieux. Centralisez tout. Accomplissez plus.</div>
-          </div>
-          <div class="content">
-            <h3>Bonjour ${fullName},</h3>
-            
-            <p class="welcome-text">
-              Pour optimiser la performance et la gestion de <strong>${companyName}</strong>, j'ai le plaisir de vous inviter à créer votre compte administrateur sur Wadashaqayn.
-            </p>
-
-            <p>Notre plateforme résout le problème de la dispersion des outils en centralisant :</p>
-            
-            <ul class="feature-list">
-              <li class="feature-item">
-                <span class="feature-title">Le suivi des Tâches & Projets</span>
-                Maîtrisez le flux de travail continu de vos équipes et l'avancement des grands projets.
-              </li>
-              <li class="feature-item">
-                <span class="feature-title">La gestion RH</span>
-                Intégrez le suivi des ressources et les processus administratifs.
-              </li>
-            </ul>
-
-            <p class="welcome-text">
-              En utilisant Wadashaqayn, vous gagnez un tableau de bord unique pour une visibilité totale et une gestion simplifiée.
-            </p>
-
-            <p style="text-align: center;">Activez votre espace ici :</p>
-            
-            <div style="text-align: center;">
-              <a href="${actionLink}" class="action-button">Démarrer l'optimisation de ma gestion</a>
-            </div>
-
-            <div class="credentials-box">
-              <p class="credentials-title">Vos identifiants de connexion :</p>
-              <div class="credential-item">
-                <span class="credential-label">Login</span>
-                <span class="credential-value">${email}</span>
-              </div>
-              <div class="credential-item">
-                <span class="credential-label">Mot de passe temporaire</span>
-                <span class="credential-value">${tempPassword}</span>
-              </div>
-            </div>
-
-            <div class="important-note">
-              <span class="important-icon">🔒</span>
-              <div>
-                <strong>Important :</strong> Une fois connecté, modifiez votre mot de passe en cliquant sur vos initiales en haut à droite de l'écran (Profil > Changer le mot de passe).
-              </div>
-            </div>
-            
-            <p>Je suis à votre disposition pour toute question initiale.</p>
-            
-            <p style="margin-top: 30px;">
-              Cordialement,<br>
-              <strong>L'équipe Wadashaqayn</strong>
-            </p>
-          </div>
-          <div class="footer">
-            <p>© ${new Date().getFullYear()} Wadashaqayn. Tous droits réservés.</p>
-            <p>Ce lien est valide pendant 7 jours.</p>
-          </div>
-        </div>
-      </body>
-      </html>
-    `;
-
+    // 4. Send email (magic link only — no credentials in email body)
     try {
       await sendEmail({
         to: email,
-        subject: `Votre centre de pilotage unique pour ${companyName} (Invitation)`,
-        html: emailHtml,
+        subject: `Votre invitation à rejoindre Wadashaqayn — ${companyName}`,
+        html: buildInviteEmail(fullName, companyName, actionLink),
       });
     } catch (emailError) {
-      console.error('Failed to send email:', emailError);
-      // We generally don't want to fail the whole request if email fails,
-      // but we should log it.
-      // Depending on requirements, we might want to throw here.
-      // For now, logging error but continuing since invitation is created.
+      console.error('SMTP send failed (non-fatal):', emailError);
     }
-
-    console.log('✅ Invitation process completed successfully');
 
     return new Response(JSON.stringify({ success: true, invitationId: invitation.id }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
-  } catch (error) {
-    console.error('🚨 Error:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
+  } catch (err: any) {
+    console.error('send-invitation error:', err.message);
+    return new Response(JSON.stringify({ error: err.message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

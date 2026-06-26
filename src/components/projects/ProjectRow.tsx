@@ -11,6 +11,7 @@ import { EditableProjectManagerCell } from './cells/EditableProjectManagerCell';
 import { EditableDateCell } from '../vues/table/cells/EditableDateCell';
 import { useProjectEditPermissions } from '@/hooks/useProjectEditPermissions';
 import { cn } from '@/lib/utils';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface Project {
   id: string;
@@ -45,11 +46,12 @@ export const ProjectRow: React.FC<ProjectRowProps> = ({
 }) => {
   // 🔒 Hook de permissions pour ce projet
   const permissions = useProjectEditPermissions({ project });
+  const { t } = useTranslation();
 
   const getManagerName = (manager: string | { id: string; full_name: string } | null): string => {
-    if (!manager) return 'Non assigné';
+    if (!manager) return t('projectsBloc.creation.unassigned');
     if (typeof manager === 'string') return manager;
-    return manager.full_name || 'Non assigné';
+    return manager.full_name || t('projectsBloc.creation.unassigned');
   };
 
   return (

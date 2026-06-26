@@ -1,10 +1,13 @@
 // @ts-ignore - Deno imports
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-// @ts-ignore - Deno imports  
+// @ts-ignore - Deno imports
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
+// Auth hooks are server-to-server; restrict to SITE_URL in production
+// @ts-ignore - Deno global
+const _siteUrl = Deno.env.get('SITE_URL') ?? null;
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': _siteUrl ?? '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
@@ -19,6 +22,19 @@ serve(async (req) => {
   // Handle CORS
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
+  }
+
+  // Verify hook secret sent by Supabase (configure HOOK_SECRET in Edge Function secrets)
+  // @ts-ignore - Deno global
+  const hookSecret = Deno.env.get('HOOK_SECRET');
+  if (hookSecret) {
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader || authHeader !== `Bearer ${hookSecret}`) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
   }
 
   try {

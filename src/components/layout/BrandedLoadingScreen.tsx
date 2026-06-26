@@ -100,8 +100,9 @@ export function BrandedLoadingScreen({
       {/* Background animated gradient */}
       <div className="animate-gradient-shift absolute inset-0 bg-gradient-to-br from-indigo-500/10 via-purple-500/10 to-pink-500/10" />
 
-      {/* Animated orbs in background */}
+      {/* Animated orbs in background — purement décoratifs */}
       <motion.div
+        aria-hidden="true"
         className="absolute top-20 left-20 h-72 w-72 rounded-full bg-indigo-500/20 blur-3xl"
         animate={{
           scale: [1, 1.2, 1],
@@ -114,6 +115,7 @@ export function BrandedLoadingScreen({
         }}
       />
       <motion.div
+        aria-hidden="true"
         className="absolute right-20 bottom-20 h-96 w-96 rounded-full bg-purple-500/20 blur-3xl"
         animate={{
           scale: [1.2, 1, 1.2],
@@ -292,8 +294,13 @@ export function BrandedLoadingScreen({
           transition={{ delay: 0.5 }}
           className="mt-16 text-center"
         >
-          <p className="flex items-center justify-center gap-2 text-sm text-slate-400">
-            <svg className="h-4 w-4 animate-spin" fill="none" viewBox="0 0 24 24">
+          <p className="flex items-center justify-center gap-2 text-sm text-slate-400" role="status" aria-live="polite">
+            <svg
+              className="h-4 w-4 animate-spin"
+              fill="none"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
               <circle
                 className="opacity-25"
                 cx="12"

@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useUserFilterContext } from '@/hooks/useUserAuth';
+import { useAuth } from '@/contexts/AuthContext';
 import { applyRoleFilters } from '@/lib/roleBasedFiltering';
 
 export interface Profile {
@@ -10,22 +10,13 @@ export interface Profile {
 }
 
 export const useProfiles = () => {
-  const [profiles, setProfiles] = useState<Profile[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
   // 🔒 Contexte utilisateur pour le filtrage
-  const { userContext } = useUserFilterContext();
+  const { userContext } = useAuth();
 
-  useEffect(() => {
-    fetchProfiles();
-  }, []);
-
-  const fetchProfiles = async () => {
-    if (!userContext) return;
-
-    try {
-      setLoading(true);
+  const { data: profiles = [], isLoading: loading, error: queryError, refetch } = useQuery<Profile[]>({
+    queryKey: ['profiles', userContext?.userId, userContext?.role, userContext?.tenantId],
+    queryFn: async () => {
+      if (!userContext) return [];
 
       let query = supabase.from('profiles').select('id, full_name, avatar_url').order('full_name');
 
@@ -35,19 +26,17 @@ export const useProfiles = () => {
       const { data, error } = await query;
 
       if (error) throw error;
-      setProfiles(data || []);
-    } catch (error: any) {
-      console.error('Error fetching profiles:', error);
-      setError(error.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+      return data || [];
+    },
+    enabled: !!userContext,
+  });
+
+  const error = queryError ? (queryError as Error).message : null;
 
   return {
     profiles,
     loading,
     error,
-    refetch: fetchProfiles,
+    refetch,
   };
 };

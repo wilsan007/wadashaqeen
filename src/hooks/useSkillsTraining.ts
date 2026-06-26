@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useUserFilterContext } from '@/hooks/useUserAuth';
+import { useAuth } from '@/contexts/AuthContext';
 import { applyRoleFilters } from '@/lib/roleBasedFiltering';
 import { useToast } from '@/hooks/use-toast';
 
@@ -31,26 +31,16 @@ export interface SkillAssessment {
 }
 
 export function useSkillsTraining() {
-  const [skills, setSkills] = useState<Skill[]>([]);
-  const [skillAssessments, setSkillAssessments] = useState<SkillAssessment[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
   // 🔒 Contexte utilisateur pour le filtrage
-  const { userContext } = useUserFilterContext();
+  const { userContext } = useAuth();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
-  const fetchData = useCallback(async () => {
-    if (!userContext) {
-      setLoading(false);
-      return;
-    }
+  const { data: skills = [], isLoading: skillsLoading, error: skillsError } = useQuery<Skill[]>({
+    queryKey: ['skills-training', 'skills', userContext?.userId, userContext?.tenantId],
+    queryFn: async () => {
+      if (!userContext) return [];
 
-    try {
-      setLoading(true);
-      setError(null);
-
-      // 🔒 Construire les queries avec filtrage
       // NOTE: La table skills contient des compétences globales (tenant_id IS NULL) et spécifiques
       let skillsQuery = supabase
         .from('skills')
@@ -63,79 +53,103 @@ export function useSkillsTraining() {
         skillsQuery = skillsQuery.is('tenant_id', null);
       }
 
+      const { data, error } = await skillsQuery;
+      if (error) throw error;
+      return (data as any) || [];
+    },
+    enabled: !!userContext?.userId,
+  });
+
+  const { data: skillAssessments = [], isLoading: assessmentsLoading, error: assessmentsError } = useQuery<SkillAssessment[]>({
+    queryKey: ['skills-training', 'assessments', userContext?.userId, userContext?.tenantId],
+    queryFn: async () => {
+      if (!userContext) return [];
+
       let assessmentsQuery = supabase
         .from('skill_assessments')
         .select('*')
         .order('last_assessed', { ascending: false });
       assessmentsQuery = applyRoleFilters(assessmentsQuery, userContext, 'skill_assessments');
 
-      const [skillsRes, assessmentsRes] = await Promise.all([skillsQuery, assessmentsQuery]);
-
-      if (skillsRes.error) throw skillsRes.error;
-      if (assessmentsRes.error) throw assessmentsRes.error;
-
-      setSkills((skillsRes.data as any) || []);
-      setSkillAssessments((assessmentsRes.data as any) || []);
-    } catch (err: any) {
-      console.error('Error fetching skills data:', err);
-      setError(err.message);
-      // Don't show toast for missing tables
-      if (!err.message?.includes('relation') && !err.message?.includes('does not exist')) {
-        toast({
-          title: 'Erreur',
-          description: 'Impossible de charger les données de compétences',
-          variant: 'destructive',
-        });
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, [userContext?.userId, userContext?.tenantId, toast]);
-
-  const createSkill = async (skillData: Omit<Skill, 'id' | 'created_at'>) => {
-    try {
-      const { error } = await supabase.from('skills').insert(skillData);
-
+      const { data, error } = await assessmentsQuery;
       if (error) throw error;
+      return (data as any) || [];
+    },
+    enabled: !!userContext?.userId,
+    meta: {
+      onError: (err: any) => {
+        console.error('Error fetching skills data:', err);
+        // Don't show toast for missing tables
+        if (!err.message?.includes('relation') && !err.message?.includes('does not exist')) {
+          toast({
+            title: 'Erreur',
+            description: 'Impossible de charger les données de compétences',
+            variant: 'destructive',
+          });
+        }
+      },
+    },
+  });
 
+  const loading = skillsLoading || assessmentsLoading;
+  const error = skillsError
+    ? (skillsError as Error).message
+    : assessmentsError
+    ? (assessmentsError as Error).message
+    : null;
+
+  const createSkillMutation = useMutation({
+    mutationFn: async (skillData: Omit<Skill, 'id' | 'created_at'>) => {
+      const { error } = await supabase.from('skills').insert(skillData);
+      if (error) throw error;
+    },
+    onSuccess: () => {
       toast({
         title: 'Succès',
         description: 'Compétence créée avec succès',
       });
-
-      fetchData();
-    } catch (err: any) {
+      queryClient.invalidateQueries({ queryKey: ['skills-training'] });
+    },
+    onError: (err: any) => {
       console.error('Error creating skill:', err);
       toast({
         title: 'Erreur',
         description: 'Impossible de créer la compétence',
         variant: 'destructive',
       });
-    }
-  };
+    },
+  });
 
-  const createSkillAssessment = async (
-    assessmentData: Omit<SkillAssessment, 'id' | 'created_at' | 'updated_at'>
-  ) => {
-    try {
+  const createSkillAssessmentMutation = useMutation({
+    mutationFn: async (assessmentData: Omit<SkillAssessment, 'id' | 'created_at' | 'updated_at'>) => {
       const { error } = await supabase.from('skill_assessments').insert(assessmentData);
-
       if (error) throw error;
-
+    },
+    onSuccess: () => {
       toast({
         title: 'Succès',
         description: 'Évaluation de compétence créée avec succès',
       });
-
-      fetchData();
-    } catch (err: any) {
+      queryClient.invalidateQueries({ queryKey: ['skills-training'] });
+    },
+    onError: (err: any) => {
       console.error('Error creating skill assessment:', err);
       toast({
         title: 'Erreur',
         description: "Impossible de créer l'évaluation",
         variant: 'destructive',
       });
-    }
+    },
+  });
+
+  const createSkill = async (skillData: Omit<Skill, 'id' | 'created_at'>) => {
+    return createSkillMutation.mutateAsync(skillData);
+  };
+
+  const createSkillAssessment = async (
+    assessmentData: Omit<SkillAssessment, 'id' | 'created_at' | 'updated_at'>
+  ) => {
+    return createSkillAssessmentMutation.mutateAsync(assessmentData);
   };
 
   const getSkillAssessmentsByEmployee = (employeeName: string) => {
@@ -196,20 +210,12 @@ export function useSkillsTraining() {
     };
   };
 
-  useEffect(() => {
-    if (userContext?.userId) {
-      fetchData();
-    } else {
-      setLoading(false);
-    }
-  }, [userContext?.userId, fetchData]);
-
   return {
     skills,
     skillAssessments,
     loading,
     error,
-    refetch: fetchData,
+    refetch: () => queryClient.invalidateQueries({ queryKey: ['skills-training'] }),
     createSkill,
     createSkillAssessment,
     getSkillAssessmentsByEmployee,

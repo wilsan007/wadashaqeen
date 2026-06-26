@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -25,12 +26,11 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { useForm } from 'react-hook-form';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { useEffect } from 'react';
 
 interface Timesheet {
   id: string;
   employee_id: string;
-  week_start_date: string; // Real DB schema
+  week_start_date: string;
   week_end_date: string;
   total_hours: number;
   regular_hours: number;
@@ -51,138 +51,113 @@ interface Employee {
 }
 
 export const TimesheetManagement = () => {
-  const [timesheets, setTimesheets] = useState<Timesheet[]>([]);
-  const [employees, setEmployees] = useState<Employee[]>([]);
-  const [loading, setLoading] = useState(true);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [selectedWeek, setSelectedWeek] = useState(getWeekString(new Date()));
   const isMobile = useIsMobile();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const { register, handleSubmit, reset, setValue } = useForm();
 
   function getWeekString(date: Date): string {
     const startOfWeek = new Date(date);
-    startOfWeek.setDate(date.getDate() - date.getDay() + 1); // Start from Monday
+    startOfWeek.setDate(date.getDate() - date.getDay() + 1);
     return startOfWeek.toISOString().split('T')[0];
   }
 
-  const fetchData = async () => {
-    try {
-      setLoading(true);
+  // useQuery inline for timesheets
+  const { data: timesheets = [], isLoading: timesheetsLoading } = useQuery<Timesheet[]>({
+    queryKey: ['timesheets'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('timesheets')
+        .select('*')
+        .order('week_start_date', { ascending: false });
+      if (error) throw error;
+      return (data as unknown as Timesheet[]) || [];
+    },
+  });
 
-      const [timesheetsRes, employeesRes] = await Promise.all([
-        supabase.from('timesheets').select('*').order('week_start_date', { ascending: false }),
-        supabase.from('profiles').select('id, full_name'),
-      ]);
+  // useQuery inline for employees (profiles)
+  const { data: employees = [], isLoading: employeesLoading } = useQuery<Employee[]>({
+    queryKey: ['profiles-minimal'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('profiles').select('id, full_name');
+      if (error) throw error;
+      return (data as unknown as Employee[]) || [];
+    },
+  });
 
-      if (timesheetsRes.error) throw timesheetsRes.error;
-      if (employeesRes.error) throw employeesRes.error;
+  const loading = timesheetsLoading || employeesLoading;
 
-      setTimesheets((timesheetsRes.data as unknown as Timesheet[]) || []);
-      setEmployees((employeesRes.data as unknown as Employee[]) || []);
-    } catch (error: any) {
-      console.error('Error fetching data:', error);
-      toast({
-        title: 'Erreur',
-        description: 'Impossible de charger les données',
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchData();
-  }, []);
-
-  const onSubmit = async (data: any) => {
-    try {
+  const createTimesheet = useMutation({
+    mutationFn: async (data: any) => {
       const timesheetData = {
         employee_id: data.employee_id,
-        week_start_date: data.week_start_date, // Changed from 'date' to 'week_start_date'
-        total_hours: parseFloat(data.total_hours), // Changed from 'hours' to 'total_hours'
+        week_start_date: data.week_start_date,
+        total_hours: parseFloat(data.total_hours),
         regular_hours: parseFloat(data.regular_hours),
         overtime_hours: parseFloat(data.overtime_hours),
-        notes: data.notes || null, // Changed from 'description' to 'notes'
-        status: 'draft', // Assuming new timesheets start as draft
+        notes: data.notes || null,
+        status: 'draft',
       };
-
       // @ts-expect-error - Supabase types are outdated, using real DB schema
       const { error } = await supabase.from('timesheets').insert(timesheetData);
-
       if (error) throw error;
-
-      toast({
-        title: 'Succès',
-        description: 'Feuille de temps créée avec succès',
-      });
-
+    },
+    onSuccess: () => {
+      toast({ title: 'Succès', description: 'Feuille de temps créée avec succès' });
       reset();
       setIsCreateDialogOpen(false);
-      fetchData();
-    } catch (error: any) {
+      queryClient.invalidateQueries({ queryKey: ['timesheets'] });
+    },
+    onError: (error: any) => {
       console.error('Error creating timesheet:', error);
-      toast({
-        title: 'Erreur',
-        description: 'Impossible de créer la feuille de temps',
-        variant: 'destructive',
-      });
-    }
-  };
+      toast({ title: 'Erreur', description: 'Impossible de créer la feuille de temps', variant: 'destructive' });
+    },
+  });
 
-  const approveTimesheet = async (timesheetId: string) => {
-    try {
+  const approveTimesheetMutation = useMutation({
+    mutationFn: async (timesheetId: string) => {
       // @ts-expect-error - Supabase types are outdated, using real DB schema
       const { error } = await supabase
         .from('timesheets')
-        .update({ status: 'approved', approved_at: new Date().toISOString() }) // Changed from 'approved' to 'status'
+        .update({ status: 'approved', approved_at: new Date().toISOString() })
         .eq('id', timesheetId);
-
       if (error) throw error;
-
-      toast({
-        title: 'Succès',
-        description: 'Feuille de temps approuvée',
-      });
-
-      fetchData();
-    } catch (error: any) {
+    },
+    onSuccess: () => {
+      toast({ title: 'Succès', description: 'Feuille de temps approuvée' });
+      queryClient.invalidateQueries({ queryKey: ['timesheets'] });
+    },
+    onError: (error: any) => {
       console.error('Error approving timesheet:', error);
-      toast({
-        title: 'Erreur',
-        description: "Impossible d'approuver la feuille de temps",
-        variant: 'destructive',
-      });
-    }
-  };
+      toast({ title: 'Erreur', description: "Impossible d'approuver la feuille de temps", variant: 'destructive' });
+    },
+  });
 
-  const rejectTimesheet = async (timesheetId: string) => {
-    try {
+  const rejectTimesheetMutation = useMutation({
+    mutationFn: async (timesheetId: string) => {
       // @ts-expect-error - Supabase types are outdated, using real DB schema
       const { error } = await supabase
         .from('timesheets')
-        .update({ status: 'rejected', rejection_reason: 'Rejected by manager' }) // Changed from 'approved' to 'status'
+        .update({ status: 'rejected', rejection_reason: 'Rejected by manager' })
         .eq('id', timesheetId);
-
       if (error) throw error;
-
-      toast({
-        title: 'Succès',
-        description: 'Feuille de temps rejetée',
-      });
-
-      fetchData();
-    } catch (error: any) {
+    },
+    onSuccess: () => {
+      toast({ title: 'Succès', description: 'Feuille de temps rejetée' });
+      queryClient.invalidateQueries({ queryKey: ['timesheets'] });
+    },
+    onError: (error: any) => {
       console.error('Error rejecting timesheet:', error);
-      toast({
-        title: 'Erreur',
-        description: 'Impossible de rejeter la feuille de temps',
-        variant: 'destructive',
-      });
-    }
-  };
+      toast({ title: 'Erreur', description: 'Impossible de rejeter la feuille de temps', variant: 'destructive' });
+    },
+  });
+
+  const onSubmit = (data: any) => createTimesheet.mutate(data);
+  const approveTimesheet = (id: string) => approveTimesheetMutation.mutate(id);
+  const rejectTimesheet = (id: string) => rejectTimesheetMutation.mutate(id);
 
   const filteredTimesheets = timesheets.filter(timesheet => {
     const timesheetDate = new Date(timesheet.week_start_date);

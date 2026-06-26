@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from '@/hooks/useTranslation';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { MyTasksView } from '@/components/tasks/MyTasksView';
@@ -21,6 +22,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import KanbanBoard from '@/components/vues/kanban/KanbanBoard';
 
 export default function TaskManagementPage() {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<
     'my-assigned-tasks' | 'all-tasks' | 'create' | 'analytics' | 'search' | 'calendar' | 'kanban'
   >('my-assigned-tasks');
@@ -60,7 +62,7 @@ export default function TaskManagementPage() {
                 className="text-primary bg-white shadow-md transition-all hover:scale-105 hover:bg-white/90"
               >
                 <PlusCircle className="mr-2 h-4 w-4" />
-                Nouvelle Tâche
+                {t('taskManagement.newTaskBtn')}
               </Button>
             </div>
           </div>
@@ -85,7 +87,7 @@ export default function TaskManagementPage() {
                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-violet-100 text-violet-600 transition-colors group-data-[state=active]:bg-violet-600 group-data-[state=active]:text-white">
                   <User className="h-4 w-4" />
                 </div>
-                <span className="font-medium">Mes Tâches</span>
+                <span className="font-medium">{t('tasks.myTasks')}</span>
               </TabsTrigger>
 
               <TabsTrigger
@@ -95,7 +97,7 @@ export default function TaskManagementPage() {
                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-blue-600 transition-colors group-data-[state=active]:bg-blue-600 group-data-[state=active]:text-white">
                   <CheckSquare className="h-4 w-4" />
                 </div>
-                <span className="font-medium">Toutes</span>
+                <span className="font-medium">{t('taskManagement.tabs.all')}</span>
               </TabsTrigger>
 
               <TabsTrigger
@@ -105,7 +107,7 @@ export default function TaskManagementPage() {
                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 transition-colors group-data-[state=active]:bg-emerald-600 group-data-[state=active]:text-white">
                   <PlusCircle className="h-4 w-4" />
                 </div>
-                <span className="font-medium">Création</span>
+                <span className="font-medium">{t('taskManagement.tabs.create')}</span>
               </TabsTrigger>
 
               <TabsTrigger
@@ -115,7 +117,7 @@ export default function TaskManagementPage() {
                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-100 text-amber-600 transition-colors group-data-[state=active]:bg-amber-600 group-data-[state=active]:text-white">
                   <BarChart3 className="h-4 w-4" />
                 </div>
-                <span className="font-medium">Analytics</span>
+                <span className="font-medium">{t('taskManagement.tabs.analytics')}</span>
               </TabsTrigger>
 
               <TabsTrigger
@@ -125,7 +127,7 @@ export default function TaskManagementPage() {
                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-pink-100 text-pink-600 transition-colors group-data-[state=active]:bg-pink-600 group-data-[state=active]:text-white">
                   <Search className="h-4 w-4" />
                 </div>
-                <span className="font-medium">Recherche</span>
+                <span className="font-medium">{t('taskManagement.tabs.search')}</span>
               </TabsTrigger>
 
               <TabsTrigger
@@ -135,7 +137,7 @@ export default function TaskManagementPage() {
                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-100 text-indigo-600 transition-colors group-data-[state=active]:bg-indigo-600 group-data-[state=active]:text-white">
                   <Calendar className="h-4 w-4" />
                 </div>
-                <span className="font-medium">Calendrier</span>
+                <span className="font-medium">{t('taskManagement.tabs.calendar')}</span>
               </TabsTrigger>
 
               {!isMobile && (
@@ -146,7 +148,7 @@ export default function TaskManagementPage() {
                   <div className="flex h-8 w-8 items-center justify-center rounded-full bg-orange-100 text-orange-600 transition-colors group-data-[state=active]:bg-orange-600 group-data-[state=active]:text-white">
                     <LayoutGrid className="h-4 w-4" />
                   </div>
-                  <span className="font-medium">Kanban</span>
+                  <span className="font-medium">{t('taskManagement.tabs.kanban')}</span>
                 </TabsTrigger>
               )}
             </TabsList>

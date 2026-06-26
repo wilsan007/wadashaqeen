@@ -112,7 +112,7 @@ export function getTaskColor(
   totalProjects: number
 ): string {
   // ✅ Si la tâche a un project_id, utiliser la couleur du projet
-  if (task.project_id && projectColorMap[task.project_id]) {
+  if (task && task.project_id && projectColorMap[task.project_id]) {
     return projectColorMap[task.project_id];
   }
 
@@ -129,10 +129,10 @@ export function hexToRgb(hex: string): { r: number; g: number; b: number } | nul
   const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
   return result
     ? {
-        r: parseInt(result[1], 16),
-        g: parseInt(result[2], 16),
-        b: parseInt(result[3], 16),
-      }
+      r: parseInt(result[1], 16),
+      g: parseInt(result[2], 16),
+      b: parseInt(result[3], 16),
+    }
     : null;
 }
 

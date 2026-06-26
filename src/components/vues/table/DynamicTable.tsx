@@ -23,6 +23,8 @@ import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import { ProjectTableView } from '../projects/ProjectTableView';
 import { AdvancedFilters, type TaskFilters } from '@/components/tasks/AdvancedFilters';
 import { useTaskFilters } from '@/hooks/useTaskFilters';
+import { assignProjectColors } from '@/lib/ganttColors';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface DynamicTableProps {
   demoTasks?: Task[];
@@ -53,6 +55,7 @@ const DynamicTable = ({ demoTasks, isDemoMode = false }: DynamicTableProps = {})
   const isMobileLayout = useIsMobileLayout(); // Pour l'UI (< 1024px)
   const { projects, loading: projectsLoading, error: projectsError } = useProjects();
   const { employees } = useEmployees();
+  const { t } = useTranslation();
 
   // Wrapper pour createMainTask avec compatibilité ancienne API
   const createMainTask = async (taskData: {
@@ -97,6 +100,10 @@ const DynamicTable = ({ demoTasks, isDemoMode = false }: DynamicTableProps = {})
 
   // Appliquer les filtres
   const { filteredTasks, stats } = useTaskFilters(optimisticTasks, filters);
+
+  const projectColorMap = React.useMemo(() => {
+    return assignProjectColors(projects || []);
+  }, [projects]);
 
   // Refs pour la synchronisation du scroll
   const fixedColumnsScrollRef = useRef<HTMLDivElement>(null);
@@ -215,8 +222,8 @@ const DynamicTable = ({ demoTasks, isDemoMode = false }: DynamicTableProps = {})
       // En mode démo, afficher un message informatif
       const toast = require('@/hooks/use-toast').toast;
       toast({
-        title: '🎨 Mode Découverte',
-        description: 'Ces données sont fictives. Créez votre première vraie tâche pour commencer!',
+        title: t('gantt.demoMode.title'),
+        description: t('gantt.demoMode.description'),
       });
       return;
     }
@@ -228,8 +235,8 @@ const DynamicTable = ({ demoTasks, isDemoMode = false }: DynamicTableProps = {})
       // En mode démo, afficher un message informatif
       const toast = require('@/hooks/use-toast').toast;
       toast({
-        title: '🎨 Mode Découverte',
-        description: 'Ces données sont fictives. Créez votre première vraie tâche pour commencer!',
+        title: t('gantt.demoMode.title'),
+        description: t('gantt.demoMode.description'),
       });
       return;
     }
@@ -375,13 +382,13 @@ const DynamicTable = ({ demoTasks, isDemoMode = false }: DynamicTableProps = {})
               value="tasks"
               className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
             >
-              📝 Tâches
+              📝 {t('gantt.toolbar.tasks')}
             </ToggleGroupItem>
             <ToggleGroupItem
               value="projects"
               className="data-[state=on]:bg-primary data-[state=on]:text-primary-foreground"
             >
-              📁 Projets
+              📁 {t('gantt.toolbar.projects')}
             </ToggleGroupItem>
           </ToggleGroup>
         </div>
@@ -419,6 +426,8 @@ const DynamicTable = ({ demoTasks, isDemoMode = false }: DynamicTableProps = {})
                 onUpdateTask={handleUpdateTask}
                 scrollRef={fixedColumnsScrollRef}
                 onScroll={() => syncScroll('fixed')}
+                projectColorMap={projectColorMap}
+                totalProjects={projects?.length || 0}
               />
             </ResizablePanel>
 
@@ -441,7 +450,7 @@ const DynamicTable = ({ demoTasks, isDemoMode = false }: DynamicTableProps = {})
               name: p.name,
               status: p.status,
               progress: p.progress || 0,
-              manager: p.manager_name || 'Non assigné',
+              manager: p.manager_name || t('projectsBloc.creation.unassigned'),
               skills: [], // À implémenter avec une table séparée
               start_date: p.start_date || '',
               end_date: p.end_date || '',
@@ -454,6 +463,7 @@ const DynamicTable = ({ demoTasks, isDemoMode = false }: DynamicTableProps = {})
               progress: t.progress,
               assignee: t.assignee,
               status: t.status,
+              parent_id: t.parent_id || t.parent_task_id || null,
             }))}
           />
         )}

@@ -3,12 +3,12 @@
  * Pattern Enterprise pour le module RH
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useTenant } from '@/hooks/useTenant';
 import { useRolesCompat as useUserRoles } from '@/contexts/RolesContext';
-import { useUserFilterContext } from '@/hooks/useUserAuth';
+import { useAuth } from '@/contexts/AuthContext';
 import { applyRoleFilters } from '@/lib/roleBasedFiltering';
 
 export interface Objective {
@@ -44,41 +44,35 @@ export interface Evaluation {
 }
 
 export const usePerformance = () => {
-  const [objectiveTemplates, setObjectiveTemplates] = useState<any[]>([]);
-
-  const [objectives, setObjectives] = useState<Objective[]>([]);
-  const [evaluations, setEvaluations] = useState<Evaluation[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
   const { toast } = useToast();
   const { tenantId } = useTenant();
   const { userRoles } = useUserRoles();
 
   // 🔒 Contexte utilisateur pour le filtrage
-  const { userContext } = useUserFilterContext();
+  const { userContext } = useAuth();
 
   // SOLUTION TEMPORAIRE : Récupérer le tenant_id depuis user_roles si useTenant échoue
   const tenantIdFromRoles = userRoles[0]?.tenant_id;
   const effectiveTenantId = tenantId || tenantIdFromRoles;
 
-  const fetchData = useCallback(async () => {
-    if (!userContext) {
-      setLoading(false);
-      return;
-    }
+  const isEnabled = !!userContext?.userId;
 
-    try {
-      setLoading(true);
-      setError(null);
-
+  // Query: objectives + templates + evaluations (bundled for shared filtering context)
+  const {
+    data: performanceData,
+    isLoading: loading,
+    error: rawError,
+    refetch,
+  } = useQuery({
+    queryKey: ['performance', userContext?.userId, userContext?.tenantId],
+    queryFn: async () => {
       // Fetch objectives avec filtrage
       let objectivesQuery = supabase
         .from('objectives')
         .select('*')
         .order('created_at', { ascending: false });
-
-      // 🔒 Appliquer le filtrage par rôle (performance_goals est l'équivalent)
-      objectivesQuery = applyRoleFilters(objectivesQuery, userContext, 'performance_goals');
+      objectivesQuery = applyRoleFilters(objectivesQuery, userContext!, 'performance_goals');
 
       // Fetch templates (Global + Tenant)
       let templatesQuery = supabase
@@ -86,10 +80,9 @@ export const usePerformance = () => {
         .select('*')
         .order('category', { ascending: true });
 
-      // Filtrage manuel pour les templates (car pas de RLS helper pour ça encore)
-      if (userContext.tenantId) {
+      if (userContext!.tenantId) {
         templatesQuery = templatesQuery.or(
-          `tenant_id.is.null,tenant_id.eq.${userContext.tenantId}`
+          `tenant_id.is.null,tenant_id.eq.${userContext!.tenantId}`
         );
       } else {
         templatesQuery = templatesQuery.is('tenant_id', null);
@@ -108,21 +101,43 @@ export const usePerformance = () => {
         .from('evaluations')
         .select('*')
         .order('created_at', { ascending: false });
-      evaluationsQuery = applyRoleFilters(evaluationsQuery, userContext, 'performance_reviews');
+      evaluationsQuery = applyRoleFilters(evaluationsQuery, userContext!, 'performance_reviews');
       const { data: evaluationsData, error: evaluationsError } = await evaluationsQuery;
       if (evaluationsError) throw evaluationsError;
 
+      // Fetch key_results pour tous les objectifs du tenant
+      const objectiveIds = (objectivesData ?? []).map((o: any) => o.id);
+      let keyResultsData: any[] = [];
+      if (objectiveIds.length > 0) {
+        const { data: krData, error: krError } = await supabase
+          .from('key_results')
+          .select('*')
+          .in('objective_id', objectiveIds);
+        if (!krError) keyResultsData = krData ?? [];
+      }
+
+      // Fetch evaluation_categories pour toutes les évaluations du tenant
+      const evaluationIds = (evaluationsData ?? []).map((e: any) => e.id);
+      let evalCategoriesData: any[] = [];
+      if (evaluationIds.length > 0) {
+        const { data: ecData, error: ecError } = await supabase
+          .from('evaluation_categories')
+          .select('*')
+          .in('evaluation_id', evaluationIds);
+        if (!ecError) evalCategoriesData = ecData ?? [];
+      }
+
       // Map objectives data
-      const mappedObjectives = (objectivesData || []).map((obj: any) => ({
+      const mappedObjectives: Objective[] = (objectivesData || []).map((obj: any) => ({
         ...obj,
-        due_date: obj.due_date || obj.target_date, // Handle both naming conventions
-        employee_name: obj.employee_name || 'Employé', // Fallback
-        department: obj.department || 'Département', // Fallback
+        due_date: obj.due_date || obj.target_date,
+        employee_name: obj.employee_name || 'Employé',
+        department: obj.department || 'Département',
         type: obj.type || 'individual',
       }));
 
       // Map evaluations data
-      const mappedEvaluations = (evaluationsData || []).map((ev: any) => ({
+      const mappedEvaluations: Evaluation[] = (evaluationsData || []).map((ev: any) => ({
         ...ev,
         overall_score: ev.overall_rating || 0,
         period: ev.period || `${ev.period_start} - ${ev.period_end}`,
@@ -131,104 +146,145 @@ export const usePerformance = () => {
         type: ev.type || 'annual',
       }));
 
-      setObjectives(mappedObjectives);
-      setObjectiveTemplates((templatesData as any) || []);
-      setEvaluations(mappedEvaluations);
-    } catch (err: any) {
-      console.error('Error fetching performance data:', err);
-      setError(err.message);
-      if (!err.message?.includes('relation') && !err.message?.includes('does not exist')) {
-        toast({
-          title: 'Erreur',
-          description: 'Impossible de charger les données de performance',
-          variant: 'destructive',
-        });
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, [userContext?.userId, userContext?.tenantId]);
+      return {
+        objectives: mappedObjectives,
+        objectiveTemplates: (templatesData as any[]) || [],
+        evaluations: mappedEvaluations,
+        keyResults: keyResultsData,
+        evaluationCategories: evalCategoriesData,
+      };
+    },
+    enabled: isEnabled,
+  });
 
-  useEffect(() => {
-    if (userContext?.userId) {
-      fetchData();
-    } else if (effectiveTenantId) {
-      // Si on a un tenantId mais pas de userContext, on charge quand même avec des données vides
-      setLoading(false);
-    }
-  }, [fetchData, effectiveTenantId, userContext?.userId]);
+  const objectives: Objective[] = performanceData?.objectives ?? [];
+  const objectiveTemplates: any[] = performanceData?.objectiveTemplates ?? [];
+  const evaluations: Evaluation[] = performanceData?.evaluations ?? [];
+  const allKeyResults: any[] = performanceData?.keyResults ?? [];
+  const allEvaluationCategories: any[] = performanceData?.evaluationCategories ?? [];
 
-  const createObjective = async (data: Omit<Objective, 'id' | 'created_at' | 'updated_at'>) => {
-    try {
+  const error: string | null = rawError
+    ? rawError instanceof Error
+      ? rawError.message
+      : String(rawError)
+    : null;
+
+  const invalidatePerformance = () => {
+    queryClient.invalidateQueries({
+      queryKey: ['performance', userContext?.userId, userContext?.tenantId],
+    });
+  };
+
+  // Mutation: createObjective
+  const createObjectiveMutation = useMutation({
+    mutationFn: async (data: Omit<Objective, 'id' | 'created_at' | 'updated_at'>) => {
       const { error } = await supabase.from('objectives').insert([data as any]);
-
       if (error) throw error;
-
-      toast({
-        title: 'Objectif créé',
-        description: "L'objectif a été créé avec succès",
-      });
-
-      await fetchData();
-    } catch (err: any) {
-      console.error('Error creating objective:', err);
+    },
+    onSuccess: () => {
+      toast({ title: 'Objectif créé', description: "L'objectif a été créé avec succès" });
+      invalidatePerformance();
+    },
+    onError: () => {
       toast({
         title: 'Erreur',
         description: "Impossible de créer l'objectif",
         variant: 'destructive',
       });
+    },
+  });
+
+  const createObjective = async (data: Omit<Objective, 'id' | 'created_at' | 'updated_at'>) => {
+    try {
+      await createObjectiveMutation.mutateAsync(data);
+    } catch (err: any) {
+      console.error('Error creating objective:', err);
       throw err;
     }
   };
 
-  const createEvaluation = async (data: Omit<Evaluation, 'id' | 'created_at' | 'updated_at'>) => {
-    try {
+  // Mutation: createEvaluation
+  const createEvaluationMutation = useMutation({
+    mutationFn: async (data: Omit<Evaluation, 'id' | 'created_at' | 'updated_at'>) => {
       const { error } = await supabase.from('evaluations').insert([data as any]);
-
       if (error) throw error;
-
-      toast({
-        title: 'Évaluation créée',
-        description: "L'évaluation a été créée avec succès",
-      });
-
-      await fetchData();
-    } catch (err: any) {
-      console.error('Error creating evaluation:', err);
+    },
+    onSuccess: () => {
+      toast({ title: 'Évaluation créée', description: "L'évaluation a été créée avec succès" });
+      invalidatePerformance();
+    },
+    onError: () => {
       toast({
         title: 'Erreur',
         description: "Impossible de créer l'évaluation",
         variant: 'destructive',
       });
+    },
+  });
+
+  const createEvaluation = async (data: Omit<Evaluation, 'id' | 'created_at' | 'updated_at'>) => {
+    try {
+      await createEvaluationMutation.mutateAsync(data);
+    } catch (err: any) {
+      console.error('Error creating evaluation:', err);
       throw err;
     }
   };
 
-  const updateObjective = async (id: string, data: Partial<Objective>) => {
-    try {
+  // Mutation: updateObjective
+  const updateObjectiveMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<Objective> }) => {
       const { error } = await supabase
         .from('objectives')
         .update(data as any)
         .eq('id', id);
-
       if (error) throw error;
-
+    },
+    onSuccess: () => {
       toast({
         title: 'Objectif mis à jour',
         description: "L'objectif a été mis à jour avec succès",
       });
-
-      await fetchData();
-    } catch (err: any) {
-      console.error('Error updating objective:', err);
+      invalidatePerformance();
+    },
+    onError: () => {
       toast({
         title: 'Erreur',
         description: "Impossible de mettre à jour l'objectif",
         variant: 'destructive',
       });
+    },
+  });
+
+  const updateObjective = async (id: string, data: Partial<Objective>) => {
+    try {
+      await updateObjectiveMutation.mutateAsync({ id, data });
+    } catch (err: any) {
+      console.error('Error updating objective:', err);
       throw err;
     }
   };
+
+  // Mutation: createObjectiveTemplate
+  const createObjectiveTemplateMutation = useMutation({
+    mutationFn: async (data: { title: string; category: string; description?: string }) => {
+      if (!effectiveTenantId) throw new Error('Tenant ID not found');
+      const { error } = await supabase
+        .from('objective_templates' as any)
+        .insert([{ ...data, tenant_id: effectiveTenantId }]);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({
+        title: 'Modèle créé',
+        description: "Le modèle d'objectif a été créé avec succès",
+      });
+      invalidatePerformance();
+    },
+    onError: () => {
+      toast({ title: 'Erreur', description: 'Impossible de créer le modèle', variant: 'destructive' });
+    },
+  });
 
   const createObjectiveTemplate = async (data: {
     title: string;
@@ -236,64 +292,47 @@ export const usePerformance = () => {
     description?: string;
   }) => {
     try {
-      if (!effectiveTenantId) throw new Error('Tenant ID not found');
-
-      const { error } = await supabase.from('objective_templates' as any).insert([
-        {
-          ...data,
-          tenant_id: effectiveTenantId,
-        },
-      ]);
-
-      if (error) throw error;
-
-      toast({
-        title: 'Modèle créé',
-        description: "Le modèle d'objectif a été créé avec succès",
-      });
-
-      await fetchData();
+      await createObjectiveTemplateMutation.mutateAsync(data);
     } catch (err: any) {
       console.error('Error creating objective template:', err);
-      toast({
-        title: 'Erreur',
-        description: 'Impossible de créer le modèle',
-        variant: 'destructive',
-      });
       throw err;
     }
   };
 
-  const deleteObjective = async (id: string) => {
-    try {
+  // Mutation: deleteObjective
+  const deleteObjectiveMutation = useMutation({
+    mutationFn: async (id: string) => {
       const { error } = await supabase.from('objectives').delete().eq('id', id);
-
       if (error) throw error;
-
-      toast({
-        title: 'Objectif supprimé',
-        description: "L'objectif a été supprimé avec succès",
-      });
-
-      await fetchData();
-    } catch (err: any) {
-      console.error('Error deleting objective:', err);
+    },
+    onSuccess: () => {
+      toast({ title: 'Objectif supprimé', description: "L'objectif a été supprimé avec succès" });
+      invalidatePerformance();
+    },
+    onError: () => {
       toast({
         title: 'Erreur',
         description: "Impossible de supprimer l'objectif",
         variant: 'destructive',
       });
+    },
+  });
+
+  const deleteObjective = async (id: string) => {
+    try {
+      await deleteObjectiveMutation.mutateAsync(id);
+    } catch (err: any) {
+      console.error('Error deleting objective:', err);
       throw err;
     }
   };
 
-  // Fonctions utilitaires manquantes
   const getKeyResultsByObjective = (objectiveId: string) => {
-    return []; // TODO: Implémenter si nécessaire
+    return allKeyResults.filter(kr => kr.objective_id === objectiveId);
   };
 
   const getCategoriesByEvaluation = (evaluationId: string) => {
-    return []; // TODO: Implémenter si nécessaire
+    return allEvaluationCategories.filter(cat => cat.evaluation_id === evaluationId);
   };
 
   const getPerformanceStats = () => {
@@ -319,25 +358,25 @@ export const usePerformance = () => {
     return {
       totalObjectives,
       completedObjectives,
-      activeObjectives, // Added
-      completionRate, // Added
+      activeObjectives,
+      completionRate,
       totalEvaluations,
-      scheduledEvaluations, // Added
+      scheduledEvaluations,
       averageScore,
     };
   };
 
   return {
     objectives,
-    objectiveTemplates, // Added
+    objectiveTemplates,
     evaluations,
-    keyResults: [], // TODO: Implémenter si nécessaire
-    evaluationCategories: [], // TODO: Implémenter si nécessaire
+    keyResults: allKeyResults,
+    evaluationCategories: allEvaluationCategories,
     loading,
     error,
-    refresh: fetchData,
+    refresh: refetch,
     createObjective,
-    createObjectiveTemplate, // Added
+    createObjectiveTemplate,
     createEvaluation,
     updateObjective,
     deleteObjective,

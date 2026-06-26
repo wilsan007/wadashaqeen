@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useMemo } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -29,85 +30,65 @@ import { useTenant } from '@/hooks/useTenant';
 import { SeniorityBonusConfigPage } from './SeniorityBonusConfig';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
+import { useTranslation } from '@/hooks/useTranslation';
 
 export const PayrollManagement = () => {
   const { tenantId, loading: tenantLoading } = useTenant();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const { t } = useTranslation();
 
   const [activeView, setActiveView] = useState('periods');
-  const [periodes, setPeriodes] = useState<PaiePeriode[]>([]);
   const [selectedPeriodeId, setSelectedPeriodeId] = useState<string | null>(null);
-  const [bulletins, setBulletins] = useState<PaieBulletin[]>([]);
   const [selectedBulletin, setSelectedBulletin] = useState<PaieBulletin | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [isActionLoading, setIsActionLoading] = useState(false);
   const [showEmployeeForm, setShowEmployeeForm] = useState(false);
   const [showSingleGenDialog, setShowSingleGenDialog] = useState(false);
   const [showSeniorityConfig, setShowSeniorityConfig] = useState(false);
-  const [stats, setStats] = useState({
-    totalBrut: 0,
-    totalNet: 0,
-    totalCharges: 0,
-    coutTotal: 0,
-    employesCount: 0,
+
+  // Fetch payroll periods
+  const { data: periodes = [] } = useQuery<PaiePeriode[]>({
+    queryKey: ['paie_periodes', tenantId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('paie_periodes')
+        .select('*')
+        .eq('tenant_id', tenantId!)
+        .order('annee', { ascending: false })
+        .order('mois', { ascending: false });
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!tenantId && !tenantLoading,
+    select: (data) => {
+      // Auto-select first period when none is selected
+      if (data.length > 0 && !selectedPeriodeId) {
+        setTimeout(() => setSelectedPeriodeId(data[0].id), 0);
+      }
+      return data;
+    },
   });
 
-  useEffect(() => {
-    if (tenantId && !tenantLoading) {
-      fetchPeriodes();
-    }
-  }, [tenantId, tenantLoading]);
+  // Fetch bulletins for the selected period
+  const { data: bulletins = [], isFetching: bulletinsFetching } = useQuery<PaieBulletin[]>({
+    queryKey: ['paie_bulletins', selectedPeriodeId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('paie_bulletins')
+        .select('*, employe:paie_employes(nom_complet, fonction, date_embauche)')
+        .eq('periode_id', selectedPeriodeId!)
+        .order('employe(nom_complet)');
+      if (error) throw error;
+      return (data as any as PaieBulletin[]) || [];
+    },
+    enabled: !!selectedPeriodeId,
+  });
 
-  useEffect(() => {
-    if (selectedPeriodeId) {
-      fetchBulletins(selectedPeriodeId);
-    }
-  }, [selectedPeriodeId]);
+  const loading = bulletinsFetching || isActionLoading;
 
-  const fetchPeriodes = async () => {
-    if (!tenantId) return;
-
-    const { data, error } = await supabase
-      .from('paie_periodes')
-      .select('*')
-      .eq('tenant_id', tenantId)
-      .order('annee', { ascending: false })
-      .order('mois', { ascending: false });
-
-    if (error) {
-      console.error('Error fetching periodes:', error);
-      return;
-    }
-
-
-    if (data) {
-      setPeriodes(data);
-      if (data.length > 0 && !selectedPeriodeId) {
-        setSelectedPeriodeId(data[0].id);
-      }
-    }
-  };
-
-  const fetchBulletins = async (periodeId: string) => {
-    setLoading(true);
-
-    const { data, error } = await supabase
-      .from('paie_bulletins')
-      .select('*, employe:paie_employes(nom_complet, fonction, date_embauche)')
-      .eq('periode_id', periodeId)
-      .order('employe(nom_complet)');
-
-    if (error) {
-      console.error('Error fetching bulletins:', error);
-    } else {
-      const typedData = data as any as PaieBulletin[]; // Cast temporaire
-      setBulletins(typedData);
-      calculateStats(typedData);
-    }
-    setLoading(false);
-  };
-
-  const calculateStats = (currentBulletins: PaieBulletin[]) => {
-    const newStats = currentBulletins.reduce(
+  // Computed stats derived from bulletins (no separate state needed)
+  const stats = useMemo(() => {
+    return bulletins.reduce(
       (acc, b) => ({
         totalBrut: acc.totalBrut + (b.salaire_brut || 0),
         totalNet: acc.totalNet + (b.salaire_net || 0),
@@ -117,8 +98,7 @@ export const PayrollManagement = () => {
       }),
       { totalBrut: 0, totalNet: 0, totalCharges: 0, coutTotal: 0, employesCount: 0 }
     );
-    setStats(newStats);
-  };
+  }, [bulletins]);
 
   const handleGeneratePayroll = async () => {
     if (!selectedPeriodeId) {
@@ -126,25 +106,24 @@ export const PayrollManagement = () => {
       return;
     }
 
-    setLoading(true);
+    setIsActionLoading(true);
 
     try {
       if (!tenantId) {
         toast({ title: 'Erreur', description: 'Contexte tenant non disponible.', variant: 'destructive' });
-        setLoading(false);
         return;
       }
 
       // Use the new batch generation method
       const result = await payrollService.genererPaieLot(tenantId, selectedPeriodeId);
 
-      await fetchBulletins(selectedPeriodeId);
+      await queryClient.invalidateQueries({ queryKey: ['paie_bulletins', selectedPeriodeId] });
       toast({ title: 'Paie générée', description: `Bulletins générés pour ${result.count} employés.` });
     } catch (error) {
       console.error('Error generating payroll:', error);
       toast({ title: 'Erreur de génération', description: (error as Error).message, variant: 'destructive' });
     } finally {
-      setLoading(false);
+      setIsActionLoading(false);
     }
   };
 
@@ -168,7 +147,7 @@ export const PayrollManagement = () => {
       toast({ title: 'Erreur', description: 'Tenant non identifié.', variant: 'destructive' });
       return;
     }
-    setLoading(true);
+    setIsActionLoading(true);
     try {
       // 1. Get employees for tenant
       const { data: employees, error: empError } = await supabase
@@ -219,7 +198,7 @@ export const PayrollManagement = () => {
       console.error('Error syncing employees:', error);
       toast({ title: 'Erreur de synchronisation', description: (error as Error).message, variant: 'destructive' });
     } finally {
-      setLoading(false);
+      setIsActionLoading(false);
     }
   };
 
@@ -227,25 +206,25 @@ export const PayrollManagement = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-foreground text-2xl font-bold">Gestion de la Paie</h2>
-          <p className="text-muted-foreground">Préparation et contrôles de paie</p>
+          <h2 className="text-foreground text-2xl font-bold">{t('hrAdvanced.payroll.title')}</h2>
+          <p className="text-muted-foreground">{t('hrAdvanced.payroll.subtitle')}</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => setShowEmployeeForm(true)}>
             <UserPlus className="mr-2 h-4 w-4" />
-            Nouvel Employé
+            {t('hrAdvanced.payroll.newEmp')}
           </Button>
           <Button variant="outline" onClick={handleSyncEmployees} disabled={loading}>
             <RefreshCw className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-            Sync. Employés
+            {t('hrAdvanced.payroll.syncEmp')}
           </Button>
           <Button variant="outline" onClick={() => setShowSeniorityConfig(true)}>
             <TrendingUp className="mr-2 h-4 w-4" />
-            Prime Ancienneté
+            {t('hrAdvanced.payroll.seniorityBonus')}
           </Button>
           <Button onClick={handleGeneratePayroll} disabled={loading || !selectedPeriodeId}>
             <DollarSign className={`mr-2 h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-            {loading ? 'Calcul...' : 'Générer la Paie'}
+            {loading ? t('hrAdvanced.payroll.calcLoading') : t('hrAdvanced.payroll.generatePaie')}
           </Button>
         </div>
       </div>
@@ -254,26 +233,26 @@ export const PayrollManagement = () => {
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="periods" className="flex items-center gap-2">
             <Calendar className="h-4 w-4" />
-            Périodes
+            {t('hrAdvanced.payroll.tabPeriods')}
           </TabsTrigger>
           <TabsTrigger value="employees" className="flex items-center gap-2">
             <DollarSign className="h-4 w-4" />
-            Bulletins
+            {t('hrAdvanced.payroll.tabBulletins')}
           </TabsTrigger>
           <TabsTrigger value="checks" className="flex items-center gap-2">
             <CheckCircle className="h-4 w-4" />
-            Contrôles
+            {t('hrAdvanced.payroll.tabChecks')}
           </TabsTrigger>
           <TabsTrigger value="exports" className="flex items-center gap-2">
             <Download className="h-4 w-4" />
-            Exports
+            {t('hrAdvanced.payroll.tabExports')}
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="periods" className="space-y-4">
           <div className="flex flex-col gap-4">
             <div className="flex items-center justify-between rounded-lg border bg-white p-4 shadow-sm dark:bg-gray-800">
-              <h3 className="text-lg font-medium">Période de paie</h3>
+              <h3 className="text-lg font-medium">{t('hrAdvanced.payroll.periodLabel')}</h3>
               <select
                 value={selectedPeriodeId || ''}
                 onChange={e => {
@@ -281,7 +260,7 @@ export const PayrollManagement = () => {
                 }}
                 className="border-input bg-background focus:ring-ring h-10 w-[200px] rounded-md border px-3 py-2 text-sm focus:ring-2 focus:ring-offset-2 focus:outline-none"
               >
-                <option value="">Choisir une période</option>
+                <option value="">{t('hrAdvanced.payroll.selectPeriod')}</option>
                 {periodes.map(p => (
                   <option key={p.id} value={p.id}>
                     {getPeriodLabel(p)}
@@ -307,32 +286,32 @@ export const PayrollManagement = () => {
                       </div>
                       <Badge className="border-green-200 bg-green-100 text-green-800">
                         <CheckCircle className="mr-1 h-4 w-4" />
-                        Calculé
+                        {t('hrAdvanced.payroll.calculatedBadge')}
                       </Badge>
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
                       <div>
-                        <p className="text-muted-foreground text-sm font-medium">Salaire brut</p>
+                        <p className="text-muted-foreground text-sm font-medium">{t('hrAdvanced.payroll.totalBrut')}</p>
                         <p className="text-xl font-bold">{formatMoney(stats.totalBrut)}</p>
                       </div>
                       <div>
-                        <p className="text-muted-foreground text-sm font-medium">Salaire net</p>
+                        <p className="text-muted-foreground text-sm font-medium">{t('hrAdvanced.payroll.totalNet')}</p>
                         <p className="text-xl font-bold text-green-600">
                           {formatMoney(stats.totalNet)}
                         </p>
                       </div>
                       <div>
                         <p className="text-muted-foreground text-sm font-medium">
-                          Charges patronales
+                          {t('hrAdvanced.payroll.totalCharges')}
                         </p>
                         <p className="text-xl font-bold text-gray-600">
                           {formatMoney(stats.totalCharges)}
                         </p>
                       </div>
                       <div>
-                        <p className="text-muted-foreground text-sm font-medium">Coût total</p>
+                        <p className="text-muted-foreground text-sm font-medium">{t('hrAdvanced.payroll.totalCost')}</p>
                         <p className="text-xl font-bold text-indigo-600">
                           {formatMoney(stats.coutTotal)}
                         </p>
@@ -342,7 +321,7 @@ export const PayrollManagement = () => {
                 </Card>
 
                 <div className="mt-6">
-                  <h3 className="mb-4 text-lg font-medium">Tableau des salaires</h3>
+                  <h3 className="mb-4 text-lg font-medium">{t('hrAdvanced.payroll.tableTitle')}</h3>
                   <PayrollTable bulletins={bulletins} loading={loading} />
                 </div>
               </>
@@ -370,7 +349,7 @@ export const PayrollManagement = () => {
                           setActiveView('employees');
                         }}
                       >
-                        Voir
+                        {t('hrAdvanced.payroll.btnView')}
                       </Button>
                     </CardTitle>
                   </CardHeader>
@@ -383,15 +362,15 @@ export const PayrollManagement = () => {
           {!selectedBulletin ? (
             <Card>
               <CardHeader>
-                <CardTitle>Génération des Bulletins</CardTitle>
+                <CardTitle>{t('hrAdvanced.payroll.generateTitle')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-6">
                   <div className="flex items-center justify-between rounded-lg border bg-white p-4 shadow-sm dark:bg-gray-800">
                     <div>
-                      <h3 className="text-lg font-medium">Sélectionner un employé</h3>
+                      <h3 className="text-lg font-medium">{t('hrAdvanced.payroll.selectEmp')}</h3>
                       <p className="text-sm text-gray-500">
-                        Choisissez un employé pour générer son bulletin de paie
+                        {t('hrAdvanced.payroll.selectEmpDesc')}
                       </p>
                     </div>
                     <div className="flex gap-2">
@@ -400,7 +379,7 @@ export const PayrollManagement = () => {
                         onChange={e => setSelectedPeriodeId(e.target.value)}
                         className="border-input bg-background focus:ring-ring h-10 w-[200px] rounded-md border px-3 py-2 text-sm focus:ring-2 focus:ring-offset-2 focus:outline-none"
                       >
-                        <option value="">Choisir une période</option>
+                        <option value="">{t('hrAdvanced.payroll.selectPeriod')}</option>
                         {periodes.map(p => (
                           <option key={p.id} value={p.id}>
                             {getPeriodLabel(p)}
@@ -413,13 +392,13 @@ export const PayrollManagement = () => {
                         disabled={!selectedPeriodeId}
                       >
                         <UserPlus className="mr-2 h-4 w-4" />
-                        Générer Bulletin
+                        {t('hrAdvanced.payroll.generateBtn')}
                       </Button>
                     </div>
                   </div>
 
                   {loading ? (
-                    <div className="py-8 text-center">Chargement des données...</div>
+                    <div className="py-8 text-center">{t('hrAdvanced.payroll.loadingData')}</div>
                   ) : bulletins.length > 0 ? (
                     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                       {bulletins.map(bulletin => (
@@ -443,7 +422,7 @@ export const PayrollManagement = () => {
                                 setSelectedBulletin(bulletin);
                               }}
                             >
-                              Voir Bulletin
+                              {t('hrAdvanced.payroll.btnViewBulletin')}
                             </Button>
                           </CardContent>
                         </Card>
@@ -451,7 +430,7 @@ export const PayrollManagement = () => {
                     </div>
                   ) : (
                     <div className="py-12 text-center text-gray-500">
-                      Aucun bulletin trouvé pour cette période. Veuillez d'abord générer la paie.
+                      {t('hrAdvanced.payroll.noBulletin')}
                     </div>
                   )}
                 </div>
@@ -531,7 +510,7 @@ export const PayrollManagement = () => {
                           String(b.cnss_salariale || 0),
                           String(b.cnss_patronale || 0),
                           String(b.montant_its || 0),
-                          String(b.net_a_payer || 0),
+                          String(b.salaire_net || 0),
                         ]),
                       ];
                       const csv = rows.map(r => r.map(v => `"${v}"`).join(',')).join('\n');
@@ -568,7 +547,7 @@ export const PayrollManagement = () => {
                         ['Employé', 'Net à payer', 'Devise'],
                         ...bulletins.map(b => [
                           b.employe?.nom_complet || '',
-                          String(b.net_a_payer || 0),
+                          String(b.salaire_net || 0),
                           'DJF',
                         ]),
                       ];
@@ -595,7 +574,9 @@ export const PayrollManagement = () => {
         <EmployeePayrollForm
           onClose={() => setShowEmployeeForm(false)}
           onSuccess={() => {
-            if (selectedPeriodeId) fetchBulletins(selectedPeriodeId);
+            if (selectedPeriodeId) {
+              queryClient.invalidateQueries({ queryKey: ['paie_bulletins', selectedPeriodeId] });
+            }
           }}
         />
       )}
@@ -607,7 +588,7 @@ export const PayrollManagement = () => {
           tenantId={tenantId}
           periodeId={selectedPeriodeId}
           onSuccess={() => {
-            fetchBulletins(selectedPeriodeId);
+            queryClient.invalidateQueries({ queryKey: ['paie_bulletins', selectedPeriodeId] });
           }}
         />
       )}

@@ -14,7 +14,6 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
@@ -22,6 +21,8 @@ import { Upload, File, FileImage, FileText, X, Check, AlertCircle, Loader2 } fro
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useTenant } from '@/contexts/TenantContext';
+import { useMutation } from '@tanstack/react-query';
+import { useTaskEditPermissions } from '@/hooks/useTaskEditPermissions';
 
 interface TaskAttachmentUploadProps {
   open: boolean;
@@ -57,9 +58,12 @@ export const TaskAttachmentUpload: React.FC<TaskAttachmentUploadProps> = ({
   onUploadSuccess,
 }) => {
   const [files, setFiles] = useState<FileToUpload[]>([]);
-  const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { currentTenant } = useTenant();
+
+  // 🔒 Vérifier les permissions d'upload : seuls les assignés ou créateurs peuvent uploader
+  const permissions = useTaskEditPermissions({ taskId });
+  const canUpload = permissions.canEdit;
 
   const getFileType = (mimeType: string): 'image' | 'pdf' | 'doc' | 'other' => {
     if (ACCEPTED_FILE_TYPES.image.includes(mimeType)) return 'image';
@@ -85,7 +89,6 @@ export const TaskAttachmentUpload: React.FC<TaskAttachmentUploadProps> = ({
     const selectedFiles = Array.from(event.target.files || []);
 
     const validFiles = selectedFiles.filter(file => {
-      // Vérifier la taille
       if (file.size > MAX_FILE_SIZE) {
         toast.error(`Fichier trop volumineux: ${file.name}`, {
           description: 'Taille maximale: 10MB',
@@ -93,7 +96,6 @@ export const TaskAttachmentUpload: React.FC<TaskAttachmentUploadProps> = ({
         return false;
       }
 
-      // Vérifier le type
       const allAcceptedTypes = [
         ...ACCEPTED_FILE_TYPES.image,
         ...ACCEPTED_FILE_TYPES.pdf,
@@ -110,14 +112,9 @@ export const TaskAttachmentUpload: React.FC<TaskAttachmentUploadProps> = ({
       return true;
     });
 
-    // Créer les previews pour les images
     const newFiles: FileToUpload[] = validFiles.map(file => {
-      const fileToUpload: FileToUpload = {
-        file,
-        description: '',
-      };
+      const fileToUpload: FileToUpload = { file, description: '' };
 
-      // Preview pour les images
       if (file.type.startsWith('image/')) {
         const reader = new FileReader();
         reader.onload = e => {
@@ -133,7 +130,6 @@ export const TaskAttachmentUpload: React.FC<TaskAttachmentUploadProps> = ({
 
     setFiles(prev => [...prev, ...newFiles]);
 
-    // Reset input
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -147,52 +143,28 @@ export const TaskAttachmentUpload: React.FC<TaskAttachmentUploadProps> = ({
     setFiles(prev => prev.map((f, i) => (i === index ? { ...f, description } : f)));
   };
 
-  const handleUpload = async () => {
-    if (files.length === 0) {
-      toast.error('Aucun fichier sélectionné');
-      return;
-    }
+  const uploadMutation = useMutation({
+    mutationFn: async (filesToUpload: FileToUpload[]) => {
+      if (!currentTenant) throw new Error('Session invalide');
 
-    if (!currentTenant) {
-      toast.error('Session invalide', {
-        description: 'Veuillez vous reconnecter',
-      });
-      return;
-    }
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+      if (userError || !user) throw new Error('Utilisateur non authentifié');
 
-    // Obtenir l'utilisateur actuel
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
+      const uploadedNames: string[] = [];
 
-    if (userError || !user) {
-      toast.error('Utilisateur non authentifié', {
-        description: 'Veuillez vous reconnecter',
-      });
-      return;
-    }
-
-    setUploading(true);
-    const uploadedFiles: string[] = [];
-
-    try {
-      for (const { file, description } of files) {
-        // 1. Upload vers Supabase Storage
+      for (const { file, description } of filesToUpload) {
         const fileExt = file.name.split('.').pop();
         const fileName = `${taskId}_${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
         const filePath = `${currentTenant.id}/${fileName}`;
 
-        const { data: storageData, error: storageError } = await supabase.storage
+        const { error: storageError } = await supabase.storage
           .from('task-attachments')
-          .upload(filePath, file, {
-            cacheControl: '3600',
-            upsert: false,
-          });
-
+          .upload(filePath, file, { cacheControl: '3600', upsert: false });
         if (storageError) throw storageError;
 
-        // 2. Insérer dans la table task_attachments
         const { error: dbError } = await supabase.from('task_attachments').insert({
           tenant_id: currentTenant.id,
           task_id: taskId,
@@ -206,33 +178,61 @@ export const TaskAttachmentUpload: React.FC<TaskAttachmentUploadProps> = ({
           uploaded_by: user.id,
           description: description || null,
         });
-
         if (dbError) throw dbError;
 
-        uploadedFiles.push(file.name);
+        uploadedNames.push(file.name);
       }
 
+      return uploadedNames;
+    },
+    onSuccess: (uploadedNames) => {
       toast.success('Fichiers uploadés avec succès ! 🎉', {
-        description: `${uploadedFiles.length} fichier(s) ajouté(s)`,
+        description: `${uploadedNames.length} fichier(s) ajouté(s)`,
       });
-
-      // Reset et fermer
       setFiles([]);
       onOpenChange(false);
-
-      // Callback
-      if (onUploadSuccess) {
-        onUploadSuccess();
-      }
-    } catch (error: any) {
+      onUploadSuccess?.();
+    },
+    onError: (error: any) => {
       console.error('Erreur upload:', error);
       toast.error("Erreur lors de l'upload", {
         description: error.message || "Une erreur inattendue s'est produite",
       });
-    } finally {
-      setUploading(false);
+    },
+  });
+
+  const handleUpload = () => {
+    if (files.length === 0) {
+      toast.error('Aucun fichier sélectionné');
+      return;
     }
+    if (!currentTenant) {
+      toast.error('Session invalide', { description: 'Veuillez vous reconnecter' });
+      return;
+    }
+    uploadMutation.mutate(files);
   };
+
+  // Afficher un message d'accès refusé si l'utilisateur n'a pas les permissions
+  if (!canUpload) {
+    return (
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Accès non autorisé</DialogTitle>
+            <DialogDescription>
+              Vous ne pouvez uploader des documents que sur les tâches qui vous sont assignées ou que vous avez créées.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button onClick={() => onOpenChange(false)} variant="outline">
+              Fermer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -259,7 +259,7 @@ export const TaskAttachmentUpload: React.FC<TaskAttachmentUploadProps> = ({
               accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.doc,.docx,.odt"
               onChange={handleFileSelect}
               className="hidden"
-              disabled={uploading}
+              disabled={uploadMutation.isPending}
             />
             <Upload className="text-muted-foreground mx-auto mb-4 h-12 w-12" />
             <p className="mb-1 text-sm font-medium">Cliquez pour sélectionner ou glissez-déposez</p>
@@ -270,7 +270,7 @@ export const TaskAttachmentUpload: React.FC<TaskAttachmentUploadProps> = ({
               onClick={() => fileInputRef.current?.click()}
               variant="outline"
               className="mt-4"
-              disabled={uploading}
+              disabled={uploadMutation.isPending}
             >
               <Upload className="mr-2 h-4 w-4" />
               Parcourir
@@ -288,7 +288,6 @@ export const TaskAttachmentUpload: React.FC<TaskAttachmentUploadProps> = ({
               {files.map((fileItem, index) => (
                 <div key={index} className="bg-muted/30 space-y-3 rounded-lg border p-4">
                   <div className="flex items-start gap-3">
-                    {/* Icon/Preview */}
                     <div className="flex-shrink-0">
                       {fileItem.preview ? (
                         <img
@@ -301,7 +300,6 @@ export const TaskAttachmentUpload: React.FC<TaskAttachmentUploadProps> = ({
                       )}
                     </div>
 
-                    {/* Info */}
                     <div className="min-w-0 flex-1">
                       <p className="truncate font-medium">{fileItem.file.name}</p>
                       <p className="text-muted-foreground text-xs">
@@ -310,19 +308,17 @@ export const TaskAttachmentUpload: React.FC<TaskAttachmentUploadProps> = ({
                       </p>
                     </div>
 
-                    {/* Bouton supprimer */}
                     <Button
                       onClick={() => handleRemoveFile(index)}
                       size="sm"
                       variant="ghost"
                       className="h-8 w-8 p-0"
-                      disabled={uploading}
+                      disabled={uploadMutation.isPending}
                     >
                       <X className="h-4 w-4" />
                     </Button>
                   </div>
 
-                  {/* Description */}
                   <div className="space-y-1">
                     <Label className="text-xs">Description (optionnelle)</Label>
                     <Textarea
@@ -330,7 +326,7 @@ export const TaskAttachmentUpload: React.FC<TaskAttachmentUploadProps> = ({
                       onChange={e => handleDescriptionChange(index, e.target.value)}
                       placeholder="Décrivez ce fichier..."
                       rows={2}
-                      disabled={uploading}
+                      disabled={uploadMutation.isPending}
                       className="text-sm"
                     />
                   </div>
@@ -341,11 +337,15 @@ export const TaskAttachmentUpload: React.FC<TaskAttachmentUploadProps> = ({
         </div>
 
         <DialogFooter>
-          <Button onClick={() => onOpenChange(false)} variant="outline" disabled={uploading}>
+          <Button
+            onClick={() => onOpenChange(false)}
+            variant="outline"
+            disabled={uploadMutation.isPending}
+          >
             Annuler
           </Button>
-          <Button onClick={handleUpload} disabled={files.length === 0 || uploading}>
-            {uploading ? (
+          <Button onClick={handleUpload} disabled={files.length === 0 || uploadMutation.isPending}>
+            {uploadMutation.isPending ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Upload en cours...

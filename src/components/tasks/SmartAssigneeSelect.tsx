@@ -10,6 +10,7 @@ import { Search, TrendingUp, Clock, Calendar } from '@/lib/icons';
 import { useEmployees } from '@/hooks/useEmployees';
 import { useSkillsTraining } from '@/hooks/useSkillsTraining';
 import { useTasksEnterprise as useTasks, type Task } from '@/hooks/useTasksEnterprise';
+import { useRoleBasedAccess } from '@/hooks/useRoleBasedAccess';
 
 interface SmartAssigneeSelectProps {
   open: boolean;
@@ -45,7 +46,16 @@ export const SmartAssigneeSelect: React.FC<SmartAssigneeSelectProps> = ({
   const { employees } = useEmployees();
   const { skillAssessments } = useSkillsTraining();
   const { tasks } = useTasks();
+  const { accessRights, isSuperAdmin, isTenantAdmin, isHRManager, isProjectManager } = useRoleBasedAccess();
   const [searchTerm, setSearchTerm] = useState('');
+
+  const canSeeWorkload =
+    accessRights.canManageEmployees ||
+    accessRights.canManageAllTasks ||
+    isSuperAdmin ||
+    isTenantAdmin ||
+    isHRManager ||
+    isProjectManager;
 
   const employeeMetrics = useMemo(() => {
     const startDate = new Date(taskStartDate);
@@ -90,7 +100,8 @@ export const SmartAssigneeSelect: React.FC<SmartAssigneeSelectProps> = ({
 
       // Calculate workload during task period
       const tasksInPeriod = tasks.filter(task => {
-        if (task.assignee !== employee.full_name) return false;
+        const taskAssigneeName = typeof task.assignee === 'string' ? task.assignee : task.assignee?.full_name;
+        if (taskAssigneeName !== employee.full_name) return false;
 
         const taskStart = new Date(task.start_date);
         const taskEnd = new Date(task.due_date);
@@ -112,9 +123,10 @@ export const SmartAssigneeSelect: React.FC<SmartAssigneeSelectProps> = ({
       const workload = Math.min(100, (totalHoursInPeriod / availableHours) * 100);
 
       // Count active tasks
-      const currentTasks = tasks.filter(
-        task => task.assignee === employee.full_name && task.status !== 'done'
-      ).length;
+      const currentTasks = tasks.filter(task => {
+        const taskAssigneeName = typeof task.assignee === 'string' ? task.assignee : task.assignee?.full_name;
+        return taskAssigneeName === employee.full_name && task.status !== 'done';
+      }).length;
 
       return {
         id: employee.id,
@@ -268,24 +280,26 @@ export const SmartAssigneeSelect: React.FC<SmartAssigneeSelectProps> = ({
                         <Progress value={employee.skillMatch} className="h-2" />
                       </div>
 
-                      {/* Workload */}
-                      <div className="space-y-1">
-                        <div className="flex items-center justify-between text-sm">
-                          <span>Charge de travail</span>
-                          <div className="flex items-center gap-2">
-                            <span className={`font-medium ${getWorkloadColor(employee.workload)}`}>
-                              {Math.round(employee.workload)}%
-                            </span>
-                            <Badge variant={workloadBadge.variant} className="text-xs">
-                              {workloadBadge.label}
-                            </Badge>
+                      {/* Workload - Seulement pour ceux qui ont la permission */}
+                      {canSeeWorkload && (
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between text-sm">
+                            <span>Charge de travail</span>
+                            <div className="flex items-center gap-2">
+                              <span className={`font-medium ${getWorkloadColor(employee.workload)}`}>
+                                {Math.round(employee.workload)}%
+                              </span>
+                              <Badge variant={workloadBadge.variant} className="text-xs">
+                                {workloadBadge.label}
+                              </Badge>
+                            </div>
+                          </div>
+                          <Progress value={employee.workload} className="h-2" />
+                          <div className="text-muted-foreground text-xs">
+                            {employee.totalHours}h sur {employee.availableHours}h disponibles
                           </div>
                         </div>
-                        <Progress value={employee.workload} className="h-2" />
-                        <div className="text-muted-foreground text-xs">
-                          {employee.totalHours}h sur {employee.availableHours}h disponibles
-                        </div>
-                      </div>
+                      )}
                     </div>
                   </div>
                 </div>

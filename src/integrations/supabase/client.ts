@@ -13,6 +13,7 @@ if (!import.meta.env.VITE_SUPABASE_URL) {
 if (!import.meta.env.VITE_SUPABASE_ANON_KEY) {
   console.error('🚨 VITE_SUPABASE_ANON_KEY is missing in .env! Authentication will fail.');
 } else {
+  // VITE_SUPABASE_ANON_KEY is set
 }
 
 // Import the supabase client like this:
@@ -23,15 +24,13 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     storage: localStorage,
     persistSession: true,
     autoRefreshToken: true,
-    detectSessionInUrl: true,
-    // Gestion des erreurs de refresh token
+    detectSessionInUrl: true, // PKCE: le SDK doit lire le ?code= dans l'URL pour établir la session
     storageKey: 'supabase.auth.token',
     flowType: 'pkce',
   },
   global: {
     headers: {
       Accept: 'application/json',
-      'Content-Type': 'application/json',
     },
   },
 });
@@ -39,6 +38,7 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
 // Gérer les erreurs de refresh token globalement
 supabase.auth.onAuthStateChange((event, session) => {
   if (event === 'TOKEN_REFRESHED') {
+    // Token refreshed successfully — no action needed
   }
 
   if (event === 'SIGNED_OUT') {

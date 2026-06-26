@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useMutation } from '@tanstack/react-query';
 import { useHRMinimal } from '@/hooks/useHRMinimal';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -50,35 +51,43 @@ export const LeaveManagement = () => {
 
   const { register, handleSubmit, reset, setValue, watch } = useForm();
 
-  // Fonctions CRUD pour les demandes de congés
-  const createLeaveRequest = async (data: any) => {
-    const { error } = await supabase.from('leave_requests').insert([data]);
+  const createLeaveRequestMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const { error } = await supabase.from('leave_requests').insert([data]);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast({ title: 'Succès', description: 'Demande de congé créée avec succès' });
+      refresh();
+      reset();
+      setIsCreateDialogOpen(false);
+    },
+    onError: (error: any) => {
+      console.error('Error creating leave request:', error);
+      toast({ title: 'Erreur', description: 'Impossible de créer la demande', variant: 'destructive' });
+    },
+  });
 
-    if (error) throw error;
-
-    toast({
-      title: 'Succès',
-      description: 'Demande de congé créée avec succès',
-    });
-
-    refresh();
-  };
-
-  const updateLeaveRequestStatus = async (requestId: string, status: string, reason?: string) => {
-    const { error } = await supabase
-      .from('leave_requests')
-      .update({ status, rejection_reason: reason })
-      .eq('id', requestId);
-
-    if (error) throw error;
-
-    toast({
-      title: 'Succès',
-      description: `Demande ${status === 'approved' ? 'approuvée' : 'rejetée'} avec succès`,
-    });
-
-    refresh();
-  };
+  const updateLeaveStatusMutation = useMutation({
+    mutationFn: async ({ requestId, status, reason }: { requestId: string; status: string; reason?: string }) => {
+      const { error } = await supabase
+        .from('leave_requests')
+        .update({ status, rejection_reason: reason })
+        .eq('id', requestId);
+      if (error) throw error;
+      return { status };
+    },
+    onSuccess: (_, { status }) => {
+      toast({
+        title: 'Succès',
+        description: `Demande ${status === 'approved' ? 'approuvée' : 'rejetée'} avec succès`,
+      });
+      refresh();
+    },
+    onError: (error: any) => {
+      console.error('Error updating leave request:', error);
+    },
+  });
 
   // Filtres
   const filteredRequests = leaveRequests.filter(
@@ -86,53 +95,32 @@ export const LeaveManagement = () => {
   );
 
   // Handlers
-  const onSubmit = async (data: any) => {
-    try {
-      // Calculate total days (simplified calculation)
-      const startDate = new Date(data.start_date);
-      const endDate = new Date(data.end_date);
-      const totalDays =
-        Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+  const onSubmit = (data: any) => {
+    const startDate = new Date(data.start_date);
+    const endDate = new Date(data.end_date);
+    const totalDays =
+      Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
 
-      await createLeaveRequest({
-        employee_id: data.employee_id,
-        absence_type_id: data.absence_type_id,
-        start_date: data.start_date,
-        end_date: data.end_date,
-        total_days: totalDays,
-        status: 'pending',
-        reason: data.reason,
-      });
-
-      reset();
-      setIsCreateDialogOpen(false);
-    } catch (error) {
-      console.error('Error creating leave request:', error);
-      toast({
-        title: 'Erreur',
-        description: 'Impossible de créer la demande',
-        variant: 'destructive',
-      });
-    }
+    createLeaveRequestMutation.mutate({
+      employee_id: data.employee_id,
+      absence_type_id: data.absence_type_id,
+      start_date: data.start_date,
+      end_date: data.end_date,
+      total_days: totalDays,
+      status: 'pending',
+      reason: data.reason,
+    });
   };
 
-  const handleApprove = async (requestId: string) => {
-    try {
-      await updateLeaveRequestStatus(requestId, 'approved');
-    } catch (error) {
-      console.error('Error approving request:', error);
-    }
+  const handleApprove = (requestId: string) => {
+    updateLeaveStatusMutation.mutate({ requestId, status: 'approved' });
   };
 
-  const handleReject = async (requestId: string) => {
+  const handleReject = (requestId: string) => {
     if (rejectionReason.trim()) {
-      try {
-        await updateLeaveRequestStatus(requestId, 'rejected', rejectionReason);
-        setRejectionReason('');
-        setSelectedRequestId(null);
-      } catch (error) {
-        console.error('Error rejecting request:', error);
-      }
+      updateLeaveStatusMutation.mutate({ requestId, status: 'rejected', reason: rejectionReason });
+      setRejectionReason('');
+      setSelectedRequestId(null);
     }
   };
 

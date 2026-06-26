@@ -106,7 +106,7 @@ export function useUserAuth(options: UseUserAuthOptions = {}): UseUserAuthResult
         const { data: profileData, error: profileError } = await supabase
           .from('profiles')
           .select('full_name, tenant_id')
-          .eq('id', user.id)
+          .eq('user_id', user.id)
           .maybeSingle(); // ✅ Utiliser maybeSingle au lieu de single
 
         // Ignorer les erreurs 406 (RLS) et 404 silencieusement
@@ -131,6 +131,12 @@ export function useUserAuth(options: UseUserAuthOptions = {}): UseUserAuthResult
           .maybeSingle();
 
         const isSuperAdmin = !!superAdminCheck;
+
+        if (!profileData && !employeeData) {
+          setProfile(null);
+          setLoading(false);
+          return;
+        }
 
         const userProfile: UserProfile = {
           userId: user.id,

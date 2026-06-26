@@ -13,7 +13,10 @@ import {
   Award,
   CheckCircle2,
   Loader2,
+  KeyRound,
 } from 'lucide-react';
+import { useOKRStats } from '@/hooks/useOKRStats';
+import { KPICard } from '@/components/analytics/KPICard';
 import {
   Select,
   SelectContent,
@@ -68,44 +71,46 @@ export const PerformanceManagement = () => {
   }
 
   const stats = getPerformanceStats();
+  const { data: okrStats, isLoading: okrLoading } = useOKRStats();
 
-  const getObjectiveStatusColor = (status: string) => {
+  const getObjectiveStatusClasses = (status: string) => {
     switch (status) {
       case 'completed':
-        return 'bg-green-100 text-green-800 border-green-200';
+        return 'border-0 bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400';
       case 'active':
-        return 'bg-blue-100 text-blue-800 border-blue-200';
+        return 'border-0 bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400';
       case 'draft':
-        return 'bg-gray-100 text-gray-800 border-gray-200';
+        return 'border-0 bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400';
       case 'cancelled':
-        return 'bg-red-100 text-red-800 border-red-200';
+        return 'border-0 bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400';
       default:
-        return 'bg-gray-100 text-gray-800 border-gray-200';
+        return 'border-0 bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400';
     }
   };
 
-  const getEvaluationStatusColor = (status: string) => {
+  const getEvaluationStatusClasses = (status: string) => {
     switch (status) {
       case 'completed':
-        return 'bg-green-100 text-green-800 border-green-200';
+        return 'border-0 bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400';
       case 'in-progress':
-        return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'in_progress':
+        return 'border-0 bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400';
       case 'scheduled':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+        return 'border-0 bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400';
       default:
-        return 'bg-gray-100 text-gray-800 border-gray-200';
+        return 'border-0 bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400';
     }
   };
 
   const getScoreColor = (score: number) => {
-    if (score >= 4.5) return 'text-green-600';
-    if (score >= 3.5) return 'text-blue-600';
-    if (score >= 2.5) return 'text-yellow-600';
-    return 'text-red-600';
+    if (score >= 4.5) return 'text-emerald-600 dark:text-emerald-400';
+    if (score >= 3.5) return 'text-blue-600 dark:text-blue-400';
+    if (score >= 2.5) return 'text-amber-600 dark:text-amber-400';
+    return 'text-red-600 dark:text-red-400';
   };
 
   return (
-    <div className="space-y-6">
+    <div className="animate-fade-in space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-foreground text-2xl font-bold">Évaluations & Objectifs</h2>
@@ -160,7 +165,19 @@ export const PerformanceManagement = () => {
               {objectives.map(objective => {
                 const objectiveKeyResults = getKeyResultsByObjective(objective.id);
                 return (
-                  <Card key={objective.id} className="transition-shadow hover:shadow-lg">
+                  <Card
+                    key={objective.id}
+                    className={
+                      'transition-shadow hover:shadow-md border-l-4 ' +
+                      (objective.status === 'active'
+                        ? 'border-l-blue-500'
+                        : objective.status === 'completed'
+                          ? 'border-l-emerald-500'
+                          : objective.status === 'cancelled'
+                            ? 'border-l-red-500'
+                            : 'border-l-slate-300')
+                    }
+                  >
                     <CardHeader>
                       <div className="flex items-center justify-between">
                         <div>
@@ -174,7 +191,7 @@ export const PerformanceManagement = () => {
                             {objective.employee_name} • {objective.department}
                           </p>
                         </div>
-                        <Badge className={getObjectiveStatusColor(objective.status)}>
+                        <Badge variant="outline" className={getObjectiveStatusClasses(objective.status)}>
                           {objective.status === 'active'
                             ? 'Actif'
                             : objective.status === 'completed'
@@ -268,7 +285,7 @@ export const PerformanceManagement = () => {
                                 ? 'Trimestrielle'
                                 : '360°'}
                           </Badge>
-                          <Badge className={getEvaluationStatusColor(evaluation.status)}>
+                          <Badge variant="outline" className={getEvaluationStatusClasses(evaluation.status)}>
                             {evaluation.status === 'completed'
                               ? 'Terminée'
                               : evaluation.status === 'in_progress'
@@ -346,6 +363,55 @@ export const PerformanceManagement = () => {
         </TabsContent>
 
         <TabsContent value="analytics" className="space-y-4">
+          {/* OKR Key Results KPIs */}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <KPICard
+              title="Key Results complétés"
+              value={okrLoading ? '...' : (okrStats?.completed ?? 0)}
+              icon={KeyRound}
+              color="success"
+              progress={okrLoading ? undefined : (okrStats?.completionRate ?? 0)}
+              subtitle={okrStats ? `sur ${okrStats.total} résultats clés` : undefined}
+              trend={
+                okrStats
+                  ? {
+                      value: okrStats.completionRate,
+                      isPositive: okrStats.completionRate >= 50,
+                      label: `${okrStats.inProgress} en cours · ${okrStats.notStarted} non démarrés`,
+                    }
+                  : undefined
+              }
+            />
+            <KPICard
+              title="Progression moyenne OKR"
+              value={okrLoading ? '...' : (okrStats?.avgProgress ?? 0)}
+              icon={TrendingUp}
+              color={
+                (okrStats?.avgProgress ?? 0) >= 70
+                  ? 'success'
+                  : (okrStats?.avgProgress ?? 0) >= 40
+                    ? 'warning'
+                    : 'destructive'
+              }
+              format="percentage"
+              progress={okrLoading ? undefined : (okrStats?.avgProgress ?? 0)}
+              trend={
+                okrStats
+                  ? {
+                      value: 0,
+                      isPositive: (okrStats.avgProgress ?? 0) >= 50,
+                      label:
+                        (okrStats.avgProgress ?? 0) >= 70
+                          ? 'Objectifs bien avancés'
+                          : (okrStats.avgProgress ?? 0) >= 40
+                            ? 'Progression à accélérer'
+                            : 'Retard critique',
+                    }
+                  : undefined
+              }
+            />
+          </div>
+
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
             <Card>
               <CardContent className="p-6">
@@ -354,7 +420,7 @@ export const PerformanceManagement = () => {
                     <p className="text-muted-foreground text-sm font-medium">Objectifs Actifs</p>
                     <p className="text-2xl font-bold">{stats.activeObjectives}</p>
                   </div>
-                  <Target className="h-8 w-8 text-blue-600" />
+                  <Target className="h-8 w-8 text-blue-600 dark:text-blue-400" />
                 </div>
               </CardContent>
             </Card>
@@ -366,7 +432,7 @@ export const PerformanceManagement = () => {
                     <p className="text-muted-foreground text-sm font-medium">Taux de Réalisation</p>
                     <p className="text-2xl font-bold">{stats.completionRate}%</p>
                   </div>
-                  <CheckCircle2 className="h-8 w-8 text-green-600" />
+                  <CheckCircle2 className="h-8 w-8 text-emerald-600 dark:text-emerald-400" />
                 </div>
               </CardContent>
             </Card>
@@ -380,7 +446,7 @@ export const PerformanceManagement = () => {
                       {stats.averageScore > 0 ? stats.averageScore : '--'}
                     </p>
                   </div>
-                  <Star className="h-8 w-8 text-yellow-600" />
+                  <Star className="h-8 w-8 text-amber-600 dark:text-[hsl(var(--status-review))]" />
                 </div>
               </CardContent>
             </Card>
@@ -394,7 +460,7 @@ export const PerformanceManagement = () => {
                     </p>
                     <p className="text-2xl font-bold">{stats.scheduledEvaluations}</p>
                   </div>
-                  <Calendar className="h-8 w-8 text-purple-600" />
+                  <Calendar className="h-8 w-8 text-violet-600 dark:text-violet-400" />
                 </div>
               </CardContent>
             </Card>
@@ -413,12 +479,12 @@ export const PerformanceManagement = () => {
                       objectives.length > 0 ? Math.round((count / objectives.length) * 100) : 0;
                     const colorClass =
                       status === 'completed'
-                        ? 'text-green-600'
+                        ? 'text-emerald-600 dark:text-emerald-400'
                         : status === 'active'
-                          ? 'text-blue-600'
+                          ? 'text-blue-600 dark:text-blue-400'
                           : status === 'cancelled'
-                            ? 'text-red-600'
-                            : 'text-yellow-600';
+                            ? 'text-[hsl(var(--status-blocked))]'
+                            : 'text-amber-700 dark:text-[hsl(var(--status-review))]';
                     return (
                       <div key={status} className="flex items-center justify-between">
                         <span className="capitalize">

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { useUserFilterContext } from '@/hooks/useUserAuth';
+import { useAuth } from '@/contexts/AuthContext';
 import { applyRoleFilters } from '@/lib/roleBasedFiltering';
 
 interface Incident {
@@ -58,7 +58,7 @@ export const useHealthSafety = () => {
   const [error, setError] = useState<string | null>(null);
 
   // 🔒 Contexte utilisateur pour le filtrage
-  const { userContext } = useUserFilterContext();
+  const { userContext } = useAuth();
 
   const fetchHealthSafetyData = useCallback(async () => {
     if (!userContext) {

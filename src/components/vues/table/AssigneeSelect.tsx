@@ -6,6 +6,9 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { UserPlus, Check, User, X } from '@/lib/icons';
 import { useEmployees } from '@/hooks/useEmployees';
 import { QuickInviteDialog } from '@/components/tasks/QuickInviteDialog';
+import { useWorkloadAlert } from '@/hooks/useWorkloadAlert';
+import { AlertTriangle } from 'lucide-react';
+import { useProjectEditPermissions } from '@/hooks/useProjectEditPermissions';
 
 interface AssigneeSelectProps {
   assignee: string | { full_name: string } | null | undefined;
@@ -23,6 +26,10 @@ export const AssigneeSelect = ({
   const { employees, loading, refetch } = useEmployees();
   const [isOpen, setIsOpen] = useState(false);
   const [showInviteDialog, setShowInviteDialog] = useState(false);
+
+  // 🔒 Seuls PM+, tenant_admin et super_admin peuvent inviter des collaborateurs
+  const projectPermissions = useProjectEditPermissions();
+  const canInviteCollaborator = projectPermissions.canManageTeam;
 
   // 🔒 SÉCURITÉ STRICTE: FILTRER LES EMPLOYÉS PAR TENANT_ID DE LA TÂCHE
   const filteredEmployees = useMemo(() => {
@@ -61,14 +68,17 @@ export const AssigneeSelect = ({
     return (assignee as any)?.full_name || (assignee as any)?.id || null;
   })();
 
+  // Calculer la charge de travail pour tous les employés
+  const workloads = useWorkloadAlert(taskId);
+
   // Trouver l'employé assigné
   const assignedEmployee = normalizedAssignee
     ? filteredEmployees.find(
-        e =>
-          e.id === normalizedAssignee ||
-          e.user_id === normalizedAssignee ||
-          e.full_name === normalizedAssignee
-      )
+      e =>
+        e.id === normalizedAssignee ||
+        e.user_id === normalizedAssignee ||
+        e.full_name === normalizedAssignee
+    )
     : null;
 
   return (
@@ -115,41 +125,55 @@ export const AssigneeSelect = ({
                   Aucun employé disponible
                 </div>
               ) : (
-                filteredEmployees.map(employee => (
-                  <button
-                    key={employee.id}
-                    onClick={() => handleProfileSelect(employee.user_id || employee.id)}
-                    className="hover:bg-accent flex w-full items-center gap-2 rounded-sm px-2 py-2 text-left text-sm"
-                  >
-                    <Avatar className="h-6 w-6">
-                      <AvatarImage src={employee.avatar_url} />
-                      <AvatarFallback className="text-xs">
-                        {employee.full_name.slice(0, 2).toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className="flex-1">{employee.full_name}</span>
-                    {assignedEmployee?.id === employee.id && (
-                      <Check className="h-4 w-4 text-green-600" />
-                    )}
-                  </button>
-                ))
+                filteredEmployees.map(employee => {
+                  const workloadInfo = workloads[employee.id] || workloads[employee.user_id || ''] || workloads[employee.full_name];
+
+                  return (
+                    <button
+                      key={employee.id}
+                      onClick={() => handleProfileSelect(employee.user_id || employee.id)}
+                      className="hover:bg-accent flex w-full items-center gap-2 rounded-sm px-2 py-2 text-left text-sm"
+                    >
+                      <Avatar className="h-6 w-6">
+                        <AvatarImage src={employee.avatar_url} />
+                        <AvatarFallback className="text-xs">
+                          {employee.full_name.slice(0, 2).toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="flex-1 truncate">
+                        {employee.full_name}
+                        {workloadInfo && workloadInfo.isOverloaded && (
+                          <span className="text-destructive ml-2 inline-flex items-center text-xs font-semibold">
+                            <AlertTriangle className="mr-1 h-3 w-3" />
+                            ({workloadInfo.workloadPercentage}%)
+                          </span>
+                        )}
+                      </span>
+                      {assignedEmployee?.id === employee.id && (
+                        <Check className="h-4 w-4 text-green-600" />
+                      )}
+                    </button>
+                  );
+                })
               )}
             </div>
 
-            {/* Bouton Inviter un collaborateur - EN BAS */}
-            <div className="border-t pt-2">
-              <Button
-                onClick={() => {
-                  setShowInviteDialog(true);
-                  setIsOpen(false);
-                }}
-                variant="outline"
-                className="w-full justify-start gap-2"
-              >
-                <UserPlus className="h-4 w-4" />
-                Inviter un collaborateur
-              </Button>
-            </div>
+            {/* Bouton Inviter un collaborateur — réservé aux PM+ et admins */}
+            {canInviteCollaborator && (
+              <div className="border-t pt-2">
+                <Button
+                  onClick={() => {
+                    setShowInviteDialog(true);
+                    setIsOpen(false);
+                  }}
+                  variant="outline"
+                  className="w-full justify-start gap-2"
+                >
+                  <UserPlus className="h-4 w-4" />
+                  Inviter un collaborateur
+                </Button>
+              </div>
+            )}
           </div>
         </PopoverContent>
       </Popover>

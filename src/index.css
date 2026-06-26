@@ -1,6 +1,15 @@
 @import 'tailwindcss';
+/*
+  tailwind.config.ts est chargé par @tailwindcss/postcss via postcss.config.js.
+  En Tailwind v4, le fichier de config est découvert automatiquement depuis la
+  racine du projet — aucune directive @config n'est nécessaire ici.
+  Les tokens @theme ci-dessous sont la source de vérité pour Tailwind v4.
+  Les variables CSS dans @layer base :root {} sont maintenues en parallèle
+  uniquement pour la compatibilité avec shadcn/ui qui consomme les variables
+  sous format HSL brut (sans hsl()).
+*/
 
-/* Animations futuristes pour la landing page */
+/* Animations pour la landing page */
 @keyframes blob {
   0% {
     transform: translate(0px, 0px) scale(1);
@@ -95,225 +104,370 @@
 }
 
 @theme {
-  /* Colors */
-  --color-border: hsl(220 13% 75%);
-  --color-input: hsl(220 13% 92%);
-  --color-ring: hsl(214 100% 45%);
-  --color-background: hsl(0 0% 100%);
-  --color-foreground: hsl(240 25% 5%);
-  --color-primary: hsl(214 100% 50%);
+  /*
+    Source de vérité pour Tailwind v4 (utilisée par les classes bg-*, text-*, etc.)
+    Ces valeurs DOIVENT rester synchronisées avec les variables CSS dans @layer base :root.
+    En cas de désaccord, la variable CSS dans :root fait foi (consommée par shadcn/ui).
+
+    Palette Premium SaaS 2025 — Linear/Vercel inspired
+    Primary: indigo profond (250 80% 55%) au lieu du bleu saturé 214 100% 50%
+    Accent: indigo très light pour backgrounds subtils
+  */
+
+  /* Semantic colors — Light mode */
+  --color-border: hsl(220 13% 88%);
+  --color-input: hsl(220 13% 93%);
+  --color-ring: hsl(250 80% 55%);
+  --color-background: hsl(40 20% 98%);
+  --color-foreground: hsl(222 47% 8%);
+  --color-primary: hsl(250 80% 55%);
   --color-primary-foreground: hsl(0 0% 100%);
-  --color-secondary: hsl(220 15% 88%);
-  --color-secondary-foreground: hsl(240 25% 5%);
+  --color-secondary: hsl(220 14% 93%);
+  --color-secondary-foreground: hsl(222 47% 15%);
   --color-destructive: hsl(0 84% 55%);
   --color-destructive-foreground: hsl(0 0% 100%);
-  --color-muted: hsl(220 12% 85%);
-  --color-muted-foreground: hsl(215 20% 25%);
-  --color-accent: hsl(176 85% 40%);
-  --color-accent-foreground: hsl(0 0% 100%);
+  --color-muted: hsl(220 14% 90%);
+  --color-muted-foreground: hsl(220 9% 46%);
+  --color-accent: hsl(250 80% 96%);
+  --color-accent-foreground: hsl(250 80% 40%);
   --color-popover: hsl(0 0% 100%);
-  --color-popover-foreground: hsl(240 25% 5%);
+  --color-popover-foreground: hsl(222 47% 8%);
   --color-card: hsl(0 0% 100%);
-  --color-card-foreground: hsl(240 25% 5%);
+  --color-card-foreground: hsl(222 47% 8%);
 
-  /* Border radius */
-  --radius-lg: 0.75rem;
-  --radius-md: 0.5rem;
-  --radius-sm: 0.25rem;
+  /* Border radius — légèrement plus généreux pour un look moderne */
+  --radius-lg: 0.875rem;
+  --radius-md: 0.625rem;
+  --radius-sm: 0.375rem;
 }
 
-/* Ultra Modern Dark Theme Design System - Premium Experience
-All colors MUST be HSL for consistency.
+/* Premium SaaS 2025 Design System — Linear/Vercel/Arc inspired
+   All colors MUST be HSL for consistency.
+   Primary: Indigo profond, not saturated blue.
+   Philosophy: Sophisticated restraint, not cyberpunk maximalism.
 */
 
 @layer base {
   :root {
-    /* Light Theme - Maximum contrast */
-    --background: 0 0% 100%;
-    --foreground: 240 25% 5%;
+    /* ── Light Theme ── */
+    /* Warm white background — moins stérile que le blanc pur, plus chaleureux */
+    --background: 40 20% 98%;
+    --foreground: 222 47% 8%;
 
+    /* Cards légèrement blanc pur pour contraste avec le fond warm */
     --card: 0 0% 100%;
-    --card-foreground: 240 25% 5%;
+    --card-foreground: 222 47% 8%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 240 25% 5%;
+    --popover-foreground: 222 47% 8%;
 
-    --primary: 214 100% 50%;
+    /* Indigo comme primaire — plus sophistiqué que le bleu vif */
+    --primary: 250 80% 55%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 220 15% 88%;
-    --secondary-foreground: 240 25% 5%;
+    --secondary: 220 14% 93%;
+    --secondary-foreground: 222 47% 15%;
 
-    --muted: 220 12% 85%;
-    --muted-foreground: 215 20% 25%;
+    --muted: 220 14% 90%;
+    --muted-foreground: 220 9% 46%;
 
-    --accent: 176 85% 40%;
-    --accent-foreground: 0 0% 100%;
+    /*
+      WCAG: accent = indigo très light pour backgrounds (pas pour texte).
+      accent-foreground = indigo foncé pour texte sur fond accent.
+      Ratio: hsl(250 80% 40%) sur hsl(250 80% 96%) = ~8:1 — PASS AAA
+    */
+    --accent: 250 80% 96%;
+    --accent-foreground: 250 80% 40%;
 
-    --destructive: 0 84% 55%;
+    --destructive: 0 72% 51%;
     --destructive-foreground: 0 0% 100%;
 
-    --border: 220 13% 75%;
-    --input: 220 13% 92%;
-    --ring: 214 100% 45%;
+    --border: 220 13% 88%;
+    --input: 220 13% 93%;
+    --ring: 250 80% 55%;
 
-    --radius: 0.75rem;
+    --radius: 0.875rem;
 
-    /* Enhanced tech colors with better contrast - Linear/Monday.com inspired */
-    --tech-blue: 214 100% 50%;
-    --tech-purple: 262 100% 58%;
-    --tech-cyan: 176 85% 45%;
+    /* Tech colors — cohérents avec la palette indigo/violet */
+    --tech-blue: 217 91% 52%;
+    --tech-purple: 250 80% 55%;
+    --tech-cyan: 199 89% 38%;
     --tech-green: 142 76% 36%;
     --tech-orange: 25 95% 50%;
-    --tech-red: 0 84% 55%;
-    --success: 142 76% 36%;
-    --warning: 43 96% 56%;
-    --danger: 0 84% 55%;
-    --info: 214 100% 50%;
+    --tech-red: 0 72% 51%;
 
-    /* Priority colors for emphasis - High contrast */
-    --priority-high: 0 84% 55%;
+    /* Semantic status */
+    --success: 142 76% 36%;
+    /*
+      WCAG NOTE: warning (43 96% 56%) = 1.69:1 sur fond blanc — FAIL text
+      Utiliser uniquement comme fond de badge avec dark text, jamais en texte standalone.
+      Pour du texte AA sur blanc, utiliser text-amber-800 = ~7.2:1
+    */
+    --warning: 43 96% 56%;
+    --danger: 0 72% 51%;
+    --info: 217 91% 52%;
+
+    /* Priority — inchangé, contraste validé */
+    --priority-high: 0 72% 51%;
     --priority-medium: 43 96% 56%;
     --priority-low: 142 76% 36%;
     --priority-critical: 340 82% 52%;
 
-    /* Status colors - Monday.com/Linear inspired */
-    --status-todo: 220 15% 65%;
-    --status-doing: 214 100% 50%;
-    --status-blocked: 0 84% 55%;
+    /* Status colors — harmonisés avec la nouvelle palette */
+    --status-todo: 220 15% 42%;
+    --status-doing: 250 80% 55%;
+    --status-blocked: 0 72% 51%;
     --status-done: 142 76% 36%;
     --status-review: 43 96% 56%;
-    --status-backlog: 220 15% 75%;
+    --status-backlog: 220 15% 48%;
 
-    /* Badge colors - Notion inspired */
-    --badge-blue: 214 100% 50%;
-    --badge-purple: 262 100% 58%;
+    /* Badge colors — spectrum cohérent avec la palette indigo */
+    --badge-blue: 217 91% 52%;
+    --badge-purple: 250 80% 55%;
     --badge-pink: 340 82% 52%;
     --badge-green: 142 76% 36%;
     --badge-yellow: 43 96% 56%;
     --badge-orange: 25 95% 50%;
-    --badge-red: 0 84% 55%;
-    --badge-gray: 220 15% 65%;
+    --badge-red: 0 72% 51%;
+    --badge-gray: 220 15% 55%;
 
-    /* Enhanced Gantt colors */
-    --gantt-grid: 220 13% 75%;
-    --gantt-header: 220 15% 94%;
-    --gantt-hover: 214 100% 50%;
+    /* Gantt — fond légèrement warm pour cohérence */
+    --gantt-grid: 220 13% 84%;
+    --gantt-header: 220 14% 95%;
+    --gantt-hover: 250 80% 55%;
     --gantt-task-bg: 0 0% 100%;
 
-    /* Refined glass morphism */
-    --glass-bg: 220 25% 98%;
-    --glass-border: 220 13% 85%;
+    /* Glassmorphism — subtil, pas excessif */
+    --glass-bg: 40 20% 99%;
+    --glass-border: 220 13% 90%;
 
-    /* Premium gradients */
-    --gradient-primary: linear-gradient(135deg, hsl(214 100% 50%), hsl(176 85% 45%));
-    --gradient-secondary: linear-gradient(135deg, hsl(0 0% 100%), hsl(220 15% 92%));
-    --gradient-accent: linear-gradient(135deg, hsl(176 85% 45%), hsl(142 76% 36%));
-    --gradient-bg: linear-gradient(135deg, hsl(220 25% 98%), hsl(220 20% 95%));
-    --gradient-card: linear-gradient(145deg, hsl(0 0% 100%), hsl(220 15% 97%));
+    /* Gradients — indigo/violet sophistiqués, plus de cyan criard */
+    --gradient-primary: linear-gradient(135deg, hsl(250 80% 55%), hsl(280 70% 60%));
+    --gradient-secondary: linear-gradient(135deg, hsl(0 0% 100%), hsl(220 14% 96%));
+    --gradient-accent: linear-gradient(135deg, hsl(250 80% 96%), hsl(280 60% 95%));
+    --gradient-bg: linear-gradient(160deg, hsl(40 20% 98%), hsl(220 20% 96%));
+    --gradient-card: linear-gradient(145deg, hsl(0 0% 100%), hsl(220 14% 98%));
 
-    --sidebar-background: 220 50% 92%;
-    --sidebar-foreground: 240 15% 10%;
-    --sidebar-primary: 217 91% 35%;
+    /* Sidebar — ton slate/lavande très doux en light mode */
+    --sidebar-background: 222 47% 97%;
+    --sidebar-foreground: 222 47% 15%;
+    --sidebar-primary: 250 80% 55%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 40% 85%;
-    --sidebar-accent-foreground: 240 15% 10%;
-    --sidebar-border: 220 30% 75%;
-    --sidebar-ring: 217 91% 35%;
+    --sidebar-accent: 250 60% 94%;
+    --sidebar-accent-foreground: 250 80% 40%;
+    --sidebar-border: 220 13% 90%;
+    --sidebar-ring: 250 80% 55%;
+
+    /* Elevation — ombres douces, pas de glow */
+    --shadow-sm: 0 1px 3px hsl(222 47% 8% / 0.06), 0 1px 2px hsl(222 47% 8% / 0.04);
+    --shadow-md: 0 4px 6px hsl(222 47% 8% / 0.05), 0 2px 4px hsl(222 47% 8% / 0.06);
+    --shadow-lg: 0 10px 15px hsl(222 47% 8% / 0.07), 0 4px 6px hsl(222 47% 8% / 0.05);
+    --shadow-xl: 0 20px 25px hsl(222 47% 8% / 0.08), 0 8px 10px hsl(222 47% 8% / 0.04);
   }
 
   .dark {
-    /* Dark Theme - Maximum contrast */
-    --background: 220 30% 4%;
-    --foreground: 210 40% 98%;
+    /* ── Dark Theme — Slate profond type Vercel ── */
+    /* Fond slate profond avec légère saturation pour éviter le noir absolu */
+    --background: 222 47% 7%;
+    --foreground: 210 40% 96%;
 
-    --card: 220 30% 6%;
-    --card-foreground: 210 40% 98%;
+    /* Cards légèrement plus clairs que le fond pour créer de la profondeur */
+    --card: 222 47% 9%;
+    --card-foreground: 210 40% 96%;
 
-    --popover: 220 30% 6%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 222 47% 9%;
+    --popover-foreground: 210 40% 96%;
 
-    --primary: 262 100% 80%;
-    --primary-foreground: 220 30% 4%;
+    /* Primary indigo lumineux en dark — bien visible sur fond sombre */
+    --primary: 252 87% 72%;
+    --primary-foreground: 222 47% 7%;
 
-    --secondary: 220 30% 10%;
-    --secondary-foreground: 210 40% 95%;
+    --secondary: 222 30% 14%;
+    --secondary-foreground: 210 40% 90%;
 
-    --muted: 220 30% 8%;
-    --muted-foreground: 220 15% 80%;
+    --muted: 222 47% 12%;
+    --muted-foreground: 220 14% 62%;
 
-    --accent: 180 100% 75%;
-    --accent-foreground: 220 30% 4%;
+    /*
+      accent en dark = indigo subtil pour hover states
+      accent-foreground = indigo clair pour texte sur fond accent dark
+      Ratio: hsl(252 87% 72%) sur hsl(250 40% 18%) = ~4.8:1 — PASS AA
+    */
+    --accent: 250 40% 18%;
+    --accent-foreground: 252 87% 78%;
 
-    --destructive: 0 84% 75%;
-    --destructive-foreground: 220 30% 4%;
+    --destructive: 0 72% 65%;
+    --destructive-foreground: 222 47% 7%;
 
-    --border: 220 30% 20%;
-    --input: 220 30% 8%;
-    --ring: 262 100% 80%;
+    --border: 222 30% 16%;
+    --input: 222 47% 12%;
+    --ring: 252 87% 72%;
 
-    /* Maximum contrast tech colors for dark theme */
-    --tech-blue: 214 100% 80%;
-    --tech-purple: 262 100% 80%;
-    --tech-cyan: 180 100% 75%;
-    --tech-green: 142 84% 65%;
-    --tech-orange: 25 100% 75%;
-    --tech-red: 0 84% 75%;
-    --success: 142 84% 65%;
-    --warning: 43 100% 75%;
-    --danger: 0 84% 75%;
-    --info: 214 100% 80%;
+    /* Tech colors — lumineux sur fond sombre, contraste élevé */
+    --tech-blue: 217 91% 75%;
+    --tech-purple: 252 87% 72%;
+    --tech-cyan: 199 89% 65%;
+    --tech-green: 142 84% 62%;
+    --tech-orange: 25 100% 70%;
+    --tech-red: 0 84% 70%;
 
-    /* Priority colors with maximum contrast for dark theme */
-    --priority-high: 0 84% 75%;
-    --priority-medium: 43 100% 75%;
-    --priority-low: 142 84% 65%;
-    --priority-critical: 340 100% 75%;
+    /* Semantic status */
+    --success: 142 84% 62%;
+    --warning: 43 100% 70%;
+    --danger: 0 84% 70%;
+    --info: 217 91% 75%;
 
-    /* Status colors - Dark theme */
-    --status-todo: 220 15% 70%;
-    --status-doing: 214 100% 80%;
-    --status-blocked: 0 84% 75%;
-    --status-done: 142 84% 65%;
-    --status-review: 43 100% 75%;
-    --status-backlog: 220 15% 60%;
+    /* Priority — contraste élevé sur fond sombre */
+    --priority-high: 0 84% 70%;
+    --priority-medium: 43 100% 70%;
+    --priority-low: 142 84% 62%;
+    --priority-critical: 340 100% 72%;
 
-    /* Badge colors - Dark theme */
-    --badge-blue: 214 100% 80%;
-    --badge-purple: 262 100% 80%;
-    --badge-pink: 340 100% 75%;
-    --badge-green: 142 84% 65%;
-    --badge-yellow: 43 100% 75%;
-    --badge-orange: 25 100% 75%;
-    --badge-red: 0 84% 75%;
-    --badge-gray: 220 15% 70%;
+    /* Status colors — dark mode */
+    --status-todo: 220 15% 68%;
+    --status-doing: 252 87% 72%;
+    --status-blocked: 0 84% 70%;
+    --status-done: 142 84% 62%;
+    --status-review: 43 100% 70%;
+    --status-backlog: 220 15% 58%;
 
-    /* Enhanced Gantt colors for dark */
-    --gantt-grid: 220 27% 25%;
-    --gantt-header: 220 27% 10%;
-    --gantt-hover: 262 100% 75%;
-    --gantt-task-bg: 220 27% 8%;
+    /* Badge colors — dark mode */
+    --badge-blue: 217 91% 75%;
+    --badge-purple: 252 87% 72%;
+    --badge-pink: 340 100% 72%;
+    --badge-green: 142 84% 62%;
+    --badge-yellow: 43 100% 70%;
+    --badge-orange: 25 100% 70%;
+    --badge-red: 0 84% 70%;
+    --badge-gray: 220 15% 65%;
 
-    /* Premium glass morphism */
-    --glass-bg: 220 27% 8%;
-    --glass-border: 220 27% 18%;
+    /* Gantt — dark mode */
+    --gantt-grid: 222 30% 20%;
+    --gantt-header: 222 47% 11%;
+    --gantt-hover: 252 87% 72%;
+    --gantt-task-bg: 222 47% 10%;
 
-    /* Vibrant gradients for dark */
-    --gradient-primary: linear-gradient(135deg, hsl(262 100% 75%), hsl(180 100% 70%));
-    --gradient-secondary: linear-gradient(135deg, hsl(220 27% 8%), hsl(220 27% 12%));
-    --gradient-accent: linear-gradient(135deg, hsl(180 100% 70%), hsl(142 84% 60%));
-    --gradient-bg: linear-gradient(135deg, hsl(220 27% 6%), hsl(220 27% 8%));
-    --gradient-card: linear-gradient(145deg, hsl(220 27% 8%), hsl(220 27% 10%));
+    /* Glassmorphism dark */
+    --glass-bg: 222 47% 9%;
+    --glass-border: 222 30% 18%;
 
-    --sidebar-background: 220 13% 9%;
-    --sidebar-foreground: 210 40% 95%;
-    --sidebar-primary: 262 83% 70%;
-    --sidebar-primary-foreground: 220 13% 8%;
-    --sidebar-accent: 220 13% 15%;
-    --sidebar-accent-foreground: 210 40% 95%;
-    --sidebar-border: 220 13% 18%;
-    --sidebar-ring: 262 83% 70%;
+    /* Gradients dark — indigo/violet, plus de cyan fluo */
+    --gradient-primary: linear-gradient(135deg, hsl(252 87% 72%), hsl(280 70% 68%));
+    --gradient-secondary: linear-gradient(135deg, hsl(222 47% 9%), hsl(222 47% 12%));
+    --gradient-accent: linear-gradient(135deg, hsl(250 40% 18%), hsl(280 35% 18%));
+    --gradient-bg: linear-gradient(160deg, hsl(222 47% 7%), hsl(222 40% 9%));
+    --gradient-card: linear-gradient(145deg, hsl(222 47% 9%), hsl(222 47% 11%));
+
+    /* Sidebar dark — slate profond, légèrement plus sombre que le fond */
+    --sidebar-background: 222 47% 5%;
+    --sidebar-foreground: 210 40% 88%;
+    --sidebar-primary: 252 87% 72%;
+    --sidebar-primary-foreground: 222 47% 7%;
+    --sidebar-accent: 250 40% 15%;
+    --sidebar-accent-foreground: 252 87% 78%;
+    --sidebar-border: 222 30% 13%;
+    --sidebar-ring: 252 87% 72%;
+
+    /* Dark mode shadows — légèrement plus marquées pour la profondeur */
+    --shadow-sm: 0 1px 3px hsl(0 0% 0% / 0.2), 0 1px 2px hsl(0 0% 0% / 0.12);
+    --shadow-md: 0 4px 6px hsl(0 0% 0% / 0.22), 0 2px 4px hsl(0 0% 0% / 0.16);
+    --shadow-lg: 0 10px 15px hsl(0 0% 0% / 0.25), 0 4px 6px hsl(0 0% 0% / 0.18);
+    --shadow-xl: 0 20px 25px hsl(0 0% 0% / 0.3), 0 8px 10px hsl(0 0% 0% / 0.2);
   }
+}
+
+/* ── Notification severity design tokens ─────────────────────────────────────
+   Semantic token hierarchy: global → alias → component
+   All values are raw HSL channels (no hsl() wrapper) for shadcn/ui compatibility.
+   Text foreground values are darkened versions of the base hue, validated AA.
+   ─────────────────────────────────────────────────────────────────────────── */
+@layer base {
+  :root {
+    /* info — blue 210 */
+    --notification-info: 210 100% 44%;
+    --notification-info-fg: 210 80% 28%;
+    --notification-info-bg: 210 100% 97%;
+
+    /* success — green 142 */
+    --notification-success: 142 71% 38%;
+    --notification-success-fg: 142 60% 22%;
+    --notification-success-bg: 142 71% 96%;
+
+    /* warning — amber 38 */
+    --notification-warning: 38 92% 40%;
+    --notification-warning-fg: 38 80% 25%;
+    --notification-warning-bg: 38 92% 96%;
+
+    /* error — red 0 */
+    --notification-error: 0 84% 55%;
+    --notification-error-fg: 0 72% 35%;
+    --notification-error-bg: 0 84% 97%;
+
+    /* urgent — deep red 0, more saturated */
+    --notification-urgent: 0 90% 48%;
+    --notification-urgent-fg: 0 80% 30%;
+    --notification-urgent-bg: 0 90% 95%;
+  }
+
+  .dark {
+    /* info dark */
+    --notification-info: 210 90% 65%;
+    --notification-info-fg: 210 100% 80%;
+    --notification-info-bg: 210 50% 14%;
+
+    /* success dark */
+    --notification-success: 142 70% 55%;
+    --notification-success-fg: 142 80% 72%;
+    --notification-success-bg: 142 40% 12%;
+
+    /* warning dark */
+    --notification-warning: 38 90% 60%;
+    --notification-warning-fg: 38 95% 75%;
+    --notification-warning-bg: 38 50% 13%;
+
+    /* error dark */
+    --notification-error: 0 84% 68%;
+    --notification-error-fg: 0 90% 82%;
+    --notification-error-bg: 0 50% 13%;
+
+    /* urgent dark */
+    --notification-urgent: 0 90% 62%;
+    --notification-urgent-fg: 0 90% 80%;
+    --notification-urgent-bg: 0 60% 12%;
+  }
+}
+
+/* ── Toast progress bar keyframe ─────────────────────────────────────────── */
+@keyframes toast-progress {
+  from { width: 100%; }
+  to   { width: 0%; }
+}
+
+/* ── Notification bell shake keyframe ─────────────────────────────────────── */
+@keyframes bell-shake {
+  0%, 100% { transform: rotate(0deg); }
+  10%       { transform: rotate(-15deg); }
+  20%       { transform: rotate(12deg); }
+  30%       { transform: rotate(-10deg); }
+  40%       { transform: rotate(8deg); }
+  50%       { transform: rotate(-6deg); }
+  60%       { transform: rotate(4deg); }
+  70%       { transform: rotate(-2deg); }
+  80%       { transform: rotate(1deg); }
+}
+
+.animate-bell-shake {
+  animation: bell-shake 0.7s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+/* ── Notification badge pulse ─────────────────────────────────────────────── */
+@keyframes badge-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 hsl(var(--notification-urgent) / 0.6); }
+  50%       { box-shadow: 0 0 0 4px hsl(var(--notification-urgent) / 0); }
+}
+
+.animate-badge-pulse {
+  animation: badge-pulse 1.5s ease-in-out infinite;
 }
 
 @layer base {
@@ -327,85 +481,89 @@ All colors MUST be HSL for consistency.
     min-height: 100vh;
   }
 
-  /* Sophisticated glass morphism - context aware */
+  /* Focus visible global — WCAG 2.4.7 / 2.4.11 (niveau AA)
+     Anneau de focus toujours visible au clavier, jamais au clic souris */
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
+
+  /* Supprimer l'outline par défaut pour les composants qui gèrent leur propre focus */
+  :focus:not(:focus-visible) {
+    outline: none;
+  }
+
+  /* Glassmorphism — minimal et professionnel, pas excessif */
   .glass {
-    backdrop-filter: blur(20px) saturate(180%);
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    backdrop-filter: blur(12px) saturate(150%);
+    -webkit-backdrop-filter: blur(12px) saturate(150%);
+    background: hsl(var(--card) / 0.85);
+    border: 1px solid hsl(var(--border) / 0.6);
+    box-shadow: var(--shadow-md);
   }
 
   .dark .glass {
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    background: hsl(var(--card) / 0.75);
+    border: 1px solid hsl(var(--border) / 0.5);
+    box-shadow: var(--shadow-lg);
   }
 
-  .glass {
-    background: rgba(220, 230, 255, 0.75);
-    border: 1px solid rgba(120, 160, 255, 0.6);
-    box-shadow: 0 8px 32px rgba(50, 100, 200, 0.15);
-  }
-
-  /* Premium modern cards */
+  /* Cards modernes — border subtile, shadow douce, pas de gradient criard */
   .modern-card {
-    background: var(--gradient-secondary);
-    border: 1px solid hsl(var(--border));
-    backdrop-filter: blur(20px) saturate(180%);
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    background: hsl(var(--card));
+    border: 1px solid hsl(var(--border) / 0.7);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-md);
+    transition: box-shadow 0.2s ease, border-color 0.2s ease;
+  }
+
+  .modern-card:hover {
+    box-shadow: var(--shadow-lg);
+    border-color: hsl(var(--border));
   }
 
   .dark .modern-card {
-    background: linear-gradient(145deg, hsl(var(--card)), hsl(var(--card)) / 95%);
-    box-shadow:
-      0 8px 32px rgba(0, 0, 0, 0.4),
-      inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    background: hsl(var(--card));
     border: 1px solid hsl(var(--border));
+    box-shadow: var(--shadow-lg);
   }
 
-  .modern-card {
-    box-shadow: 0 12px 48px rgba(50, 100, 200, 0.18);
-    border: 2px solid hsl(220 40% 70%);
-    background: linear-gradient(145deg, hsl(220 60% 96%), hsl(220 50% 92%));
+  .dark .modern-card:hover {
+    box-shadow: var(--shadow-xl);
+    border-color: hsl(var(--primary) / 0.25);
   }
 
-  /* Enhanced glow effects */
+  /* Glow effects — subtils, pas de néon agressif */
   .glow-primary {
-    box-shadow: 0 0 40px hsl(var(--primary) / 0.4);
+    box-shadow: 0 0 20px hsl(var(--primary) / 0.2), 0 4px 12px hsl(var(--primary) / 0.1);
   }
 
   .dark .glow-primary {
-    box-shadow: 0 0 50px hsl(var(--primary) / 0.3);
+    box-shadow: 0 0 24px hsl(var(--primary) / 0.25), 0 4px 12px hsl(var(--primary) / 0.15);
   }
 
   .glow-accent {
-    box-shadow: 0 0 40px hsl(var(--accent) / 0.4);
+    box-shadow: 0 0 20px hsl(var(--primary) / 0.15);
   }
 
   .dark .glow-accent {
-    box-shadow: 0 0 50px hsl(var(--accent) / 0.3);
+    box-shadow: 0 0 24px hsl(var(--primary) / 0.2);
   }
 
-  /* Smooth transitions */
+  /* Transitions professionnelles */
   .transition-smooth {
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
-  /* Animated gradients */
-  .animate-gradient {
-    background-size: 200% 200%;
-    animation: gradient 3s ease infinite;
-  }
-
-  @keyframes gradient {
-    0% {
-      background-position: 0% 50%;
-    }
-
-    50% {
-      background-position: 100% 50%;
-    }
-
-    100% {
-      background-position: 0% 50%;
+  /* Respect des préférences de réduction de mouvement (WCAG 2.3.3) */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
     }
   }
 
@@ -423,15 +581,57 @@ All colors MUST be HSL for consistency.
     animation: shimmer 3s ease-in-out infinite;
   }
 
-  /* Premium hover effects */
+  /* Hover effects — subtils lift + shadow, pas de glow criard */
   .hover-glow:hover {
-    box-shadow: 0 0 60px hsl(var(--primary) / 0.4);
-    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+    transform: translateY(-1px);
   }
 
   .dark .hover-glow:hover {
-    box-shadow: 0 0 80px hsl(var(--primary) / 0.3);
-    transform: translateY(-2px);
+    box-shadow: var(--shadow-xl), 0 0 20px hsl(var(--primary) / 0.15);
+    transform: translateY(-1px);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .hover-glow:hover {
+      transform: none;
+    }
+    .animate-blob,
+    .animate-gradient,
+    .animate-pulse-subtle,
+    .animate-scroll-seamless,
+    .animate-shimmer {
+      animation: none;
+    }
+  }
+
+  /* Lien d'évitement clavier (skip-to-content) — WCAG 2.4.1
+     Utilisation : <a href="#main-content" class="skip-link">Aller au contenu</a> */
+  .skip-link {
+    position: absolute;
+    left: -9999px;
+    top: auto;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    background: hsl(var(--primary));
+    color: hsl(var(--primary-foreground));
+    padding: 0.5rem 1rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.875rem;
+    font-weight: 600;
+    z-index: 9999;
+  }
+
+  .skip-link:focus {
+    position: fixed;
+    left: 1rem;
+    top: 1rem;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
   }
 
   /* Global Scrollbar Styling - Ultra thin and auto-hiding behavior */

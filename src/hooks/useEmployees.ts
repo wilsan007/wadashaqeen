@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { useUserFilterContext } from '@/hooks/useUserAuth';
+import { useAuth } from '@/contexts/AuthContext';
 import { applyRoleFilters } from '@/lib/roleBasedFiltering';
 
 export interface Employee {
@@ -35,66 +35,64 @@ export interface Department {
 }
 
 export const useEmployees = () => {
-  const [employees, setEmployees] = useState<Employee[]>([]);
-  const [departments, setDepartments] = useState<Department[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   // 🔒 Contexte utilisateur pour le filtrage
-  const { userContext } = useUserFilterContext();
+  const { userContext } = useAuth();
 
-  useEffect(() => {
-    if (userContext) {
-      fetchData();
-    }
-  }, [userContext?.userId, userContext?.tenantId]); // Dépendances stables
-
-  const fetchData = async () => {
-    if (!userContext) {
-      setLoading(false);
-      return;
-    }
-
-    try {
-      setLoading(true);
-
-      // Fetch employees from profiles table avec filtrage
-      let employeesQuery = supabase.from('profiles').select('*').order('full_name');
-
-      // 🔒 Appliquer le filtrage par rôle (profiles = employees)
-      employeesQuery = applyRoleFilters(employeesQuery, userContext, 'employees');
-
-      const { data: employeesData, error: employeesError } = await employeesQuery;
-
-      // Employés chargés
-
-      if (employeesError) throw employeesError;
-
-      // Fetch departments
-      const { data: departmentsData, error: departmentsError } = await supabase
-        .from('departments')
-        .select('*')
-        .order('name');
-
-      if (departmentsError) throw departmentsError;
-
-      // Map profiles data to match Employee interface
-      const mappedEmployees = (employeesData || []).map(profile => ({
+  // Query: employees from profiles table avec filtrage
+  const {
+    data: employees = [],
+    isLoading: employeesLoading,
+    error: employeesError,
+    refetch: refetchEmployees,
+  } = useQuery<Employee[]>({
+    queryKey: ['employees', userContext?.userId, userContext?.tenantId],
+    queryFn: async () => {
+      let query = supabase.from('profiles').select('*').order('full_name');
+      query = applyRoleFilters(query, userContext!, 'employees');
+      const { data, error } = await query;
+      if (error) throw error;
+      return (data || []).map(profile => ({
         ...profile,
         employee_id: profile.employee_id || `EMP${profile.id.slice(-4)}`,
       }));
+    },
+    enabled: !!userContext,
+  });
 
-      // Déjà filtré par applyRoleFilters
-      setEmployees(mappedEmployees);
-      setDepartments(departmentsData || []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Une erreur est survenue');
-      console.error('Error fetching employees data:', err);
-    } finally {
-      setLoading(false);
-    }
+  // Query: departments
+  const {
+    data: departments = [],
+    isLoading: departmentsLoading,
+    error: departmentsError,
+    refetch: refetchDepartments,
+  } = useQuery<Department[]>({
+    queryKey: ['departments'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('departments').select('*').order('name');
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: !!userContext,
+  });
+
+  const loading = employeesLoading || departmentsLoading;
+  const error = employeesError
+    ? employeesError instanceof Error
+      ? employeesError.message
+      : String(employeesError)
+    : departmentsError
+      ? departmentsError instanceof Error
+        ? departmentsError.message
+        : String(departmentsError)
+      : null;
+
+  const refetch = async () => {
+    await Promise.all([refetchEmployees(), refetchDepartments()]);
   };
 
+  // createEmployee: always throws (invitation system required)
   const createEmployee = async (
     employeeData: Omit<Employee, 'id' | 'created_at' | 'updated_at'>
   ) => {
@@ -106,119 +104,129 @@ export const useEmployees = () => {
       throw new Error(
         "La création directe d'employés n'est pas supportée. Utilisez le système d'invitation."
       );
-
-      // const { data, error } = await supabase
-      //   .from('profiles')
-      //   .insert([
-      //     {
-      //       email: '', // REQUIS mais non fourni
-      //       tenant_id: '', // REQUIS mais non fourni
-      //       user_id: '', // REQUIS mais non fourni
-      //       full_name: employeeData.full_name,
-      //       job_title: employeeData.job_title,
-      //       employee_id: employeeData.employee_id || `EMP${Date.now().toString().slice(-6)}`,
-      //       hire_date: employeeData.hire_date,
-      //       contract_type: employeeData.contract_type || 'CDI',
-      //       phone: employeeData.phone,
-      //       salary: employeeData.salary,
-      //       weekly_hours: employeeData.weekly_hours || 35,
-      //       manager_id: employeeData.manager_id,
-      //       emergency_contact: employeeData.emergency_contact,
-      //     },
-      //   ])
-      //   .select()
-      //   .single();
-      // if (error) throw error;
-
-      // return mappedEmployee;
     } catch (err) {
       console.error('Error creating employee:', err);
       throw err;
     }
   };
 
-  const updateEmployee = async (id: string, updates: Partial<Employee>) => {
-    try {
+  // Mutation: updateEmployee
+  const updateEmployeeMutation = useMutation({
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<Employee> }) => {
       const { data, error } = await supabase
         .from('profiles')
         .update(updates)
-        .eq('user_id', id) // Use user_id for updates
+        .eq('user_id', id)
         .select()
         .single();
-
       if (error) throw error;
-
-      setEmployees(prev =>
-        prev.map(employee => (employee.user_id === id ? { ...employee, ...data } : employee))
-      );
       return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ['employees', userContext?.userId, userContext?.tenantId],
+      });
+    },
+  });
+
+  const updateEmployee = async (id: string, updates: Partial<Employee>) => {
+    try {
+      return await updateEmployeeMutation.mutateAsync({ id, updates });
     } catch (err) {
       console.error('Error updating employee:', err);
       throw err;
     }
   };
 
+  // Mutation: deleteEmployee
+  const deleteEmployeeMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('profiles').delete().eq('user_id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ['employees', userContext?.userId, userContext?.tenantId],
+      });
+    },
+  });
+
   const deleteEmployee = async (id: string) => {
     try {
-      const { error } = await supabase.from('profiles').delete().eq('user_id', id); // Use user_id for deletion
-
-      if (error) throw error;
-
-      setEmployees(prev => prev.filter(employee => employee.user_id !== id));
+      await deleteEmployeeMutation.mutateAsync(id);
     } catch (err) {
       console.error('Error deleting employee:', err);
       throw err;
     }
   };
 
-  const createDepartment = async (
-    departmentData: Omit<Department, 'id' | 'created_at' | 'updated_at'>
-  ) => {
-    try {
+  // Mutation: createDepartment
+  const createDepartmentMutation = useMutation({
+    mutationFn: async (departmentData: Omit<Department, 'id' | 'created_at' | 'updated_at'>) => {
       const { data, error } = await supabase
         .from('departments')
         .insert([departmentData])
         .select()
         .single();
-
       if (error) throw error;
-
-      setDepartments(prev => [...prev, data]);
       return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['departments'] });
+    },
+  });
+
+  const createDepartment = async (
+    departmentData: Omit<Department, 'id' | 'created_at' | 'updated_at'>
+  ) => {
+    try {
+      return await createDepartmentMutation.mutateAsync(departmentData);
     } catch (err) {
       console.error('Error creating department:', err);
       throw err;
     }
   };
 
-  const updateDepartment = async (id: string, updates: Partial<Department>) => {
-    try {
+  // Mutation: updateDepartment
+  const updateDepartmentMutation = useMutation({
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<Department> }) => {
       const { data, error } = await supabase
         .from('departments')
         .update(updates)
         .eq('id', id)
         .select()
         .single();
-
       if (error) throw error;
-
-      setDepartments(prev =>
-        prev.map(department => (department.id === id ? { ...department, ...data } : department))
-      );
       return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['departments'] });
+    },
+  });
+
+  const updateDepartment = async (id: string, updates: Partial<Department>) => {
+    try {
+      return await updateDepartmentMutation.mutateAsync({ id, updates });
     } catch (err) {
       console.error('Error updating department:', err);
       throw err;
     }
   };
 
+  // Mutation: deleteDepartment
+  const deleteDepartmentMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('departments').delete().eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['departments'] });
+    },
+  });
+
   const deleteDepartment = async (id: string) => {
     try {
-      const { error } = await supabase.from('departments').delete().eq('id', id);
-
-      if (error) throw error;
-
-      setDepartments(prev => prev.filter(department => department.id !== id));
+      await deleteDepartmentMutation.mutateAsync(id);
     } catch (err) {
       console.error('Error deleting department:', err);
       throw err;
@@ -236,6 +244,6 @@ export const useEmployees = () => {
     createDepartment,
     updateDepartment,
     deleteDepartment,
-    refetch: fetchData,
+    refetch,
   };
 };

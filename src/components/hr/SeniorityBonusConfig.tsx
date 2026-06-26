@@ -162,11 +162,7 @@ export const SeniorityBonusConfigPage: React.FC = () => {
       } = await supabase.auth.getUser();
       if (!tenantId || !user) throw new Error('Organisation ou utilisateur introuvable');
 
-        tenantId,
-        dateDebut: newFreezeStart,
-        dateFin: newFreezeEnd || null,
-        motif: newFreezeMotif,
-      });
+
 
       await SeniorityBonusService.addFreezePeriod(
         tenantId,
@@ -245,7 +241,7 @@ export const SeniorityBonusConfigPage: React.FC = () => {
   // Vérifier les permissions - Accès restreint
   const hasAccess =
     userRole === 'tenant_admin' ||
-    userRole === 'manager_hr' ||
+    userRole === 'hr_manager' ||
     userRole === 'owner' ||
     userRole === 'super_admin';
 

@@ -53,7 +53,7 @@ const TenantOwnerWelcome: React.FC<TenantOwnerWelcomeProps> = ({ userEmail }) =>
         `
         )
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle();
 
       if (profileError || !profile) {
         // Le trigger n'a peut-être pas encore fini, réessayer

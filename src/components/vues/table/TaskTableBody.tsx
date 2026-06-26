@@ -37,7 +37,6 @@ interface TaskTableBodyProps {
   onDuplicate: (taskId: string) => void;
   onEdit: (taskId: string) => void;
   onUpdateAssignee: (taskId: string, assignee: string) => void;
-  onUpdateAssignee: (taskId: string, assignee: string) => void;
   onUpdateTask?: (taskId: string, updates: Partial<Task>) => void;
   onCreateTask?: (taskData: {
     title: string;
@@ -48,6 +47,8 @@ interface TaskTableBodyProps {
     status: 'todo' | 'doing' | 'blocked' | 'done';
     effort_estimate_h: number;
   }) => Promise<any>;
+  projectColorMap?: Record<string, string>;
+  totalProjects?: number;
 }
 
 export const TaskTableBody = ({
@@ -63,6 +64,8 @@ export const TaskTableBody = ({
   onUpdateAssignee,
   onUpdateTask,
   onCreateTask,
+  projectColorMap,
+  totalProjects,
 }: TaskTableBodyProps) => {
   // Trier les tâches par display_order pour afficher les sous-tâches correctement
   const sortedTasks = [...tasks].sort((a, b) => {
@@ -123,7 +126,7 @@ export const TaskTableBody = ({
 
   return (
     <TableBody>
-      {allTasks.map(task => (
+      {allTasks.map((task, index) => (
         <TaskRow
           key={task.id}
           task={task}
@@ -144,6 +147,9 @@ export const TaskTableBody = ({
             }
           }}
           isGhost={task.id.startsWith('ghost-task-')}
+          projectColorMap={projectColorMap}
+          taskIndex={index}
+          totalProjects={totalProjects}
         />
       ))}
     </TableBody>

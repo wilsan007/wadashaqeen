@@ -75,19 +75,26 @@ export const useSessionManager = () => {
         }
       }
 
-      if (session && !isSessionExpired()) {
-        setUser(session.user);
-        setSession(session);
-        updateActivity();
-        // Nettoyer le flag de déconnexion manuelle
-        localStorage.removeItem(MANUAL_LOGOUT_KEY);
-      } else if (session && isSessionExpired()) {
-        // Session expirée, forcer la déconnexion
-        await supabase.auth.signOut();
-        localStorage.removeItem(LAST_ACTIVITY_KEY);
-        localStorage.removeItem(MANUAL_LOGOUT_KEY);
-      } else if (!session) {
-        // Pas de session, s'assurer que tout est nettoyé
+      if (session) {
+        // Initialiser l'activité AVANT de vérifier l'expiration (premier login = pas de lastActivity)
+        if (!localStorage.getItem(LAST_ACTIVITY_KEY)) {
+          localStorage.setItem(LAST_ACTIVITY_KEY, Date.now().toString());
+        }
+
+        if (!isSessionExpired()) {
+          setUser(session.user);
+          setSession(session);
+          updateActivity();
+          // Nettoyer le flag de déconnexion manuelle
+          localStorage.removeItem(MANUAL_LOGOUT_KEY);
+        } else {
+          // Session expirée (inactivité réelle), forcer la déconnexion
+          await supabase.auth.signOut();
+          localStorage.removeItem(LAST_ACTIVITY_KEY);
+          localStorage.removeItem(MANUAL_LOGOUT_KEY);
+        }
+      } else {
+        // Pas de session active
         setUser(null);
         setSession(null);
       }

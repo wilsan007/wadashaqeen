@@ -52,6 +52,7 @@ import { ProjectTableInline } from '@/components/projects/ProjectTableInline';
 import { LayoutGrid, LayoutList } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { formatCurrency } from '@/components/common/CurrencySelect';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface ProjectDashboardEnterpriseProps {
   showMetrics?: boolean;
@@ -100,6 +101,7 @@ export const ProjectDashboardEnterprise: React.FC<ProjectDashboardEnterpriseProp
   } = useProjectsEnterprise(filters);
 
   const { toast } = useToast();
+  const { t } = useTranslation();
 
   // Handler pour mise à jour inline
   const handleUpdateProject = useCallback(
@@ -107,14 +109,14 @@ export const ProjectDashboardEnterprise: React.FC<ProjectDashboardEnterpriseProp
       try {
         await updateProject(projectId, updates);
         toast({
-          title: 'Projet mis à jour',
-          description: 'Les modifications ont été sauvegardées.',
+          title: t('projectsBloc.enterprise.updateSuccess'),
+          description: t('projectsBloc.enterprise.updateSuccessDesc'),
         });
       } catch (error) {
         console.error('Erreur mise à jour projet:', error);
         toast({
-          title: 'Erreur',
-          description: 'Impossible de mettre à jour le projet.',
+          title: t('projectsBloc.enterprise.updateError'),
+          description: t('projectsBloc.enterprise.updateErrorDesc'),
           variant: 'destructive',
         });
       }
@@ -227,34 +229,34 @@ export const ProjectDashboardEnterprise: React.FC<ProjectDashboardEnterpriseProp
       {showMetrics && !compactMode && (
         <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
           <MetricCard
-            label="Total Projets"
+            label={t('projectsBloc.analytics.totalProjects')}
             value={totalCount}
-            subtitle="Tous les projets"
+            subtitle={t('projectsBloc.analytics.allProjects')}
             icon={<BarChart3 className="h-6 w-6" />}
             color="blue"
           />
 
           <MetricCard
-            label="Actifs"
+            label={t('projectsBloc.analytics.activeProjects')}
             value={activeProjects}
-            subtitle="En cours"
+            subtitle={t('projectsBloc.analytics.inProgress')}
             icon={<TrendingUp className="h-6 w-6" />}
             color="green"
             trend="up"
           />
 
           <MetricCard
-            label="Terminés"
+            label={t('projectsBloc.analytics.completedProjects')}
             value={completedProjects}
-            subtitle="Complétés"
+            subtitle={t('projectsBloc.analytics.completedSub')}
             icon={<CheckCircle2 className="h-6 w-6" />}
             color="green"
           />
 
           <MetricCard
-            label="En retard"
+            label={t('projectsBloc.analytics.overdueProjects')}
             value={overdueProjects}
-            subtitle="Nécessitent attention"
+            subtitle={t('projectsBloc.analytics.needsAction')}
             icon={<AlertTriangle className="h-6 w-6" />}
             color="red"
             trend="down"
@@ -271,24 +273,24 @@ export const ProjectDashboardEnterprise: React.FC<ProjectDashboardEnterpriseProp
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0 flex-1">
                 <CardTitle className="flex flex-wrap items-center gap-2 text-lg sm:text-xl">
-                  <span className="truncate">Gestion des Projets</span>
+                  <span className="truncate">{t('projectsBloc.enterprise.title')}</span>
                   {isSuperAdmin && (
                     <Badge variant="secondary" className="shrink-0 text-xs">
-                      Super Admin
+                      {t('projectsBloc.enterprise.superAdmin')}
                     </Badge>
                   )}
                 </CardTitle>
                 {!compactMode && (
                   <p className="text-muted-foreground mt-1 text-xs sm:text-sm">
-                    <span className="font-medium">{totalCount} projets</span>
+                    <span className="font-medium">{totalCount} {t('projectsBloc.enterprise.projectsCount')}</span>
                     {/* Métriques techniques masquées sur mobile */}
                     <span className="hidden md:inline">
                       {' '}
-                      • Cache: {metrics.cacheHit ? '✅' : '❌'} • Données:{' '}
-                      {(metrics.dataSize / 1024).toFixed(1)}KB • Fetch:{' '}
+                      • {t('projectsBloc.enterprise.cacheLabel')} {metrics.cacheHit ? '✅' : '❌'} • {t('projectsBloc.enterprise.dataLabel')}{' '}
+                      {(metrics.dataSize / 1024).toFixed(1)}KB • {t('projectsBloc.enterprise.fetchLabel')}{' '}
                       {metrics.fetchTime.toFixed(0)}ms
                     </span>
-                    {isDataStale && <span className="text-orange-600"> • Données obsolètes</span>}
+                    {isDataStale && <span className="text-orange-600"> • {t('projectsBloc.enterprise.staleData')}</span>}
                   </p>
                 )}
               </div>
@@ -302,7 +304,7 @@ export const ProjectDashboardEnterprise: React.FC<ProjectDashboardEnterpriseProp
                 className="shrink-0"
               >
                 <RefreshCw className={`h-4 w-4 sm:mr-2 ${loading ? 'animate-spin' : ''}`} />
-                <span className="hidden sm:inline">Actualiser</span>
+                <span className="hidden sm:inline">{t('projectsBloc.analytics.refreshBtn')}</span>
               </Button>
             </div>
 
@@ -315,7 +317,7 @@ export const ProjectDashboardEnterprise: React.FC<ProjectDashboardEnterpriseProp
                 onClick={() => setIsCreateDialogOpen(true)}
               >
                 <Plus className="mr-2 h-4 w-4" />
-                Nouveau Projet
+                {t('projectsBloc.enterprise.newProject')}
               </Button>
 
               {/* Toggle vue grille/tableau */}
@@ -340,7 +342,7 @@ export const ProjectDashboardEnterprise: React.FC<ProjectDashboardEnterpriseProp
 
               <Button variant="outline" size="sm" className="w-full justify-center sm:w-auto">
                 <Download className="mr-2 h-4 w-4" />
-                <span className="hidden sm:inline">Exporter</span>
+                <span className="hidden sm:inline">{t('projectsBloc.analytics.exportBtn')}</span>
                 <span className="sm:hidden">Export</span>
               </Button>
             </div>
@@ -355,7 +357,7 @@ export const ProjectDashboardEnterprise: React.FC<ProjectDashboardEnterpriseProp
               <div className="relative">
                 <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 transform" />
                 <Input
-                  placeholder="Rechercher des projets..."
+                  placeholder={t('projectsBloc.enterprise.searchPlaceholder')}
                   value={searchTerm}
                   onChange={e => handleSearchChange(e.target.value)}
                   className="h-10 pl-10 text-base sm:h-9 sm:text-sm"
@@ -368,24 +370,24 @@ export const ProjectDashboardEnterprise: React.FC<ProjectDashboardEnterpriseProp
               <Select onValueChange={handleStatusFilterChange}>
                 <SelectTrigger className="h-10 sm:h-9 sm:w-40">
                   <Filter className="mr-2 h-3.5 w-3.5 shrink-0 sm:hidden" />
-                  <SelectValue placeholder="Statut" />
+                  <SelectValue placeholder={t('projectsBloc.enterprise.filterStatus')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="active">Actif</SelectItem>
-                  <SelectItem value="completed">Terminé</SelectItem>
-                  <SelectItem value="on_hold">En pause</SelectItem>
-                  <SelectItem value="cancelled">Annulé</SelectItem>
+                  <SelectItem value="active">{t('projectsBloc.analytics.statusActive')}</SelectItem>
+                  <SelectItem value="completed">{t('projectsBloc.analytics.statusCompleted')}</SelectItem>
+                  <SelectItem value="on_hold">{t('projectsBloc.analytics.statusOnHold')}</SelectItem>
+                  <SelectItem value="cancelled">{t('projectsBloc.analytics.statusCancelled')}</SelectItem>
                 </SelectContent>
               </Select>
 
               <Select onValueChange={handlePriorityFilterChange}>
                 <SelectTrigger className="h-10 sm:h-9 sm:w-40">
-                  <SelectValue placeholder="Priorité" />
+                  <SelectValue placeholder={t('projectsBloc.enterprise.filterPriority')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="high">Haute</SelectItem>
-                  <SelectItem value="medium">Moyenne</SelectItem>
-                  <SelectItem value="low">Basse</SelectItem>
+                  <SelectItem value="high">{t('projectsBloc.analytics.priorityHigh')}</SelectItem>
+                  <SelectItem value="medium">{t('projectsBloc.analytics.priorityMedium')}</SelectItem>
+                  <SelectItem value="low">{t('projectsBloc.analytics.priorityLow')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -395,32 +397,32 @@ export const ProjectDashboardEnterprise: React.FC<ProjectDashboardEnterpriseProp
           {loading && projects.length === 0 ? (
             <div className="py-8 text-center">
               <RefreshCw className="text-muted-foreground mx-auto mb-4 h-8 w-8 animate-spin" />
-              <p className="text-muted-foreground">Chargement des projets...</p>
+              <p className="text-muted-foreground">{t('projectsBloc.enterprise.loading')}</p>
             </div>
           ) : error ? (
             <div className="py-8 text-center">
               <AlertTriangle className="mx-auto mb-4 h-8 w-8 text-red-500" />
-              <p className="mb-4 text-red-600">{error}</p>
+              <p className="mb-4 text-red-600">{t('projectsBloc.enterprise.loadError')}</p>
               <Button onClick={refresh} variant="outline">
-                Réessayer
+                {t('projectsBloc.enterprise.retryBtn')}
               </Button>
             </div>
           ) : projects.length === 0 ? (
             <div className="py-8 text-center">
               <BarChart3 className="text-muted-foreground mx-auto mb-4 h-8 w-8" />
-              <p className="text-muted-foreground">Aucun projet trouvé</p>
+              <p className="text-muted-foreground">{t('projectsBloc.enterprise.noProjects')}</p>
               <Button
                 className="mt-4"
                 variant="outline"
                 onClick={() => setIsCreateDialogOpen(true)}
               >
                 <Plus className="mr-2 h-4 w-4" />
-                Créer votre premier projet
+                {t('projectsBloc.enterprise.createFirstProject')}
               </Button>
             </div>
           ) : viewMode === 'table' ? (
             <ProjectTableInline
-              projects={projects}
+              projects={projects as any}
               onUpdateProject={handleUpdateProject}
               onProjectClick={project => {
                 setSelectedProject(project);
@@ -445,11 +447,10 @@ export const ProjectDashboardEnterprise: React.FC<ProjectDashboardEnterpriseProp
                         setSelectedProject(project);
                         setIsDetailsDialogOpen(true);
                       }}
-                      className={`group cursor-pointer overflow-hidden transition-all duration-200 hover:shadow-lg active:scale-[0.98] ${
-                        isOverdue
+                      className={`group cursor-pointer overflow-hidden transition-all duration-200 hover:shadow-lg active:scale-[0.98] ${isOverdue
                           ? 'border-red-300 bg-red-50/30 dark:border-red-800 dark:bg-red-950/20'
                           : ''
-                      }`}
+                        }`}
                     >
                       <CardHeader className="p-4 pb-3 sm:p-6 sm:pb-3">
                         <div className="flex items-start justify-between gap-2">
@@ -488,7 +489,7 @@ export const ProjectDashboardEnterprise: React.FC<ProjectDashboardEnterpriseProp
                         {project.progress !== undefined && (
                           <div className="space-y-1.5 sm:space-y-2">
                             <div className="flex items-center justify-between text-xs sm:text-sm">
-                              <span className="text-muted-foreground">Progression</span>
+                              <span className="text-muted-foreground">{t('projectsBloc.table.colProgress')}</span>
                               <span className="font-semibold">{project.progress}%</span>
                             </div>
                             <Progress value={project.progress} className="h-2.5 sm:h-2" />
@@ -501,7 +502,7 @@ export const ProjectDashboardEnterprise: React.FC<ProjectDashboardEnterpriseProp
                           <div className="space-y-0.5 sm:space-y-1">
                             <div className="text-muted-foreground flex items-center gap-1">
                               <Calendar className="h-3 w-3 shrink-0" />
-                              <span className="truncate">Début</span>
+                              <span className="truncate">{t('projectsBloc.enterprise.startDate')}</span>
                             </div>
                             <div className="truncate font-medium">
                               {formatDate(project.start_date)}
@@ -511,7 +512,7 @@ export const ProjectDashboardEnterprise: React.FC<ProjectDashboardEnterpriseProp
                           <div className="space-y-0.5 sm:space-y-1">
                             <div className="text-muted-foreground flex items-center gap-1">
                               <Calendar className="h-3 w-3 shrink-0" />
-                              <span className="truncate">Fin</span>
+                              <span className="truncate">{t('projectsBloc.enterprise.endDate')}</span>
                             </div>
                             <div
                               className={`truncate font-medium ${isOverdue ? 'text-red-600 dark:text-red-400' : ''}`}
@@ -525,10 +526,10 @@ export const ProjectDashboardEnterprise: React.FC<ProjectDashboardEnterpriseProp
                             <div className="space-y-0.5 sm:space-y-1">
                               <div className="text-muted-foreground flex items-center gap-1">
                                 <DollarSign className="h-3 w-3 shrink-0" />
-                                <span className="truncate">Budget</span>
+                                <span className="truncate">{t('projectsBloc.enterprise.budget')}</span>
                               </div>
                               <div className="truncate font-medium">
-                                {formatCurrency(project.budget, project.currency || 'DJF')}
+                                {formatCurrency(project.budget, 'DJF')}
                               </div>
                             </div>
                           )}
@@ -538,10 +539,10 @@ export const ProjectDashboardEnterprise: React.FC<ProjectDashboardEnterpriseProp
                             <div className="space-y-0.5 sm:space-y-1">
                               <div className="text-muted-foreground flex items-center gap-1">
                                 <Users className="h-3 w-3 shrink-0" />
-                                <span className="truncate">Équipe</span>
+                                <span className="truncate">{t('projectsBloc.enterprise.team')}</span>
                               </div>
                               <div className="truncate font-medium">
-                                {project.team_size} membres
+                                {project.team_size} {t('projectsBloc.enterprise.membersCount')}
                               </div>
                             </div>
                           )}
@@ -557,7 +558,7 @@ export const ProjectDashboardEnterprise: React.FC<ProjectDashboardEnterpriseProp
                               </AvatarFallback>
                             </Avatar>
                             <span className="text-muted-foreground truncate text-xs sm:text-sm">
-                              Créé par {project.profiles.full_name}
+                              {t('projectsBloc.enterprise.createdBy').replace('%s', project.profiles.full_name)}
                             </span>
                           </div>
                         )}
@@ -579,8 +580,8 @@ export const ProjectDashboardEnterprise: React.FC<ProjectDashboardEnterpriseProp
                 <div className="mt-6 space-y-3 sm:mt-8 sm:space-y-0">
                   {/* Info pagination - Centré mobile */}
                   <div className="text-muted-foreground text-center text-xs sm:text-left sm:text-sm">
-                    Page {pagination.page} sur {pagination.totalPages}
-                    <span className="hidden sm:inline"> • {totalCount} projets au total</span>
+                    {t('projectsBloc.enterprise.pageFormat').replace('%s', pagination.page.toString()).replace('%s', pagination.totalPages.toString())}
+                    <span className="hidden sm:inline"> {t('projectsBloc.enterprise.totalFormat').replace('%s', totalCount.toString())}</span>
                   </div>
 
                   {/* Contrôles pagination - Full width mobile */}
@@ -593,7 +594,7 @@ export const ProjectDashboardEnterprise: React.FC<ProjectDashboardEnterpriseProp
                       className="h-9 w-9 p-0 sm:h-auto sm:w-auto sm:px-3"
                     >
                       <ChevronLeft className="h-4 w-4" />
-                      <span className="sr-only">Page précédente</span>
+                      <span className="sr-only">{t('projectsBloc.enterprise.prevPage')}</span>
                     </Button>
 
                     {/* Numéros de page - Moins sur mobile */}
@@ -646,7 +647,7 @@ export const ProjectDashboardEnterprise: React.FC<ProjectDashboardEnterpriseProp
                       className="h-9 w-9 p-0 sm:h-auto sm:w-auto sm:px-3"
                     >
                       <ChevronRight className="h-4 w-4" />
-                      <span className="sr-only">Page suivante</span>
+                      <span className="sr-only">{t('projectsBloc.enterprise.nextPage')}</span>
                     </Button>
                   </div>
                 </div>
@@ -662,7 +663,7 @@ export const ProjectDashboardEnterprise: React.FC<ProjectDashboardEnterpriseProp
                     className="w-full sm:w-auto"
                   >
                     {loading ? <RefreshCw className="mr-2 h-4 w-4 animate-spin" /> : null}
-                    Charger plus de projets
+                    {t('projectsBloc.enterprise.loadMore')}
                   </Button>
                 </div>
               )}
@@ -687,14 +688,14 @@ export const ProjectDashboardEnterprise: React.FC<ProjectDashboardEnterpriseProp
               budget: projectData.budget,
             });
             toast({
-              title: '✅ Projet créé',
-              description: `Le projet "${projectData.name}" a été créé avec succès.`,
+              title: t('projectsBloc.creation.successTitle'),
+              description: t('projectsBloc.creation.successDesc').replace('%s', projectData.name),
             });
             setIsCreateDialogOpen(false);
           } catch (err: any) {
             toast({
-              title: 'Erreur',
-              description: err.message ?? 'Impossible de créer le projet.',
+              title: t('projectsBloc.creation.createError'),
+              description: err.message ?? t('projectsBloc.creation.createErrorDesc'),
               variant: 'destructive',
             });
           }

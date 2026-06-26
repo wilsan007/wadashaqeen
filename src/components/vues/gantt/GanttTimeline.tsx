@@ -194,8 +194,16 @@ export const GanttTimeline = ({
     let currentDate = new Date(startDate);
 
     for (let i = 0; i < totalUnits; i++) {
+      // Pour le mode année, avancer d'une année
+      if (config.unitDuration === 365) {
+        currentDate = new Date(startDate.getFullYear() + i, 0, 1);
+      }
+      // Pour le mode trimestre, avancer de 3 mois
+      else if (config.unitDuration === 90) {
+        currentDate = new Date(startDate.getFullYear(), Math.floor(startDate.getMonth() / 3) * 3 + (i * 3), 1);
+      }
       // Pour le mode mois, avancer d'un mois à la fois
-      if (config.unitDuration === 30) {
+      else if (config.unitDuration === 30) {
         currentDate = new Date(startDate.getFullYear(), startDate.getMonth() + i, 1);
       } else {
         currentDate = new Date(startDate.getTime() + i * config.unitDuration * 24 * 60 * 60 * 1000);
@@ -328,7 +336,7 @@ export const GanttTimeline = ({
     });
 
     return positions;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tasks, config, startDate, rowHeight, displayMode, projectsOrder, dependencies]);
 
   return (

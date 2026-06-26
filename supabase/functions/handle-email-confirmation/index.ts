@@ -1,164 +1,291 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+declare const Deno: any;
 
-serve(async req => {
-  // Handle CORS
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+// ─── CORS ─────────────────────────────────────────────────────────────────────
+function corsHeaders(origin: string | null) {
+  return {
+    'Access-Control-Allow-Origin': origin ?? '*',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  };
+}
+
+function respond(body: unknown, status: number, origin: string | null): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders(origin), 'Content-Type': 'application/json' },
+  });
+}
+
+// ─── Email confirmation helper ────────────────────────────────────────────────
+async function confirmEmail(admin: any, userId: string, currentMeta: Record<string, any>) {
+  const ts = new Date().toISOString();
+  const { error } = await admin.auth.admin.updateUserById(userId, {
+    email_confirm: true,
+    user_metadata: { ...currentMeta, email_confirmed_at: ts },
+  });
+  if (!error) return;
+  // Fallback — metadata-only flag
+  await admin.auth.admin.updateUserById(userId, {
+    user_metadata: { ...currentMeta, email_confirmed_at: ts, email_confirm_fallback: true },
+  });
+}
+
+// ─── COLLABORATOR onboarding ──────────────────────────────────────────────────
+async function processCollaborator(
+  admin: any,
+  userId: string,
+  userEmail: string,
+  userMeta: Record<string, any>,
+  emailAlreadyConfirmed: boolean,
+  origin: string | null
+): Promise<Response> {
+
+  if (userMeta?.invitation_type !== 'collaborator') {
+    return respond({ message: 'Ignoré: non collaborateur' }, 200, origin);
   }
 
-  try {
-    console.log('🚀 Edge Function: handle-email-confirmation (REWRITTEN) started');
+  // Anti-loop guard: check if THIS specific invitation was already processed.
+  // This allows the same user to be re-invited into another tenant.
+  if (
+    userMeta?.processed_collaborator_at &&
+    userMeta?.last_processed_invitation_id &&
+    userMeta.last_processed_invitation_id === userMeta.invitation_id
+  ) {
+    return respond({ message: 'Déjà traité pour cette invitation' }, 200, origin);
+  }
 
-    // 1. Init Supabase Admin Client
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-        },
+  // 1. Resolve invitation — by ID first, fallback by email
+  let invitation: {
+    id: string;
+    tenant_id: string;
+    full_name: string;
+    role_to_assign: string;
+    department: string | null;
+    job_position: string | null;
+    status: string;
+  } | null = null;
+
+  if (userMeta.invitation_id) {
+    const { data, error } = await admin
+      .from('invitations')
+      .select('id, tenant_id, full_name, role_to_assign, department, job_position, status')
+      .eq('id', userMeta.invitation_id)
+      .single();
+    if (!error && data) {
+      if (data.status === 'accepted') {
+        console.log(`✅ Invitation ${data.id} déjà acceptée — skip duplicate`);
+        return respond({ success: true, message: 'Déjà traité', data: { user_id: userId, tenant_id: data.tenant_id } }, 200, origin);
       }
-    );
-
-    // 2. Parse Webhook Payload
-    const payload = await req.json();
-    console.log('📦 Payload received type:', payload.type);
-
-    // Only process UPDATE events on auth.users
-    if (payload.type !== 'UPDATE' || payload.table !== 'users' || payload.schema !== 'auth') {
-      console.log('⏭️ Ignoring non-UPDATE event or wrong table');
-      return new Response(JSON.stringify({ message: 'Ignored' }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      invitation = data;
     }
+  }
 
-    const newUser = payload.record;
-    const oldUser = payload.old_record;
-
-    // 3. Check if email was just confirmed
-    const wasConfirmed = !oldUser.email_confirmed_at && newUser.email_confirmed_at;
-
-    if (!wasConfirmed) {
-      console.log('⏭️ Email not confirmed in this update (or already confirmed)');
-      return new Response(JSON.stringify({ message: 'Ignored: Not a confirmation event' }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+  if (!invitation) {
+    console.warn(`⚠️ invitation_id introuvable (${userMeta.invitation_id}), fallback email: ${userEmail}`);
+    const { data, error } = await admin
+      .from('invitations')
+      .select('id, tenant_id, full_name, role_to_assign, department, job_position, status')
+      .eq('email', userEmail)
+      .eq('invitation_type', 'collaborator')
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+    if (error || !data) {
+      throw new Error(`INVITATION_NOT_FOUND: invitation_id=${userMeta.invitation_id}, email=${userEmail}`);
     }
+    invitation = data;
+    console.log(`✅ Fallback email réussi — invitation: ${invitation.id}, tenant: ${invitation.tenant_id}`);
+  }
 
-    console.log(`✅ Email confirmation detected for user: ${newUser.id} (${newUser.email})`);
+  if (!invitation.tenant_id) throw new Error('INVALID_INVITATION: tenant_id manquant');
 
-    // 4. Check Invitation Type & Dispatch
-    const metadata = newUser.raw_user_meta_data || {};
+  // 2. Confirm email if not already done
+  if (!emailAlreadyConfirmed) {
+    await confirmEmail(admin, userId, userMeta);
+  }
 
-    // A. Dispatch to Collaborator Handler
-    if (metadata.invitation_type === 'collaborator') {
-      console.log('🔀 Dispatching to handle-collaborator-confirmation...');
+  // 3. Resolve role
+  const { data: role, error: roleError } = await admin
+    .from('roles')
+    .select('id, name, display_name')
+    .eq('name', invitation.role_to_assign)
+    .single();
+  if (roleError || !role) {
+    throw new Error(`ROLE_NOT_FOUND: '${invitation.role_to_assign}' inexistant`);
+  }
 
-      // Construct URL for the other function
-      // We assume they are in the same project, so we can use the same base URL logic or env vars
-      const projectUrl = Deno.env.get('SUPABASE_URL');
-      // Extract project ref from URL (e.g. https://xyz.supabase.co -> xyz)
-      // Or just append /functions/v1/handle-collaborator-confirmation if it's the standard structure
+  // 4. Create profile (skip if already exists in this tenant)
+  const { data: existingProfile } = await admin
+    .from('profiles')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('tenant_id', invitation.tenant_id)
+    .maybeSingle();
 
-      // Robust way: Use the same host as the current request if possible, or build from SUPABASE_URL
-      const targetUrl = `${projectUrl}/functions/v1/handle-collaborator-confirmation`;
-
-      const response = await fetch(targetUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: req.headers.get('Authorization') || '', // Pass through the key
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const result = await response.json();
-      console.log('✅ Collaborator handler response:', response.status, result);
-
-      return new Response(JSON.stringify(result), {
-        status: response.status,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    // B. Handle Tenant Owner (Default Logic)
-    if (metadata.invitation_type !== 'tenant_owner') {
-      console.log('⏭️ Unknown invitation type:', metadata.invitation_type);
-      return new Response(JSON.stringify({ message: 'Ignored: Unknown type' }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    // 5. Create Tenant and Profile
-    console.log('🏗️ Creating Tenant and Profile...');
-    const tenantId = metadata.tenant_id;
-    const fullName = metadata.full_name;
-    const companyName = metadata.company_name || `${fullName}'s Company`;
-
-    // Create Tenant
-    const { error: tenantError } = await supabaseAdmin.from('tenants').insert({
-      id: tenantId,
-      name: companyName,
-      slug:
-        companyName.toLowerCase().replace(/[^a-z0-9]/g, '-') +
-        '-' +
-        Math.floor(Math.random() * 1000),
-      status: 'active',
-    });
-
-    if (tenantError) {
-      console.error('❌ Error creating tenant:', tenantError);
-      // If tenant already exists (idempotency), we might want to continue or fail.
-      // For now, let's log and try to continue to profile creation if it's a duplicate key error
-      if (!tenantError.message.includes('duplicate key')) {
-        throw tenantError;
-      }
-      console.log('⚠️ Tenant might already exist, continuing...');
-    } else {
-      console.log('✅ Tenant created');
-    }
-
-    // Create Profile (matching production schema exactly)
-    const { error: profileError } = await supabaseAdmin.from('profiles').insert({
-      user_id: newUser.id,
-      tenant_id: tenantId,
-      full_name: fullName,
-      email: newUser.email,
-      role: 'tenant_admin',
+  if (!existingProfile) {
+    const { error: profileError } = await admin.from('profiles').insert({
+      user_id: userId,
+      tenant_id: invitation.tenant_id,
+      full_name: invitation.full_name,
+      email: userEmail,
+      role: role.name,
       contract_type: 'CDI',
       weekly_hours: 35,
     });
+    if (profileError) throw new Error(`DB_PROFILE_ERROR: ${profileError.message}`);
+  } else {
+    await admin
+      .from('profiles')
+      .update({ role: role.name, updated_at: new Date().toISOString() })
+      .eq('user_id', userId)
+      .eq('tenant_id', invitation.tenant_id);
+  }
 
-    if (profileError) {
-      console.error('❌ Error creating profile:', profileError);
-      if (!profileError.message.includes('duplicate key')) {
-        throw profileError;
-      }
-      console.log('⚠️ Profile might already exist');
-    } else {
-      console.log('✅ Profile created');
-    }
+  // 5. Create or update employee — handles UNIQUE(email) + UNIQUE(user_id,tenant_id)
+  //    employee_id auto-generated by DB trigger set_employee_id when inserting new rows
+  const { data: existingEmp } = await admin
+    .from('employees')
+    .select('id, employee_id')
+    .or(`user_id.eq.${userId},email.eq.${userEmail}`)
+    .maybeSingle();
 
-    // [NEW] Create Employee Record
-    const employeeId =
-      'EMP-' +
-      Math.floor(Math.random() * 10000)
-        .toString()
-        .padStart(4, '0');
-    console.log('👷 Creating Employee record:', employeeId);
+  let employeeId = 'auto-generated';
+  if (existingEmp) {
+    // Already exists — just update non-critical fields, keep employee_id
+    await admin
+      .from('employees')
+      .update({
+        tenant_id: invitation.tenant_id,
+        job_title: invitation.job_position ?? 'Collaborateur',
+        department_id: invitation.department ?? null,
+        status: 'active',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', existingEmp.id);
+    employeeId = existingEmp.employee_id ?? 'auto-generated';
+    console.log(`ℹ️ Employé existant mis à jour: ${employeeId}`);
+  } else {
+    // New employee — employee_id generated by trigger set_employee_id
+    const { data: newEmp, error: empError } = await admin
+      .from('employees')
+      .insert({
+        user_id: userId,
+        full_name: invitation.full_name,
+        email: userEmail,
+        job_title: invitation.job_position ?? 'Collaborateur',
+        department_id: invitation.department ?? null,
+        hire_date: new Date().toISOString().split('T')[0],
+        contract_type: 'CDI',
+        weekly_hours: 35,
+        status: 'active',
+        tenant_id: invitation.tenant_id,
+      })
+      .select('employee_id')
+      .maybeSingle();
+    if (empError) console.warn('⚠️ employees insert:', empError.message);
+    employeeId = newEmp?.employee_id ?? 'auto-generated';
+  }
 
-    const { error: employeeError } = await supabaseAdmin.from('employees').insert({
-      user_id: newUser.id,
+  // 6. Assign role
+  const { error: roleAssignError } = await admin.from('user_roles').upsert(
+    {
+      user_id: userId,
+      role_id: role.id,
+      context_type: 'global',
+      context_id: invitation.tenant_id,
+      assigned_at: new Date().toISOString(),
+      is_active: true,
+      tenant_id: invitation.tenant_id,
+    },
+    { onConflict: 'user_id,role_id,tenant_id', ignoreDuplicates: true }
+  );
+  if (roleAssignError) console.warn('⚠️ user_roles upsert:', roleAssignError.message);
+
+  // 7. Mark as processed (anti-loop)
+  await admin.auth.admin.updateUserById(userId, {
+    user_metadata: {
+      ...userMeta,
+      processed_collaborator_at: new Date().toISOString(),
+      last_processed_invitation_id: invitation.id,
       employee_id: employeeId,
+    },
+  });
+
+  await admin.from('invitations').update({ status: 'accepted' }).eq('id', invitation.id);
+
+  console.log(`✅ Collaborateur configuré: user=${userId}, tenant=${invitation.tenant_id}, employee_id=${employeeId}`);
+
+  return respond(
+    {
+      success: true,
+      message: 'Collaborateur configuré avec succès',
+      data: { user_id: userId, tenant_id: invitation.tenant_id, employee_id: employeeId, role: role.display_name },
+    },
+    200,
+    origin
+  );
+}
+
+// ─── TENANT OWNER onboarding ──────────────────────────────────────────────────
+async function processTenantOwner(
+  admin: any,
+  userId: string,
+  userEmail: string,
+  userMeta: Record<string, any>,
+  origin: string | null
+): Promise<Response> {
+  const tenantId    = userMeta.tenant_id;
+  const fullName    = userMeta.full_name    ?? userEmail.split('@')[0];
+  const companyName = userMeta.company_name ?? `${fullName}'s Company`;
+
+  if (!tenantId) throw new Error('TENANT_OWNER: tenant_id manquant dans user_metadata');
+
+  // 1. Create tenant (idempotent)
+  const { error: tenantError } = await admin.from('tenants').insert({
+    id: tenantId,
+    name: companyName,
+    slug: companyName.toLowerCase().replace(/[^a-z0-9]/g, '-') + '-' + Math.floor(Math.random() * 1000),
+    status: 'active',
+  });
+  if (tenantError && !tenantError.message.includes('duplicate key')) {
+    throw new Error(`DB_TENANT_ERROR: ${tenantError.message}`);
+  }
+
+  // 2. Create profile (idempotent)
+  const { error: profileError } = await admin.from('profiles').insert({
+    user_id: userId,
+    tenant_id: tenantId,
+    full_name: fullName,
+    email: userEmail,
+    role: 'tenant_admin',
+    contract_type: 'CDI',
+    weekly_hours: 35,
+  });
+  if (profileError && !profileError.message.includes('duplicate key')) {
+    throw new Error(`DB_PROFILE_ERROR: ${profileError.message}`);
+  }
+
+  // 3. Create or update employee — handles UNIQUE(email) + UNIQUE(user_id,tenant_id)
+  const { data: existingEmpOwner } = await admin
+    .from('employees')
+    .select('id')
+    .or(`user_id.eq.${userId},email.eq.${userEmail}`)
+    .maybeSingle();
+
+  if (existingEmpOwner) {
+    await admin
+      .from('employees')
+      .update({ tenant_id: tenantId, status: 'active', updated_at: new Date().toISOString() })
+      .eq('id', existingEmpOwner.id);
+  } else {
+    const { error: empError } = await admin.from('employees').insert({
+      user_id: userId,
       full_name: fullName,
-      email: newUser.email,
+      email: userEmail,
       job_title: 'Tenant Administrateur',
       hire_date: new Date().toISOString().split('T')[0],
       contract_type: 'CDI',
@@ -166,59 +293,122 @@ serve(async req => {
       status: 'active',
       tenant_id: tenantId,
     });
+    if (empError) console.warn('⚠️ employees insert:', empError.message);
+  }
 
-    if (employeeError) {
-      console.error('❌ Error creating employee:', employeeError);
-      // Don't throw here to avoid blocking the whole process if just this fails
-    } else {
-      console.log('✅ Employee created');
-    }
+  // 4. Assign tenant_admin role
+  const { data: roleData } = await admin
+    .from('roles')
+    .select('id')
+    .eq('name', 'tenant_admin')
+    .single();
 
-    // Assign tenant_admin role via user_roles table
-    // First, get the tenant_admin role_id
-    const { data: roleData } = await supabaseAdmin
-      .from('roles')
-      .select('id')
-      .eq('name', 'tenant_admin')
-      .single();
-
-    if (roleData) {
-      const { error: roleError } = await supabaseAdmin.from('user_roles').insert({
-        user_id: newUser.id,
+  if (roleData) {
+    const { error: roleError } = await admin.from('user_roles').upsert(
+      {
+        user_id: userId,
         role_id: roleData.id,
         context_type: 'global',
         context_id: tenantId,
         assigned_at: new Date().toISOString(),
         is_active: true,
         tenant_id: tenantId,
-      });
+      },
+      { onConflict: 'user_id,role_id,tenant_id', ignoreDuplicates: true }
+    );
+    if (roleError) console.warn('⚠️ user_roles upsert:', roleError.message);
+  }
 
-      if (roleError) {
-        console.error('⚠️ Error assigning role:', roleError);
-      } else {
-        console.log('✅ Role assigned');
-      }
+  // 5. Mark invitation as accepted (if one exists)
+  await admin
+    .from('invitations')
+    .update({ status: 'accepted', accepted_at: new Date().toISOString() })
+    .eq('email', userEmail)
+    .eq('invitation_type', 'tenant_owner')
+    .eq('status', 'pending');
+
+  console.log(`✅ Tenant owner configuré: user=${userId}, tenant=${tenantId}`);
+
+  return respond(
+    { success: true, message: 'Tenant owner configuré avec succès', data: { user_id: userId, tenant_id: tenantId } },
+    200,
+    origin
+  );
+}
+
+// ─── Entry point ──────────────────────────────────────────────────────────────
+serve(async (req) => {
+  const origin = req.headers.get('origin');
+
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders(origin) });
+  }
+
+  if (req.method !== 'POST') {
+    return respond({ error: 'Method Not Allowed' }, 405, origin);
+  }
+
+  try {
+    const admin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      { auth: { autoRefreshToken: false, persistSession: false } }
+    );
+
+    const payload = await req.json();
+
+    // ── Mode A: Direct call from frontend (AuthCallback) ──────────────────────
+    // Payload: { user_id: string } + Authorization: Bearer <user_token>
+    if (payload.user_id) {
+      const authHeader = req.headers.get('Authorization');
+      if (!authHeader) return respond({ error: 'Non autorisé' }, 401, origin);
+
+      const { data: { user: caller }, error: authError } = await admin.auth.getUser(
+        authHeader.replace('Bearer ', '').trim()
+      );
+      if (authError || !caller) return respond({ error: 'Token invalide' }, 401, origin);
+      if (caller.id !== payload.user_id) return respond({ error: 'Identité non concordante' }, 403, origin);
+
+      const userMeta = caller.user_metadata ?? {};
+      // Mode A only supports collaborator (tenant_owner uses onboard-tenant-owner via RPC)
+      return await processCollaborator(admin, caller.id, caller.email!, userMeta, true, origin);
     }
 
-    // 6. Assign Role in user_roles (if you have a separate roles table)
-    // Assuming 'profiles' table handles the role as per schema seen in previous contexts,
-    // but if there is a separate user_roles table or RBAC system, add it here.
-    // Based on previous context, roles seem to be in profiles or a separate system.
-    // Let's assume profiles.role is the main one for now, or add to user_roles if it exists.
+    // ── Mode B: DB webhook from pg_net trigger (notify_email_confirmation) ────
+    // Payload: { type, table, schema, record, old_record }
+    if (payload.type === 'UPDATE' && payload.table === 'users' && payload.schema === 'auth') {
+      const newUser = payload.record;
+      const oldUser = payload.old_record;
 
-    // Check if user_roles table exists and insert if needed
-    // (Skipping for now to keep it simple and robust based on profile role)
+      // Verify it's a real email confirmation event
+      const wasConfirmed = !oldUser?.email_confirmed_at && newUser?.email_confirmed_at;
+      if (!wasConfirmed) {
+        console.log('⏭️ Pas un événement de confirmation email — ignoré');
+        return respond({ message: 'Ignoré: pas une confirmation' }, 200, origin);
+      }
 
-    console.log('🎉 Onboarding completed successfully');
+      const userId    = newUser.id;
+      const userEmail = newUser.email;
+      const userMeta  = newUser.raw_user_meta_data ?? {};
 
-    return new Response(JSON.stringify({ success: true }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
-  } catch (error) {
-    console.error('🚨 Unhandled error:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+      console.log(`📧 Confirmation email détectée: ${userEmail} (type: ${userMeta.invitation_type})`);
+
+      if (userMeta.invitation_type === 'collaborator') {
+        return await processCollaborator(admin, userId, userEmail, userMeta, true, origin);
+      }
+
+      if (userMeta.invitation_type === 'tenant_owner') {
+        return await processTenantOwner(admin, userId, userEmail, userMeta, origin);
+      }
+
+      console.warn('⚠️ Type d\'invitation inconnu:', userMeta.invitation_type);
+      return respond({ message: 'Ignoré: type inconnu', type: userMeta.invitation_type }, 200, origin);
+    }
+
+    return respond({ error: 'Format de requête non reconnu' }, 400, origin);
+
+  } catch (err: any) {
+    console.error('❌ handle-email-confirmation:', err.message);
+    return respond({ success: false, error: err.message, timestamp: new Date().toISOString() }, 500, origin);
   }
 });

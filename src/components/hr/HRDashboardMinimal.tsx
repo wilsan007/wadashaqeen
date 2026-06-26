@@ -21,9 +21,16 @@ import {
   AlertCircle,
   RefreshCw,
   Shield,
+  TrendingDown,
 } from 'lucide-react';
+import { useTranslation } from '@/hooks/useTranslation';
+import { useAbsenteeismRate } from '@/hooks/useAbsenteeismRate';
+import { KPICard } from '@/components/analytics/KPICard';
 
 export const HRDashboardMinimal = () => {
+  const { t } = useTranslation();
+  const { data: absenteeism, isLoading: absenteeismLoading } = useAbsenteeismRate();
+
   const {
     leaveRequests,
     attendances,
@@ -104,19 +111,19 @@ export const HRDashboardMinimal = () => {
   const recentRequests = leaveRequests?.slice(0, 5) || [];
 
   return (
-    <div className="mx-auto max-w-7xl space-y-6 p-6">
+    <div className="animate-fade-in mx-auto max-w-7xl space-y-6 p-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="from-primary to-accent bg-gradient-to-r bg-clip-text text-3xl font-bold text-transparent">
-            Tableau de bord RH
+            {t('hrDashboard.title')}
           </h1>
           <div className="text-muted-foreground mt-1 flex items-center gap-2">
-            <span>Vue d'ensemble des ressources humaines</span>
+            <span>{t('hrDashboard.subtitle')}</span>
             {isSuperAdmin && (
               <Badge variant="secondary">
                 <Shield className="mr-1 h-3 w-3" />
-                Super Admin
+                {t('hrDashboard.superAdmin')}
               </Badge>
             )}
           </div>
@@ -124,42 +131,79 @@ export const HRDashboardMinimal = () => {
 
         <Button onClick={refresh} variant="outline" size="sm">
           <RefreshCw className="mr-2 h-4 w-4" />
-          Actualiser
+          {t('hrDashboard.refresh')}
         </Button>
       </div>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
         <MetricCard
-          label="Total Employés"
+          label={t('hrDashboard.totalEmployees')}
           value={stats.totalEmployees}
-          subtitle="Effectif actuel"
+          subtitle={t('hrDashboard.currentStaff')}
           icon={<Users className="h-6 w-6" />}
           color="blue"
         />
 
         <MetricCard
-          label="En attente"
+          label={t('hrDashboard.pending')}
           value={stats.pendingRequests}
-          subtitle="Demandes à traiter"
+          subtitle={t('hrDashboard.toProcess')}
           icon={<AlertCircle className="h-6 w-6" />}
           color="orange"
         />
 
         <MetricCard
-          label="Approuvées"
+          label={t('hrDashboard.approved')}
           value={stats.approvedRequests}
-          subtitle="Demandes validées"
+          subtitle={t('hrDashboard.validatedRequests')}
           icon={<CheckCircle className="h-6 w-6" />}
           color="green"
         />
 
         <MetricCard
-          label="Présences"
+          label={t('hrDashboard.attendances')}
           value={stats.todayAttendances}
-          subtitle="Aujourd'hui"
+          subtitle={t('hrDashboard.today')}
           icon={<Clock className="h-6 w-6" />}
           color="blue"
+        />
+      </div>
+
+      {/* Absenteeism KPI */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <KPICard
+          title="Taux d'absentéisme (mois)"
+          value={absenteeismLoading ? '...' : (absenteeism?.rate ?? 0)}
+          icon={TrendingDown}
+          color={
+            (absenteeism?.rate ?? 0) > 10
+              ? 'destructive'
+              : (absenteeism?.rate ?? 0) > 5
+                ? 'warning'
+                : 'success'
+          }
+          format="percentage"
+          progress={absenteeismLoading ? undefined : Math.min(absenteeism?.rate ?? 0, 20) * 5}
+          subtitle={
+            absenteeism
+              ? `${absenteeism.totalAbsenceDays}j absence · ${absenteeism.workingDaysInMonth}j ouvrés`
+              : undefined
+          }
+          trend={
+            absenteeism
+              ? {
+                value: 0,
+                isPositive: absenteeism.rate <= 5,
+                label:
+                  absenteeism.rate <= 5
+                    ? 'Excellent — objectif < 5%'
+                    : absenteeism.rate <= 10
+                      ? 'Acceptable — objectif < 5%'
+                      : 'Élevé — action requise',
+              }
+              : undefined
+          }
         />
       </div>
 
@@ -168,7 +212,7 @@ export const HRDashboardMinimal = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Calendar className="h-5 w-5" />
-            Demandes de congés récentes
+            {t('hrDashboard.recentLeaveRequests')}
             <Badge variant="secondary" className="ml-auto">
               {recentRequests.length}
             </Badge>
@@ -178,7 +222,7 @@ export const HRDashboardMinimal = () => {
           {recentRequests.length === 0 ? (
             <div className="text-muted-foreground py-8 text-center">
               <Calendar className="mx-auto mb-4 h-12 w-12 opacity-50" />
-              <p>Aucune demande de congé récente</p>
+              <p>{t('hrDashboard.noRecentLeaveRequests')}</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -191,9 +235,9 @@ export const HRDashboardMinimal = () => {
                   >
                     <div className="min-w-0 flex-1">
                       <div className="truncate font-medium">
-                        {employee?.full_name || request.profiles?.full_name || 'Employé inconnu'}
+                        {employee?.full_name || request.profiles?.full_name || t('hrDashboard.unknownEmployee')}
                         {isSuperAdmin && request.profiles?.tenant_id && (
-                          <span className="ml-2 text-xs font-normal text-blue-600">
+                          <span className="ml-2 text-xs font-normal text-[hsl(var(--tech-blue))]">
                             ({request.profiles.tenant_id})
                           </span>
                         )}
@@ -203,25 +247,25 @@ export const HRDashboardMinimal = () => {
                         {new Date(request.end_date).toLocaleDateString()}
                       </div>
                       <div className="text-muted-foreground text-xs">
-                        {request.total_days} jour(s)
+                        {request.total_days} {t('hrDashboard.days')}
                         {request.reason && ` • ${request.reason}`}
                       </div>
                     </div>
                     <Badge
-                      variant={
-                        request.status === 'approved'
-                          ? 'default'
+                      className={
+                        `ml-3 flex-shrink-0 border-0 font-medium ` +
+                        (request.status === 'approved'
+                          ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400'
                           : request.status === 'rejected'
-                            ? 'destructive'
-                            : 'secondary'
+                            ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400'
+                            : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400')
                       }
-                      className="ml-3 flex-shrink-0"
                     >
                       {request.status === 'approved'
-                        ? 'Approuvée'
+                        ? t('hrDashboard.statusApproved')
                         : request.status === 'rejected'
-                          ? 'Rejetée'
-                          : 'En attente'}
+                          ? t('hrDashboard.statusRejected')
+                          : t('hrDashboard.statusPending')}
                     </Badge>
                   </div>
                 );
@@ -237,7 +281,7 @@ export const HRDashboardMinimal = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Users className="h-5 w-5" />
-              Tous les employés du système
+              {t('hrDashboard.allSystemEmployees')}
               <Badge variant="outline" className="ml-auto">
                 {employees.length}
               </Badge>
@@ -257,14 +301,9 @@ export const HRDashboardMinimal = () => {
                     <div className="min-w-0 flex-1">
                       <div className="truncate font-medium">{employee.full_name}</div>
                       <div className="text-muted-foreground text-sm">
-                        {employee.job_title || 'Poste non défini'}
+                        {employee.job_title || t('hrDashboard.undefinedJob')}
                       </div>
-                      <div className="text-xs text-blue-600">ID: {employee.employee_id}</div>
-                      {employee.tenants?.name && (
-                        <div className="text-xs font-medium text-orange-600">
-                          {employee.tenants.name}
-                        </div>
-                      )}
+                      <div className="text-xs text-[hsl(var(--tech-blue))]">ID: {employee.employee_id}</div>
                     </div>
                   </div>
                 </div>
@@ -272,7 +311,7 @@ export const HRDashboardMinimal = () => {
             </div>
             {employees.length > 12 && (
               <div className="text-muted-foreground mt-4 text-center text-sm">
-                ... et {employees.length - 12} autres employés
+                {t('hrDashboard.otherEmployees').replace('%s', String(employees.length - 12))}
               </div>
             )}
           </CardContent>
@@ -284,7 +323,7 @@ export const HRDashboardMinimal = () => {
         <Card className="border-dashed">
           <CardHeader>
             <CardTitle className="text-muted-foreground text-sm">
-              🔧 Informations de débogage (Super Admin)
+              {t('hrDashboard.debugInfo')}
             </CardTitle>
           </CardHeader>
           <CardContent className="text-muted-foreground space-y-1 text-xs">

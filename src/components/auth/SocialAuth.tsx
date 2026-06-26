@@ -7,14 +7,14 @@ export const SocialAuth = () => {
 
   const handleGoogleLogin = async () => {
     try {
-      // Production : https://wadashaqayn.org/auth/callback
-      // Développement : utilise l'origine courante (localhost)
-      const appUrl = import.meta.env.VITE_APP_URL ?? window.location.origin;
+      // Toujours utiliser l'origine courante pour garantir la cohérence avec le Supabase redirect URLs.
+      // Note: VITE_APP_URL n'est pas défini dans .env — seul APP_URL l'est (sans préfixe VITE_).
+      const callbackUrl = `${window.location.origin}/auth/callback`;
 
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${appUrl}/auth/callback`,
+          redirectTo: callbackUrl,
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',

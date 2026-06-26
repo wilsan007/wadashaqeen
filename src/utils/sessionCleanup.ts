@@ -109,6 +109,7 @@ export const debugSession = async (): Promise<void> => {
       error,
     } = await supabase.auth.getSession();
 
+    console.log(
       'Expires At:',
       session?.expires_at ? new Date(session.expires_at * 1000).toLocaleString() : 'N/A'
     );
@@ -121,6 +122,7 @@ export const debugSession = async (): Promise<void> => {
         key === 'lastActivity' ||
         key === 'manualLogout'
       ) {
+        // Skip auth, lastActivity, and manualLogout keys
       }
     });
   } catch (error) {

@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/select';
 import { Clock, AlertCircle, CheckCircle2 } from '@/lib/icons';
 import { Ban } from 'lucide-react';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface EditableTaskStatusProps {
   value: string;
@@ -20,18 +21,20 @@ interface EditableTaskStatusProps {
   readOnly?: boolean;
 }
 
-const STATUS_OPTIONS = [
-  { value: 'todo', label: 'À faire', color: 'bg-gray-100 text-gray-800', icon: Clock },
-  { value: 'doing', label: 'En cours', color: 'bg-blue-100 text-blue-800', icon: AlertCircle },
-  { value: 'blocked', label: 'Bloqué', color: 'bg-red-100 text-red-800', icon: Ban },
-  { value: 'done', label: 'Terminé', color: 'bg-green-100 text-green-800', icon: CheckCircle2 },
-];
-
 export const EditableTaskStatus = ({
   value,
   onChange,
   readOnly = false,
 }: EditableTaskStatusProps) => {
+  const { t } = useTranslation();
+
+  const STATUS_OPTIONS = [
+    { value: 'todo', label: t('tasks.status.todo'), color: 'bg-gray-100 text-gray-800', icon: Clock },
+    { value: 'doing', label: t('tasks.status.in_progress'), color: 'bg-blue-100 text-blue-800', icon: AlertCircle },
+    { value: 'blocked', label: t('tasks.status.blocked'), color: 'bg-red-100 text-red-800', icon: Ban },
+    { value: 'done', label: t('tasks.status.done'), color: 'bg-green-100 text-green-800', icon: CheckCircle2 },
+  ];
+
   const currentStatus =
     STATUS_OPTIONS.find(s => s.value === value?.toLowerCase()) || STATUS_OPTIONS[0];
   const StatusIcon = currentStatus.icon;

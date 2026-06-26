@@ -50,12 +50,6 @@ const SetupAccount: React.FC = () => {
       }
 
 
-      // Récupérer les métadonnées utilisateur pour le mot de passe temporaire
-      const tempPassword = session.user.user_metadata?.temp_password;
-      if (tempPassword) {
-        setCurrentPassword(tempPassword);
-      }
-
       // Récupérer les informations du tenant
       if (tenantId) {
         const { data: tenant } = await supabase

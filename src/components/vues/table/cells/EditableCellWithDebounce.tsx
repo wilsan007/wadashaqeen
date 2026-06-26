@@ -146,7 +146,7 @@ export const EditableCellWithDebounce = ({
       className={cn(
         'group relative cursor-text transition-colors',
         isSubtask ? 'py-0 text-xs' : 'py-0',
-        isEditing && 'bg-blue-50 dark:bg-blue-950',
+        isEditing && 'bg-accent/50 dark:bg-accent/25',
         saveStatus === 'saving' && 'bg-yellow-50 dark:bg-yellow-950',
         saveStatus === 'saved' && 'bg-green-50 dark:bg-green-950',
         className

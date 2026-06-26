@@ -34,11 +34,20 @@ import { ActionTemplateList, type ActionTemplate } from './ActionTemplateList';
 import { useOperationalActivities } from '@/hooks/useOperationalActivities';
 import { supabase } from '@/integrations/supabase/client';
 import { useTenant } from '@/hooks/useTenant';
+import { useMutation } from '@tanstack/react-query';
 
 interface OneOffActivityDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;
+}
+
+interface SubmitPayload {
+  name: string;
+  description: string;
+  scope: 'org' | 'department' | 'team' | 'person';
+  dueDate: Date;
+  actionTemplates: ActionTemplate[];
 }
 
 export const OneOffActivityDialog: React.FC<OneOffActivityDialogProps> = ({
@@ -55,27 +64,24 @@ export const OneOffActivityDialog: React.FC<OneOffActivityDialogProps> = ({
   const [scope, setScope] = useState<'org' | 'department' | 'team' | 'person'>('org');
   const [dueDate, setDueDate] = useState<Date>(new Date());
   const [actionTemplates, setActionTemplates] = useState<ActionTemplate[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  const handleSubmit = async () => {
-    // Validation
-    if (!name.trim()) {
-      setError('Le nom est requis');
-      return;
-    }
+  const resetForm = () => {
+    setName('');
+    setDescription('');
+    setScope('org');
+    setDueDate(new Date());
+    setActionTemplates([]);
+  };
 
-    setLoading(true);
-    setError(null);
-
-    try {
-      // 1. Créer l'activité
+  const submitMutation = useMutation({
+    mutationFn: async (payload: SubmitPayload) => {
+      // 1. Créer l'activité via le hook existant
       const activityData = await createActivity({
-        name: name.trim(),
-        description: description.trim() || null,
+        name: payload.name,
+        description: payload.description || null,
         kind: 'one_off',
-        scope,
-        task_title_template: name.trim(),
+        scope: payload.scope,
+        task_title_template: payload.name,
         is_active: true,
       });
 
@@ -84,56 +90,47 @@ export const OneOffActivityDialog: React.FC<OneOffActivityDialogProps> = ({
       }
 
       // 2. Créer les templates d'actions si présents
-      if (actionTemplates.length > 0) {
-        const validTemplates = actionTemplates.filter(t => t.title.trim() !== '');
-
-        for (const template of validTemplates) {
-          await supabase.from('operational_action_templates').insert({
-            activity_id: activityData.id,
-            title: template.title,
-            description: template.description || null,
-            position: template.position,
-            tenant_id: tenantId,
-          });
-        }
+      const validTemplates = payload.actionTemplates.filter(t => t.title.trim() !== '');
+      for (const template of validTemplates) {
+        await supabase.from('operational_action_templates').insert({
+          activity_id: activityData.id,
+          title: template.title,
+          description: template.description || null,
+          position: template.position,
+          tenant_id: tenantId,
+        });
       }
 
       // 3. Appeler la RPC pour générer la tâche immédiatement
       const { error: rpcError } = await supabase.rpc('instantiate_one_off_activity', {
         p_activity_id: activityData.id,
-        p_due_date: format(dueDate, 'yyyy-MM-dd'),
-        p_title: null, // Utiliser le template
+        p_due_date: format(payload.dueDate, 'yyyy-MM-dd'),
+        p_title: null,
       });
 
-      if (rpcError) {
-        throw rpcError;
-      }
-
-      // Succès !
+      if (rpcError) throw rpcError;
+    },
+    onSuccess: () => {
       resetForm();
       onOpenChange(false);
       onSuccess?.();
-    } catch (err: any) {
+    },
+    onError: (err: any) => {
       console.error('❌ Erreur création activité ponctuelle:', err);
-      setError(err.message || 'Une erreur est survenue');
-    } finally {
-      setLoading(false);
-    }
-  };
+    },
+  });
 
-  const resetForm = () => {
-    setName('');
-    setDescription('');
-    setScope('org');
-    setDueDate(new Date());
-    setActionTemplates([]);
-    setError(null);
+  const handleSubmit = () => {
+    if (!name.trim()) return;
+    submitMutation.mutate({ name: name.trim(), description: description.trim(), scope, dueDate, actionTemplates });
   };
 
   const handleCancel = () => {
     resetForm();
     onOpenChange(false);
   };
+
+  const error = submitMutation.isError ? (submitMutation.error as any)?.message || 'Une erreur est survenue' : null;
 
   return (
     <ResponsiveModal open={open} onOpenChange={onOpenChange}>
@@ -245,11 +242,11 @@ export const OneOffActivityDialog: React.FC<OneOffActivityDialogProps> = ({
         </div>
 
         <ResponsiveModalFooter>
-          <Button variant="outline" onClick={handleCancel} disabled={loading}>
+          <Button variant="outline" onClick={handleCancel} disabled={submitMutation.isPending}>
             Annuler
           </Button>
-          <Button onClick={handleSubmit} disabled={loading || !name.trim()}>
-            {loading ? (
+          <Button onClick={handleSubmit} disabled={submitMutation.isPending || !name.trim()}>
+            {submitMutation.isPending ? (
               <>
                 <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
                 Création...

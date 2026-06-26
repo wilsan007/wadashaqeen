@@ -46,7 +46,7 @@ export default function PrivacyPage() {
               <strong className="text-zinc-100">Wadashaqayn</strong> est une plateforme SaaS de
               gestion des ressources humaines et de projets, éditée par la société Wadashaqayn,
               dont le siège social est situé à <strong className="text-zinc-100">Djibouti,
-              République de Djibouti</strong>.
+                République de Djibouti</strong>.
             </p>
             <p>
               La plateforme est accessible à l&apos;adresse{' '}
@@ -114,7 +114,85 @@ export default function PrivacyPage() {
           </Section>
 
           {/* 3 */}
-          <Section title="3. Finalités du traitement">
+          <Section title="3. Utilisation des données des services Google (Exigences OAuth)">
+            <p>
+              L'utilisation et le transfert à toute autre application d'informations reçues des
+              API Google respecteront la{' '}
+              <a
+                href="https://developers.google.com/terms/api-services-user-data-policy"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-400 underline underline-offset-2 hover:text-blue-300"
+              >
+                Politique relative aux données utilisateur des services API de Google
+              </a>
+              , y compris les exigences d'utilisation restreinte.
+            </p>
+
+            <Subsection title="3.1 Données Google auxquelles nous accédons">
+              <p>
+                Si vous choisissez de connecter votre compte Google à Wadashaqayn (par exemple, pour
+                l'authentification OAuth), nous accédons uniquement aux informations strictement
+                nécessaires au fonctionnement de l'intégration. Cela inclut votre nom,
+                votre adresse e-mail et votre photo de profil de compte Google.
+              </p>
+            </Subsection>
+
+            <Subsection title="3.2 Utilisation des données Google">
+              <p>
+                Ces données Google sont utilisées exclusivement pour vous fournir les
+                fonctionnalités de la plateforme Wadashaqayn (en l'occurrence, vous authentifier
+                et créer votre session en toute sécurité). Nous n'utilisons en aucun cas
+                ces données pour vous proposer des publicités ciblées ou pour des finalités tierces.
+              </p>
+            </Subsection>
+
+            <Subsection title="3.3 Partage des données Google">
+              <p>
+                <strong className="text-zinc-100">Nous ne partageons, ne vendons et ne louons
+                  aucune de vos données Google</strong> à des tiers ou des partenaires externes à des
+                fins marketing ou commerciales. Les seules exceptions concernent le respect
+                des obligations légales (processus juridique valide).
+              </p>
+            </Subsection>
+
+            <Subsection title="3.4 Stockage et protection des données Google">
+              <p>
+                Vos données provenant de Google, comme toutes vos autres données personnelles,
+                sont chiffrées en transit (HTTPS/TLS 1.3) et au repos (AES-256) de manière
+                sécurisée.
+              </p>
+            </Subsection>
+
+            <Subsection title="3.5 Conservation et suppression des données Google">
+              <p>
+                Nous conservons ces données temporelles uniquement le temps nécessaire ou
+                tant que votre compte Wadashaqayn restera actif. Vous pouvez à tout moment :
+              </p>
+              <ul className="list-disc space-y-1 pl-5">
+                <li>
+                  Révoquer l'accès à vos données directement via la page des paramètres de votre
+                  compte Google ({' '}
+                  <a
+                    href="https://myaccount.google.com/permissions"
+                    className="text-blue-400 underline underline-offset-2 hover:text-blue-300"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    myaccount.google.com/permissions
+                  </a>
+                  ).
+                </li>
+                <li>
+                  Demander la suppression de toutes vos données hébergées en nous contactant à{' '}
+                  <a href="mailto:privacy@wadashaqayn.org" className="text-blue-400">privacy@wadashaqayn.org</a>.
+                </li>
+              </ul>
+            </Subsection>
+          </Section>
+
+          {/* 4 */}
+          <Section title="4. Finalités du traitement">
             <p>Vos données sont traitées pour les finalités suivantes :</p>
             <ul className="list-disc space-y-1 pl-5">
               <li>
@@ -147,8 +225,8 @@ export default function PrivacyPage() {
             </ul>
           </Section>
 
-          {/* 4 */}
-          <Section title="4. Base légale du traitement">
+          {/* 5 */}
+          <Section title="5. Base légale du traitement">
             <p>Nos traitements reposent sur les bases légales suivantes :</p>
             <div className="overflow-x-auto rounded-lg border border-zinc-800">
               <table className="w-full text-xs">
@@ -176,8 +254,8 @@ export default function PrivacyPage() {
             </div>
           </Section>
 
-          {/* 5 */}
-          <Section title="5. Hébergement et sous-traitants">
+          {/* 6 */}
+          <Section title="6. Hébergement et sous-traitants">
             <p>
               La plateforme est hébergée sur l&apos;infrastructure de{' '}
               <strong className="text-zinc-100">Supabase</strong> (base de données PostgreSQL,
@@ -201,8 +279,8 @@ export default function PrivacyPage() {
             </p>
           </Section>
 
-          {/* 6 */}
-          <Section title="6. Durée de conservation">
+          {/* 7 */}
+          <Section title="7. Durée de conservation">
             <ul className="list-disc space-y-1 pl-5">
               <li>
                 <strong className="text-zinc-100">Données de compte actif</strong> : conservées
@@ -222,8 +300,8 @@ export default function PrivacyPage() {
             </ul>
           </Section>
 
-          {/* 7 */}
-          <Section title="7. Vos droits (RGPD)">
+          {/* 8 */}
+          <Section title="8. Vos droits (RGPD)">
             <p>
               Conformément au RGPD, vous disposez des droits suivants sur vos données
               personnelles :
@@ -275,8 +353,8 @@ export default function PrivacyPage() {
             </p>
           </Section>
 
-          {/* 8 */}
-          <Section title="8. Cookies et traceurs">
+          {/* 9 */}
+          <Section title="9. Cookies et traceurs">
             <p>
               Wadashaqayn utilise des cookies strictement nécessaires au fonctionnement du
               service (session, authentification, préférences d&apos;interface). Aucun cookie
@@ -289,8 +367,8 @@ export default function PrivacyPage() {
             </p>
           </Section>
 
-          {/* 9 */}
-          <Section title="9. Sécurité des données">
+          {/* 10 */}
+          <Section title="10. Sécurité des données">
             <p>Nous mettons en œuvre les mesures techniques et organisationnelles suivantes :</p>
             <ul className="list-disc space-y-1 pl-5">
               <li>Chiffrement des données en transit (TLS 1.3) et au repos (AES-256)</li>
@@ -302,8 +380,8 @@ export default function PrivacyPage() {
             </ul>
           </Section>
 
-          {/* 10 */}
-          <Section title="10. Modifications de la politique">
+          {/* 11 */}
+          <Section title="11. Modifications de la politique">
             <p>
               Nous nous réservons le droit de modifier la présente politique à tout moment.
               Toute modification substantielle sera notifiée par e-mail avec un préavis
@@ -313,8 +391,8 @@ export default function PrivacyPage() {
             </p>
           </Section>
 
-          {/* 11 */}
-          <Section title="11. Contact">
+          {/* 12 */}
+          <Section title="12. Contact">
             <p>
               Pour toute question relative à cette politique ou à vos données personnelles,
               contactez notre Délégué à la Protection des Données (DPD) :

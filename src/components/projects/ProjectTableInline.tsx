@@ -14,6 +14,7 @@ import { Users, Calendar, DollarSign, User } from 'lucide-react';
 import { ProjectRow } from './ProjectRow';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { formatCurrency } from '@/components/common/CurrencySelect';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface Project {
   id: string;
@@ -46,6 +47,7 @@ export const ProjectTableInline: React.FC<ProjectTableInlineProps> = ({
   compactMode = false,
 }) => {
   const isMobile = useIsMobile();
+  const { t } = useTranslation();
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -72,9 +74,9 @@ export const ProjectTableInline: React.FC<ProjectTableInlineProps> = ({
   };
 
   const getManagerName = (manager: string | { id: string; full_name: string } | null) => {
-    if (!manager) return 'Non assigné';
+    if (!manager) return t('projectsBloc.creation.unassigned');
     if (typeof manager === 'string') return manager;
-    return manager.full_name || 'Non assigné';
+    return manager.full_name || t('projectsBloc.creation.unassigned');
   };
 
   if (isMobile) {
@@ -83,15 +85,14 @@ export const ProjectTableInline: React.FC<ProjectTableInlineProps> = ({
         {projects.length === 0 ? (
           <div className="text-muted-foreground flex flex-col items-center gap-2 py-8 text-center">
             <Users className="h-8 w-8" />
-            <p>Aucun projet trouvé</p>
+            <p>{t('projectsBloc.enterprise.noProjects')}</p>
           </div>
         ) : (
           projects.map(project => (
             <Card
               key={project.id}
-              className={`cursor-pointer transition-all active:scale-[0.98] ${
-                selectedProjectId === project.id ? 'border-primary ring-primary/20 ring-2' : ''
-              }`}
+              className={`cursor-pointer transition-all active:scale-[0.98] ${selectedProjectId === project.id ? 'border-primary ring-primary/20 ring-2' : ''
+                }`}
               onClick={() => onProjectClick?.(project)}
             >
               <CardContent className="space-y-3 p-4">
@@ -145,15 +146,15 @@ export const ProjectTableInline: React.FC<ProjectTableInlineProps> = ({
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead className="w-[300px]">Nom du Projet</TableHead>
-            <TableHead className="w-[150px]">Statut</TableHead>
-            <TableHead className="w-[120px]">Progression</TableHead>
-            <TableHead className="w-[150px]">Chef de Projet</TableHead>
-            <TableHead className="w-[150px]">Budget</TableHead>
+            <TableHead className="w-[300px]">{t('projectsBloc.table.colName')}</TableHead>
+            <TableHead className="w-[150px]">{t('projectsBloc.table.colStatus')}</TableHead>
+            <TableHead className="w-[120px]">{t('projectsBloc.table.colProgress')}</TableHead>
+            <TableHead className="w-[150px]">{t('projectsBloc.table.colManager')}</TableHead>
+            <TableHead className="w-[150px]">{t('projectsBloc.table.colBudget')}</TableHead>
             {!compactMode && (
               <>
-                <TableHead className="w-[120px]">Début</TableHead>
-                <TableHead className="w-[120px]">Fin</TableHead>
+                <TableHead className="w-[120px]">{t('projectsBloc.table.colStart')}</TableHead>
+                <TableHead className="w-[120px]">{t('projectsBloc.table.colEnd')}</TableHead>
               </>
             )}
             <TableHead className="w-[50px]"></TableHead>
@@ -165,7 +166,7 @@ export const ProjectTableInline: React.FC<ProjectTableInlineProps> = ({
               <TableCell colSpan={compactMode ? 6 : 8} className="h-24 text-center">
                 <div className="text-muted-foreground flex flex-col items-center gap-2">
                   <Users className="h-8 w-8" />
-                  <p>Aucun projet trouvé</p>
+                  <p>{t('projectsBloc.enterprise.noProjects')}</p>
                 </div>
               </TableCell>
             </TableRow>

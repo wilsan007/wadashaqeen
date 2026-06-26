@@ -41,6 +41,8 @@ interface TaskFixedColumnsProps {
   onSelectTask: (taskId: string) => void;
   scrollRef?: React.RefObject<HTMLDivElement>;
   onScroll?: () => void;
+  projectColorMap?: Record<string, string>;
+  totalProjects?: number;
 }
 
 export const TaskFixedColumns = ({
@@ -56,18 +58,20 @@ export const TaskFixedColumns = ({
   onSelectTask,
   scrollRef,
   onScroll,
+  projectColorMap,
+  totalProjects,
 }: TaskFixedColumnsProps) => {
   return (
     <>
       <div ref={scrollRef} className="h-[600px] overflow-auto" onScroll={onScroll}>
         <Table>
-          <TableHeader className="sticky top-0 z-20 border-b-2 border-slate-300 bg-gradient-to-r from-blue-500 to-blue-600 shadow-md">
+          <TableHeader className="sticky top-0 z-20 border-b border-border/60 bg-gradient-to-r from-primary to-violet-600 shadow-md">
             <TableRow className="h-16 border-0 hover:bg-transparent">
               <TableHead className="h-16 min-w-[200px] font-bold text-white">Tâche</TableHead>
               <TableHead className="h-16 min-w-[150px] font-bold text-white">
                 <div className="flex items-center gap-2">
-                  <span className="h-2 w-2 animate-pulse rounded-full bg-gradient-to-r from-cyan-400 to-blue-400 shadow-lg shadow-cyan-400/50"></span>
-                  <span className="bg-gradient-to-r from-cyan-100 via-blue-100 to-purple-100 bg-clip-text text-transparent">
+                  <span className="bg-primary/80 h-2 w-2 animate-pulse rounded-full shadow-sm"></span>
+                  <span className="text-white/90">
                     Projet
                   </span>
                 </div>
@@ -98,6 +102,8 @@ export const TaskFixedColumns = ({
             onEdit={onEdit}
             onUpdateAssignee={onUpdateAssignee}
             onUpdateTask={onUpdateTask}
+            projectColorMap={projectColorMap}
+            totalProjects={totalProjects}
           />
         </Table>
       </div>

@@ -45,6 +45,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { BookTemplate, Plus, Trash2, Edit, Search, Globe, Lock, TrendingUp } from '@/lib/icons';
 import { useTaskTemplates, TaskTemplate, TaskTemplateData } from '@/hooks/useTaskTemplates';
+import { useTranslation } from '@/hooks/useTranslation';
 
 const CATEGORIES = [
   { value: 'onboarding', label: '👋 Onboarding', color: 'bg-blue-100 text-blue-700' },
@@ -55,19 +56,7 @@ const CATEGORIES = [
   { value: 'other', label: '📦 Autre', color: 'bg-gray-100 text-gray-700' },
 ];
 
-const PRIORITIES = [
-  { value: 'low', label: 'Basse' },
-  { value: 'medium', label: 'Moyenne' },
-  { value: 'high', label: 'Haute' },
-  { value: 'urgent', label: 'Urgente' },
-];
 
-const STATUS_OPTIONS = [
-  { value: 'todo', label: 'À faire' },
-  { value: 'doing', label: 'En cours' },
-  { value: 'blocked', label: 'Bloqué' },
-  { value: 'done', label: 'Terminé' },
-];
 
 interface TemplateFormData {
   name: string;
@@ -78,12 +67,27 @@ interface TemplateFormData {
 }
 
 export const TemplateManagementDialog = () => {
+  const { t } = useTranslation();
   const { templates, loading, createTemplate, updateTemplate, deleteTemplate } = useTaskTemplates();
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<TaskTemplate | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+
+  const PRIORITIES = [
+    { value: 'low', label: t('tasks.priority.low') },
+    { value: 'medium', label: t('tasks.priority.medium') },
+    { value: 'high', label: t('tasks.priority.high') },
+    { value: 'urgent', label: t('tasks.priority.urgent') },
+  ];
+
+  const STATUS_OPTIONS = [
+    { value: 'todo', label: t('tasks.status.todo') },
+    { value: 'doing', label: t('tasks.status.in_progress') },
+    { value: 'blocked', label: t('tasks.status.blocked') },
+    { value: 'done', label: t('tasks.status.done') },
+  ];
 
   const [formData, setFormData] = useState<TemplateFormData>({
     name: '',

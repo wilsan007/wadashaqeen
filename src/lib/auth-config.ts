@@ -126,6 +126,7 @@ export function setupSessionMonitoring(onSessionInvalid: () => void): () => void
   // Détection de visibilité (changement d'onglet, verrouillage écran, etc.)
   const handleVisibilityChange = async () => {
     if (document.hidden) {
+      // Tab hidden — no action needed
     } else {
       // Vérifier si la session est toujours valide au retour
       const valid = isSessionValid();

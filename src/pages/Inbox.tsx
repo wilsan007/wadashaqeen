@@ -136,14 +136,14 @@ function StatChip({
   color: string;
 }) {
   return (
-    <Card className="border-slate-800 bg-slate-900/60 backdrop-blur-sm">
+    <Card className="border">
       <CardContent className="flex items-center gap-3 p-4">
-        <div className={`rounded-xl p-2.5 ${color}`}>
+        <div className={`rounded-xl p-2.5 ${color}`} aria-hidden="true">
           <Icon className="h-5 w-5 text-white" />
         </div>
         <div>
-          <p className="text-2xl font-bold text-white">{value}</p>
-          <p className="text-xs text-slate-400">{label}</p>
+          <p className="text-2xl font-bold text-foreground" aria-label={`${value} ${label}`}>{value}</p>
+          <p className="text-xs text-muted-foreground">{label}</p>
         </div>
       </CardContent>
     </Card>
@@ -183,25 +183,31 @@ export default function Inbox() {
   const urgentCount = notifications.filter(n => n.priority === 'urgent' || n.priority === 'high').length;
 
   return (
-    <div className="min-h-full bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 p-4 sm:p-6">
+    <div className="min-h-full bg-background p-4 sm:p-6">
       {/* Header */}
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-violet-600 shadow-lg shadow-blue-500/30">
+          <div
+            className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-violet-600 shadow-lg shadow-blue-500/30"
+            aria-hidden="true"
+          >
             <Bell className="h-6 w-6 text-white" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-white">Notifications</h1>
+            <h1 className="text-2xl font-bold text-foreground">Notifications</h1>
             <div className="flex items-center gap-2">
-              <p className="text-sm text-slate-400">
+              <p className="text-sm text-muted-foreground" aria-live="polite" aria-atomic="true">
                 {unreadCount > 0 ? (
-                  <span className="text-blue-400 font-medium">{unreadCount} non lues</span>
+                  <span className="font-medium text-[hsl(var(--tech-blue))]">{unreadCount} non lues</span>
                 ) : (
                   'Tout est à jour'
                 )}
               </p>
               {isFetching && (
-                <Zap className="h-3 w-3 animate-pulse text-emerald-400" title="Temps réel actif" />
+                <Zap
+                  className="h-3 w-3 animate-pulse text-[hsl(var(--tech-green))]"
+                  aria-label="Synchronisation en temps réel"
+                />
               )}
             </div>
           </div>
@@ -212,28 +218,32 @@ export default function Inbox() {
             size="sm"
             onClick={markAllRead}
             disabled={unreadCount === 0}
-            className="border-slate-700 bg-slate-800/50 text-slate-300 hover:bg-slate-700 hover:text-white"
           >
-            <CheckCircle2 className="mr-2 h-4 w-4" />
+            <CheckCircle2 className="mr-2 h-4 w-4" aria-hidden="true" />
             <span className="hidden sm:inline">Tout marquer lu</span>
+            <span className="sr-only sm:hidden">Tout marquer comme lu</span>
           </Button>
         </div>
       </div>
 
       {/* Stats */}
-      <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatChip icon={Bell} label="Non lues" value={unreadCount} color="bg-blue-600" />
-        <StatChip icon={AlertCircle} label="Urgentes" value={urgentCount} color="bg-rose-600" />
-        <StatChip icon={CheckCircle2} label="Tâches" value={taskCount} color="bg-violet-600" />
-        <StatChip icon={Clock} label="Approbations" value={approvalCount} color="bg-amber-600" />
+      <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4" aria-label="Résumé des notifications">
+        <StatChip icon={Bell} label="Non lues" value={unreadCount} color="bg-[hsl(var(--tech-blue))]" />
+        <StatChip icon={AlertCircle} label="Urgentes" value={urgentCount} color="bg-[hsl(var(--priority-high))]" />
+        <StatChip icon={CheckCircle2} label="Tâches" value={taskCount} color="bg-[hsl(var(--tech-purple))]" />
+        <StatChip icon={Clock} label="Approbations" value={approvalCount} color="bg-[hsl(var(--tech-orange))]" />
       </div>
 
       {/* Realtime badge */}
       <div className="mb-4 flex items-center gap-2">
-        <span className="flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-400">
-          <span className="relative flex h-2 w-2">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+        <span
+          className="flex items-center gap-1.5 rounded-full border border-[hsl(var(--tech-green)/0.3)] bg-[hsl(var(--tech-green)/0.1)] px-3 py-1 text-xs font-medium text-[hsl(var(--tech-green))]"
+          role="status"
+          aria-label="Synchronisation en temps réel activée"
+        >
+          <span className="relative flex h-2 w-2" aria-hidden="true">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[hsl(var(--tech-green))] opacity-75" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-[hsl(var(--tech-green))]" />
           </span>
           Temps réel activé
         </span>
@@ -241,7 +251,7 @@ export default function Inbox() {
 
       {/* Tabs */}
       <Tabs value={filter} onValueChange={v => setFilter(v as FilterType)}>
-        <TabsList className="mb-4 w-full border border-slate-800 bg-slate-900/60 sm:w-auto">
+        <TabsList className="mb-4 w-full border border-border bg-muted/60 sm:w-auto">
           {[
             { value: 'all', label: 'Toutes', count: notifications.length },
             { value: 'unread', label: 'Non lues', count: unreadCount },
@@ -251,11 +261,14 @@ export default function Inbox() {
             <TabsTrigger
               key={tab.value}
               value={tab.value}
-              className="gap-1.5 text-xs data-[state=active]:bg-blue-600 data-[state=active]:text-white sm:text-sm"
+              className="gap-1.5 text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground sm:text-sm"
             >
               {tab.label}
               {tab.count > 0 && (
-                <span className="rounded-full bg-slate-700 px-1.5 py-0.5 text-[10px] font-bold data-[state=active]:bg-blue-500">
+                <span
+                  className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-bold data-[state=active]:bg-primary-foreground data-[state=active]:text-primary"
+                  aria-label={`${tab.count} ${tab.label.toLowerCase()}`}
+                >
                   {tab.count}
                 </span>
               )}
@@ -265,76 +278,94 @@ export default function Inbox() {
 
         <TabsContent value={filter}>
           {isLoading ? (
-            <div className="space-y-3">
+            <div className="space-y-3" aria-label="Chargement des notifications" aria-busy="true">
               {Array.from({ length: 5 }).map((_, i) => (
-                <Skeleton key={i} className="h-24 rounded-2xl bg-slate-800" />
+                <Skeleton key={i} className="h-24 rounded-2xl bg-muted" />
               ))}
             </div>
           ) : filtered.length === 0 ? (
-            <Card className="border-slate-800 bg-slate-900/60">
-              <CardContent className="flex flex-col items-center justify-center py-16">
-                <div className="mb-4 rounded-full bg-slate-800 p-6">
-                  <BellOff className="h-12 w-12 text-slate-600" />
+            <Card className="border">
+              <CardContent className="flex flex-col items-center justify-center py-16" role="status">
+                <div className="mb-4 rounded-full bg-muted p-6">
+                  <BellOff className="h-12 w-12 text-muted-foreground" aria-hidden="true" />
                 </div>
-                <p className="text-lg font-semibold text-white">Aucune notification</p>
-                <p className="mt-1 text-sm text-slate-400">Vous êtes à jour !</p>
+                <p className="text-lg font-semibold text-foreground">Aucune notification</p>
+                <p className="mt-1 text-sm text-muted-foreground">Vous êtes à jour !</p>
               </CardContent>
             </Card>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-2" role="list" aria-label="Liste des notifications">
               {filtered.map(notif => (
                 <Card
                   key={notif.id}
+                  role="listitem"
                   className={`group cursor-pointer border transition-all duration-200 hover:shadow-xl ${
                     !notif.is_read
-                      ? 'border-blue-500/30 bg-blue-950/30 hover:border-blue-400/50'
-                      : 'border-slate-800 bg-slate-900/60 hover:border-slate-600'
+                      ? 'border-[hsl(var(--tech-blue)/0.3)] bg-[hsl(var(--tech-blue)/0.05)] hover:border-[hsl(var(--tech-blue)/0.5)]'
+                      : 'border-border bg-card hover:border-border/80'
                   }`}
                   onClick={() => !notif.is_read && markRead(notif.id)}
+                  tabIndex={0}
+                  aria-label={`Notification${!notif.is_read ? ' non lue' : ''} : ${notif.title}`}
+                  onKeyDown={e => {
+                    if ((e.key === 'Enter' || e.key === ' ') && !notif.is_read) {
+                      e.preventDefault();
+                      markRead(notif.id);
+                    }
+                  }}
                 >
                   <CardContent className="p-4">
                     <div className="flex items-start gap-3">
-                      {/* Unread dot */}
-                      <div className="mt-1.5 flex w-5 shrink-0 justify-center">
+                      {/* Indicateur non-lu (visuel + accessible) */}
+                      <div className="mt-1.5 flex w-5 shrink-0 justify-center" aria-hidden="true">
                         {!notif.is_read ? (
-                          <span className="h-2.5 w-2.5 rounded-full bg-blue-500 shadow-lg shadow-blue-500/50" />
+                          <span className="h-2.5 w-2.5 rounded-full bg-[hsl(var(--tech-blue))] shadow-lg shadow-[hsl(var(--tech-blue)/0.5)]" />
                         ) : (
                           <span className="h-2.5 w-2.5 rounded-full bg-transparent" />
                         )}
                       </div>
 
-                      {/* Icon */}
-                      <div className="mt-0.5 shrink-0 rounded-xl bg-slate-800/80 p-2">
+                      {/* Icône type */}
+                      <div className="mt-0.5 shrink-0 rounded-xl bg-muted/80 p-2" aria-hidden="true">
                         {typeIcon(notif.notification_type)}
                       </div>
 
-                      {/* Content */}
+                      {/* Contenu */}
                       <div className="min-w-0 flex-1">
                         <div className="flex items-start justify-between gap-2">
-                          <p className={`text-sm leading-snug ${!notif.is_read ? 'font-semibold text-white' : 'font-medium text-slate-300'}`}>
+                          <p className={`text-sm leading-snug ${!notif.is_read ? 'font-semibold text-foreground' : 'font-medium text-muted-foreground'}`}>
                             {notif.title}
                           </p>
-                          <span className="shrink-0 text-xs text-slate-500">
+                          <time
+                            className="shrink-0 text-xs text-muted-foreground"
+                            dateTime={notif.created_at || notif.sent_at || ''}
+                          >
                             {formatDate(notif.created_at || notif.sent_at || '')}
-                          </span>
+                          </time>
                         </div>
                         {notif.message && (
-                          <p className="mt-1 line-clamp-2 text-xs text-slate-400">{notif.message}</p>
+                          <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{notif.message}</p>
                         )}
                         <div className="mt-2 flex flex-wrap items-center gap-2">
                           {notif.priority && notif.priority !== 'low' && (
                             <span
                               className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold text-white ${priorityColor(notif.priority)}`}
+                              aria-label={`Priorité : ${notif.priority === 'urgent' ? 'Urgent' : notif.priority === 'high' ? 'Élevé' : 'Moyen'}`}
                             >
-                              {notif.priority === 'urgent' ? '🔴 Urgent' : notif.priority === 'high' ? '🟠 Élevé' : '🟡 Moyen'}
+                              {/* Emojis masqués aux lecteurs d'écran */}
+                              <span aria-hidden="true">
+                                {notif.priority === 'urgent' ? '🔴' : notif.priority === 'high' ? '🟠' : '🟡'}
+                              </span>{' '}
+                              {notif.priority === 'urgent' ? 'Urgent' : notif.priority === 'high' ? 'Élevé' : 'Moyen'}
                             </span>
                           )}
                           {!notif.is_read && (
                             <Button
                               size="sm"
                               variant="ghost"
-                              className="h-6 px-2 text-[10px] text-blue-400 hover:bg-blue-500/10 hover:text-blue-300"
+                              className="h-6 px-2 text-[10px] text-[hsl(var(--tech-blue))] hover:bg-[hsl(var(--tech-blue)/0.1)] hover:text-[hsl(var(--tech-blue))]"
                               onClick={e => { e.stopPropagation(); markRead(notif.id); }}
+                              aria-label={`Marquer comme lue : ${notif.title}`}
                             >
                               Marquer lu
                             </Button>

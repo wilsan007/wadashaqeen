@@ -16,7 +16,6 @@ import {
   MessageCircle,
   TrendingUp,
 } from 'lucide-react';
-import { motion } from 'framer-motion';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import FuturisticBackground from '@/components/ui/FuturisticBackground';
 import SplineStyleCarousel from '@/components/landing/SplineStyleCarousel';
@@ -47,9 +46,8 @@ function ModuleCard({ icon, title, description, status, color }: ModuleCardProps
             {icon}
           </div>
           <span
-            className={`rounded-full px-3 py-1.5 text-xs font-bold sm:px-4 sm:py-2 ${
-              status === 'Disponible' ? 'bg-white/90 text-green-700' : 'bg-white/60 text-orange-700'
-            }`}
+            className={`rounded-full px-3 py-1.5 text-xs font-bold sm:px-4 sm:py-2 ${status === 'Disponible' ? 'bg-white/90 text-green-700' : 'bg-white/60 text-orange-700'
+              }`}
           >
             {status}
           </span>
@@ -687,24 +685,24 @@ export default function LandingPage() {
               <h4 className="mb-4 font-semibold text-white">Ressources</h4>
               <ul className="space-y-2 text-sm">
                 <li>
-                  <a href="#" className="hover:text-white">
+                  <Link to="/documentation" className="hover:text-white transition-colors">
                     Documentation
-                  </a>
+                  </Link>
                 </li>
                 <li>
-                  <a href="#" className="hover:text-white">
+                  <Link to="/guides" className="hover:text-white transition-colors">
                     Guides
-                  </a>
+                  </Link>
                 </li>
                 <li>
-                  <a href="#" className="hover:text-white">
+                  <Link to="/blog" className="hover:text-white transition-colors">
                     Blog
-                  </a>
+                  </Link>
                 </li>
                 <li>
-                  <a href="#" className="hover:text-white">
+                  <Link to="/support" className="hover:text-white transition-colors">
                     Support
-                  </a>
+                  </Link>
                 </li>
               </ul>
             </div>
@@ -714,24 +712,24 @@ export default function LandingPage() {
               <h4 className="mb-4 font-semibold text-white">Entreprise</h4>
               <ul className="space-y-2 text-sm">
                 <li>
-                  <a href="#" className="hover:text-white">
+                  <Link to="/about" className="hover:text-white transition-colors">
                     À propos
-                  </a>
+                  </Link>
                 </li>
                 <li>
-                  <a href="#" className="hover:text-white">
+                  <Link to="/careers" className="hover:text-white transition-colors">
                     Carrières
-                  </a>
+                  </Link>
                 </li>
                 <li>
-                  <a href="#" className="hover:text-white">
+                  <Link to="/contact" className="hover:text-white transition-colors">
                     Contact
-                  </a>
+                  </Link>
                 </li>
                 <li>
-                  <a href="#" className="hover:text-white">
+                  <Link to="/partners" className="hover:text-white transition-colors">
                     Partenaires
-                  </a>
+                  </Link>
                 </li>
               </ul>
             </div>

@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from '@/hooks/useTranslation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -70,6 +71,7 @@ interface TrainingRecord {
 }
 
 export const HealthSafety = () => {
+  const { t } = useTranslation();
   const { toast } = useToast();
   const {
     incidents,
@@ -82,8 +84,8 @@ export const HealthSafety = () => {
     uploadDocument,
   } = useHealthSafety();
 
-  if (loading) return <div>Chargement...</div>;
-  if (error) return <div>Erreur: {error}</div>;
+  if (loading) return <div>{t('common.loading')}</div>;
+  if (error) return <div>{t('common.error')}: {error}</div>;
 
   // Utiliser uniquement les vraies données de la base
   const realIncidents = incidents;
@@ -160,14 +162,14 @@ export const HealthSafety = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-foreground text-2xl font-bold">Santé & Sécurité</h2>
-          <p className="text-muted-foreground">Gestion des incidents, formation et conformité</p>
+          <h2 className="text-foreground text-2xl font-bold">{t('healthSafety.title')}</h2>
+          <p className="text-muted-foreground">{t('healthSafety.subtitle')}</p>
         </div>
         <div className="flex gap-2">
           <CreateSafetyDocumentDialog>
             <Button variant="outline">
               <FileText className="mr-2 h-4 w-4" />
-              Nouveau document
+              {t('healthSafety.newDocBtn')}
             </Button>
           </CreateSafetyDocumentDialog>
           <CreateIncidentDialog>
@@ -185,7 +187,7 @@ export const HealthSafety = () => {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-muted-foreground text-sm font-medium">Incidents totaux</p>
+                <p className="text-muted-foreground text-sm font-medium">{t('healthSafety.totalIncidents')}</p>
                 <p className="text-2xl font-bold">{stats.totalIncidents}</p>
               </div>
               <AlertTriangle className="text-muted-foreground h-8 w-8" />
@@ -197,7 +199,7 @@ export const HealthSafety = () => {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-muted-foreground text-sm font-medium">Incidents ouverts</p>
+                <p className="text-muted-foreground text-sm font-medium">{t('healthSafety.openIncidents')}</p>
                 <p className="text-2xl font-bold text-orange-600">{stats.openIncidents}</p>
               </div>
               <Clock className="h-8 w-8 text-orange-600" />
@@ -209,7 +211,7 @@ export const HealthSafety = () => {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-muted-foreground text-sm font-medium">Incidents critiques</p>
+                <p className="text-muted-foreground text-sm font-medium">{t('healthSafety.criticalIncidents')}</p>
                 <p className="text-2xl font-bold text-red-600">{stats.criticalIncidents}</p>
               </div>
               <XCircle className="h-8 w-8 text-red-600" />
@@ -221,7 +223,7 @@ export const HealthSafety = () => {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-muted-foreground text-sm font-medium">Actions en cours</p>
+                <p className="text-muted-foreground text-sm font-medium">{t('healthSafety.pendingActions')}</p>
                 <p className="text-2xl font-bold text-blue-600">{stats.pendingActions}</p>
               </div>
               <CheckCircle className="h-8 w-8 text-blue-600" />
@@ -233,7 +235,7 @@ export const HealthSafety = () => {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-muted-foreground text-sm font-medium">Formation en retard</p>
+                <p className="text-muted-foreground text-sm font-medium">{t('healthSafety.overdueTraining')}</p>
                 <p className="text-2xl font-bold text-red-600">{stats.overdueTraining}</p>
               </div>
               <BookOpen className="h-8 w-8 text-red-600" />
@@ -245,7 +247,7 @@ export const HealthSafety = () => {
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-muted-foreground text-sm font-medium">Documents actifs</p>
+                <p className="text-muted-foreground text-sm font-medium">{t('healthSafety.activeDocs')}</p>
                 <p className="text-2xl font-bold text-green-600">{stats.activeDocuments}</p>
               </div>
               <FileText className="h-8 w-8 text-green-600" />
@@ -257,17 +259,11 @@ export const HealthSafety = () => {
       <Tabs defaultValue="incidents" className="space-y-4">
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="incidents" className="flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4" />
-            Incidents
-          </TabsTrigger>
+            <AlertTriangle className="h-4 w-4" />{t('healthSafety.tabIncidents')}</TabsTrigger>
           <TabsTrigger value="documents" className="flex items-center gap-2">
-            <FileText className="h-4 w-4" />
-            Documents
-          </TabsTrigger>
+            <FileText className="h-4 w-4" />{t('healthSafety.tabDocs')}</TabsTrigger>
           <TabsTrigger value="training" className="flex items-center gap-2">
-            <BookOpen className="h-4 w-4" />
-            Formations
-          </TabsTrigger>
+            <BookOpen className="h-4 w-4" />{t('healthSafety.tabTraining')}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="incidents" className="space-y-4">
@@ -275,7 +271,7 @@ export const HealthSafety = () => {
             <Card>
               <CardContent className="p-8 text-center">
                 <Shield className="text-muted-foreground mx-auto mb-4 h-12 w-12" />
-                <h3 className="mb-2 text-lg font-medium">Aucun incident déclaré</h3>
+                <h3 className="mb-2 text-lg font-medium">{t('healthSafety.noIncidentTitle')}</h3>
                 <p className="text-muted-foreground">
                   Commencez par déclarer votre premier incident.
                 </p>
@@ -311,14 +307,14 @@ export const HealthSafety = () => {
                     {incident.affectedEmployee && (
                       <div className="bg-muted/50 rounded-lg p-3">
                         <p className="text-sm font-medium">
-                          Employé concerné: {incident.affectedEmployee}
+                          {t('healthSafety.incidentAffected', { name: incident.affectedEmployee })}
                         </p>
                       </div>
                     )}
 
                     {incident.actions && incident.actions.length > 0 && (
                       <div className="space-y-2">
-                        <h4 className="text-sm font-medium">Actions correctives</h4>
+                        <h4 className="text-sm font-medium">{t('healthSafety.incidentActions')}</h4>
                         {incident.actions.map(action => (
                           <div
                             key={action.id}
@@ -369,7 +365,7 @@ export const HealthSafety = () => {
             <Card>
               <CardContent className="p-8 text-center">
                 <FileText className="text-muted-foreground mx-auto mb-4 h-12 w-12" />
-                <h3 className="mb-2 text-lg font-medium">Aucun document</h3>
+                <h3 className="mb-2 text-lg font-medium">{t('healthSafety.noDocTitle')}</h3>
                 <p className="text-muted-foreground">
                   Ajoutez des documents de sécurité et conformité.
                 </p>
@@ -387,7 +383,7 @@ export const HealthSafety = () => {
                           {document.title}
                         </CardTitle>
                         <p className="text-muted-foreground text-sm">
-                          {document.category} • Version {document.version}
+                          {document.category} • {t('healthSafety.docVersion', { version: document.version })}
                         </p>
                       </div>
                       <Badge className={getStatusColor(document.status)}>{document.status}</Badge>
@@ -395,13 +391,13 @@ export const HealthSafety = () => {
                   </CardHeader>
                   <CardContent className="space-y-4">
                     <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Publié le:</span>
+                      <span className="text-muted-foreground">{t('healthSafety.docPublishedOn')}</span>
                       <span>{new Date(document.publishedDate).toLocaleDateString()}</span>
                     </div>
 
                     {document.expiryDate && (
                       <div className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">Expire le:</span>
+                        <span className="text-muted-foreground">{t('healthSafety.docExpiresOn')}</span>
                         <span
                           className={
                             new Date(document.expiryDate) < new Date()
@@ -422,7 +418,7 @@ export const HealthSafety = () => {
                           if (document.downloadUrl) {
                             window.open(document.downloadUrl, '_blank');
                           } else {
-                            toast({ title: 'Document non disponible', description: 'Aucun fichier associé à ce document.', variant: 'destructive' });
+                            toast({ title: t('healthSafety.docNotAvailable'), description: t('healthSafety.docNotAvailableDesc'), variant: 'destructive' });
                           }
                         }}
                       >
@@ -436,7 +432,7 @@ export const HealthSafety = () => {
                           if (document.downloadUrl) {
                             window.open(document.downloadUrl, '_blank');
                           } else {
-                            toast({ title: 'Aperçu non disponible', description: 'Aucun fichier associé à ce document.', variant: 'destructive' });
+                            toast({ title: t('healthSafety.previewNotAvailable'), description: t('healthSafety.docNotAvailableDesc'), variant: 'destructive' });
                           }
                         }}
                       >
@@ -456,7 +452,7 @@ export const HealthSafety = () => {
             <Card>
               <CardContent className="p-8 text-center">
                 <BookOpen className="text-muted-foreground mx-auto mb-4 h-12 w-12" />
-                <h3 className="mb-2 text-lg font-medium">Aucune formation</h3>
+                <h3 className="mb-2 text-lg font-medium">{t('healthSafety.noTrainingTitle')}</h3>
                 <p className="text-muted-foreground">
                   Planifiez des formations de sécurité pour vos employés.
                 </p>
@@ -480,14 +476,14 @@ export const HealthSafety = () => {
                   <CardContent className="space-y-4">
                     <div className="grid grid-cols-2 gap-4 text-sm">
                       <div>
-                        <span className="text-muted-foreground">Date formation:</span>
+                        <span className="text-muted-foreground">{t('healthSafety.trainingDate')}</span>
                         <p className="font-medium">
                           {new Date(record.trainingDate).toLocaleDateString()}
                         </p>
                       </div>
                       {record.expiryDate && (
                         <div>
-                          <span className="text-muted-foreground">Expire le:</span>
+                          <span className="text-muted-foreground">{t('healthSafety.docExpiresOn')}</span>
                           <p
                             className={`font-medium ${
                               new Date(record.expiryDate) < new Date() ? 'text-red-600' : ''
@@ -499,7 +495,7 @@ export const HealthSafety = () => {
                       )}
                       {record.score && (
                         <div>
-                          <span className="text-muted-foreground">Score:</span>
+                          <span className="text-muted-foreground">{t('healthSafety.trainingScore')}</span>
                           <p className="font-medium">{record.score}/100</p>
                         </div>
                       )}

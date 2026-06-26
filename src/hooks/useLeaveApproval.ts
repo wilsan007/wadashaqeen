@@ -10,7 +10,7 @@
  * - Support multi-niveaux
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useTenant } from '@/contexts/TenantContext';
@@ -56,229 +56,178 @@ interface UseLeaveApprovalReturn {
   refresh: () => Promise<void>;
 }
 
+const LEAVE_APPROVAL_SELECT = `
+  *,
+  leave_request:leave_requests(
+    id,
+    employee_id,
+    start_date,
+    end_date,
+    leave_type,
+    reason,
+    status,
+    employee:employees(
+      full_name,
+      email,
+      department
+    )
+  )
+`;
+
 export const useLeaveApproval = (): UseLeaveApprovalReturn => {
-  const [pendingApprovals, setPendingApprovals] = useState<LeaveApproval[]>([]);
-  const [myApprovals, setMyApprovals] = useState<LeaveApproval[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
+  const queryClient = useQueryClient();
   const { toast } = useToast();
   const { currentTenant } = useTenant();
 
-  /**
-   * Charger les approbations en attente pour l'utilisateur actuel
-   */
-  const fetchPendingApprovals = useCallback(async () => {
-    if (!currentTenant?.id) {
-      setPendingApprovals([]);
-      setLoading(false);
-      return;
-    }
+  // Helper to get current session user id
+  const getCurrentUserId = async (): Promise<string> => {
+    const { data: session } = await supabase.auth.getSession();
+    if (!session?.session?.user) throw new Error('Non authentifié');
+    return session.session.user.id;
+  };
 
-    try {
-      setLoading(true);
-      setError(null);
-
-      const { data: session } = await supabase.auth.getSession();
-      if (!session?.session?.user) {
-        throw new Error('Non authentifié');
-      }
-
-      // Récupérer les approbations en attente où je suis l'approbateur
+  // Query: pending approvals
+  const {
+    data: pendingApprovals = [],
+    isLoading: pendingLoading,
+    error: pendingError,
+    refetch: refetchPending,
+  } = useQuery<LeaveApproval[]>({
+    queryKey: ['leave-approvals', 'pending', currentTenant?.id],
+    queryFn: async () => {
+      const userId = await getCurrentUserId();
       const { data, error: fetchError } = await supabase
         .from('leave_approvals')
-        .select(
-          `
-          *,
-          leave_request:leave_requests(
-            id,
-            employee_id,
-            start_date,
-            end_date,
-            leave_type,
-            reason,
-            status,
-            employee:employees(
-              full_name,
-              email,
-              department
-            )
-          )
-        `
-        )
-        .eq('tenant_id', currentTenant.id)
-        .eq('approver_id', session.session.user.id)
+        .select(LEAVE_APPROVAL_SELECT)
+        .eq('tenant_id', currentTenant!.id)
+        .eq('approver_id', userId)
         .eq('status', 'pending')
         .order('created_at', { ascending: false });
 
       if (fetchError) throw fetchError;
+      return (data as any) || [];
+    },
+    enabled: !!currentTenant?.id,
+  });
 
-      setPendingApprovals((data as any) || []);
-    } catch (err) {
-      console.error('Erreur chargement approbations en attente:', err);
-      setError(err as Error);
-      toast({
-        title: '❌ Erreur',
-        description: 'Impossible de charger les approbations en attente',
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(false);
-    }
-  }, [currentTenant?.id, toast]);
-
-  /**
-   * Charger toutes mes approbations (historique)
-   */
-  const fetchMyApprovals = useCallback(async () => {
-    if (!currentTenant?.id) {
-      setMyApprovals([]);
-      return;
-    }
-
-    try {
-      const { data: session } = await supabase.auth.getSession();
-      if (!session?.session?.user) {
-        throw new Error('Non authentifié');
-      }
-
+  // Query: my approvals (history)
+  const {
+    data: myApprovals = [],
+    isLoading: myApprovalsLoading,
+    error: myApprovalsError,
+    refetch: refetchMyApprovals,
+  } = useQuery<LeaveApproval[]>({
+    queryKey: ['leave-approvals', 'my', currentTenant?.id],
+    queryFn: async () => {
+      const userId = await getCurrentUserId();
       const { data, error: fetchError } = await supabase
         .from('leave_approvals')
-        .select(
-          `
-          *,
-          leave_request:leave_requests(
-            id,
-            employee_id,
-            start_date,
-            end_date,
-            leave_type,
-            reason,
-            status,
-            employee:employees(
-              full_name,
-              email,
-              department
-            )
-          )
-        `
-        )
-        .eq('tenant_id', currentTenant.id)
-        .eq('approver_id', session.session.user.id)
+        .select(LEAVE_APPROVAL_SELECT)
+        .eq('tenant_id', currentTenant!.id)
+        .eq('approver_id', userId)
         .order('created_at', { ascending: false })
         .limit(50);
 
       if (fetchError) throw fetchError;
+      return (data as any) || [];
+    },
+    enabled: !!currentTenant?.id,
+  });
 
-      setMyApprovals((data as any) || []);
+  const loading = pendingLoading || myApprovalsLoading;
+  const error = (pendingError || myApprovalsError) as Error | null;
+
+  const invalidateApprovals = () => {
+    queryClient.invalidateQueries({ queryKey: ['leave-approvals', 'pending', currentTenant?.id] });
+    queryClient.invalidateQueries({ queryKey: ['leave-approvals', 'my', currentTenant?.id] });
+  };
+
+  // Mutation: approve request
+  const approveMutation = useMutation({
+    mutationFn: async ({ approvalId, notes }: { approvalId: string; notes?: string }) => {
+      const { data, error } = await supabase.rpc('process_leave_approval', {
+        p_approval_id: approvalId,
+        p_status: 'approved',
+        p_notes: notes || null,
+      });
+      if (error) throw error;
+      const result = data as { success: boolean; message: string; final_status: string };
+      if (!result.success) throw new Error(result.message || "Erreur lors de l'approbation");
+      return result;
+    },
+    onSuccess: result => {
+      toast({ title: '✅ Demande approuvée', description: result.message });
+      invalidateApprovals();
+    },
+    onError: () => {
+      toast({
+        title: '❌ Erreur',
+        description: "Impossible d'approuver la demande",
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const approveRequest = async (approvalId: string, notes?: string): Promise<boolean> => {
+    try {
+      await approveMutation.mutateAsync({ approvalId, notes });
+      return true;
     } catch (err) {
-      console.error('Erreur chargement historique approbations:', err);
+      console.error('Erreur approbation:', err);
+      return false;
     }
-  }, [currentTenant?.id]);
+  };
 
-  useEffect(() => {
-    fetchPendingApprovals();
-    fetchMyApprovals();
-  }, [fetchPendingApprovals, fetchMyApprovals]);
-
-  /**
-   * Approuver une demande
-   */
-  const approveRequest = useCallback(
-    async (approvalId: string, notes?: string): Promise<boolean> => {
-      try {
-        const { data, error } = await supabase.rpc('process_leave_approval', {
-          p_approval_id: approvalId,
-          p_status: 'approved',
-          p_notes: notes || null,
-        });
-
-        if (error) throw error;
-
-        const result = data as { success: boolean; message: string; final_status: string };
-
-        if (!result.success) {
-          throw new Error(result.message || "Erreur lors de l'approbation");
-        }
-
-        toast({
-          title: '✅ Demande approuvée',
-          description: result.message,
-        });
-
-        await fetchPendingApprovals();
-        await fetchMyApprovals();
-
-        return true;
-      } catch (err) {
-        console.error('Erreur approbation:', err);
-        toast({
-          title: '❌ Erreur',
-          description: "Impossible d'approuver la demande",
-          variant: 'destructive',
-        });
-        return false;
-      }
+  // Mutation: reject request
+  const rejectMutation = useMutation({
+    mutationFn: async ({ approvalId, reason }: { approvalId: string; reason: string }) => {
+      const { data, error } = await supabase.rpc('process_leave_approval', {
+        p_approval_id: approvalId,
+        p_status: 'rejected',
+        p_notes: reason,
+      });
+      if (error) throw error;
+      const result = data as { success: boolean; message: string };
+      if (!result.success) throw new Error(result.message || 'Erreur lors du rejet');
+      return result;
     },
-    [toast, fetchPendingApprovals, fetchMyApprovals]
-  );
-
-  /**
-   * Rejeter une demande
-   */
-  const rejectRequest = useCallback(
-    async (approvalId: string, reason: string): Promise<boolean> => {
-      if (!reason.trim()) {
-        toast({
-          title: '⚠️ Attention',
-          description: 'Veuillez fournir une raison pour le rejet',
-          variant: 'destructive',
-        });
-        return false;
-      }
-
-      try {
-        const { data, error } = await supabase.rpc('process_leave_approval', {
-          p_approval_id: approvalId,
-          p_status: 'rejected',
-          p_notes: reason,
-        });
-
-        if (error) throw error;
-
-        const result = data as { success: boolean; message: string };
-
-        if (!result.success) {
-          throw new Error(result.message || 'Erreur lors du rejet');
-        }
-
-        toast({
-          title: '❌ Demande rejetée',
-          description: result.message,
-        });
-
-        await fetchPendingApprovals();
-        await fetchMyApprovals();
-
-        return true;
-      } catch (err) {
-        console.error('Erreur rejet:', err);
-        toast({
-          title: '❌ Erreur',
-          description: 'Impossible de rejeter la demande',
-          variant: 'destructive',
-        });
-        return false;
-      }
+    onSuccess: result => {
+      toast({ title: '❌ Demande rejetée', description: result.message });
+      invalidateApprovals();
     },
-    [toast, fetchPendingApprovals, fetchMyApprovals]
-  );
+    onError: () => {
+      toast({
+        title: '❌ Erreur',
+        description: 'Impossible de rejeter la demande',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const rejectRequest = async (approvalId: string, reason: string): Promise<boolean> => {
+    if (!reason.trim()) {
+      toast({
+        title: '⚠️ Attention',
+        description: 'Veuillez fournir une raison pour le rejet',
+        variant: 'destructive',
+      });
+      return false;
+    }
+    try {
+      await rejectMutation.mutateAsync({ approvalId, reason });
+      return true;
+    } catch (err) {
+      console.error('Erreur rejet:', err);
+      return false;
+    }
+  };
 
   /**
    * Rafraîchir les données
    */
-  const refresh = useCallback(async () => {
-    await Promise.all([fetchPendingApprovals(), fetchMyApprovals()]);
-  }, [fetchPendingApprovals, fetchMyApprovals]);
+  const refresh = async () => {
+    await Promise.all([refetchPending(), refetchMyApprovals()]);
+  };
 
   return {
     pendingApprovals,

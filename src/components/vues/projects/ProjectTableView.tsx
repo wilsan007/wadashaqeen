@@ -6,6 +6,7 @@ import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@/componen
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
+import { assignProjectColors, getTaskColor } from '@/lib/ganttColors';
 
 interface Project {
   id: string;
@@ -26,6 +27,7 @@ interface Task {
   progress: number;
   assignee: string | { full_name: string } | null;
   status: string;
+  parent_id?: string | null;
 }
 
 interface ProjectTableViewProps {
@@ -57,8 +59,28 @@ export const ProjectTableView: React.FC<ProjectTableViewProps> = ({ projects, ta
   const isMobile = useIsMobile();
 
   const getTasksForProject = (projectId: string) => {
-    return tasks.filter(task => task.project_id === projectId);
+    const projectTasks = tasks.filter(task => task.project_id === projectId);
+
+    // Sort logic to put subtasks immediately after their parent tasks
+    const parents = projectTasks.filter(t => !t.parent_id);
+    const sorted: Task[] = [];
+
+    parents.forEach(p => {
+      sorted.push(p);
+      const children = projectTasks.filter(t => t.parent_id === p.id);
+      sorted.push(...children);
+    });
+
+    // Handle any subtasks that don't have a parent in this project (or if parent_id is used loosely)
+    const orphans = projectTasks.filter(t => t.parent_id && !parents.find(p => p.id === t.parent_id));
+    sorted.push(...orphans);
+
+    return sorted.length > 0 ? sorted : projectTasks; // Fallback to unordered if something goes wrong
   };
+
+  const projectColorMap = React.useMemo(() => {
+    return assignProjectColors(projects || []);
+  }, [projects]);
 
   // Fonction pour scroller vers les tâches d'un projet
   const scrollToProjectTasks = (projectId: string) => {
@@ -97,11 +119,10 @@ export const ProjectTableView: React.FC<ProjectTableViewProps> = ({ projects, ta
           return (
             <Card
               key={project.id}
-              className={`cursor-pointer transition-all ${
-                isSelected
-                  ? 'border-primary ring-primary shadow-lg ring-2'
-                  : 'hover:border-primary/50 hover:shadow-md'
-              }`}
+              className={`cursor-pointer transition-all ${isSelected
+                ? 'border-primary ring-primary shadow-lg ring-2'
+                : 'hover:border-primary/50 hover:shadow-md'
+                }`}
               onClick={() => scrollToProjectTasks(project.id)}
             >
               <CardContent className="p-4">
@@ -109,10 +130,16 @@ export const ProjectTableView: React.FC<ProjectTableViewProps> = ({ projects, ta
                   {/* Nom et statut du projet */}
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <span className="bg-primary/20 text-primary rounded px-2 py-1 text-sm font-bold">
+                      <span
+                        className="rounded px-2 py-1 text-sm font-bold"
+                        style={{ backgroundColor: `${projectColorMap[project.id]}33`, color: projectColorMap[project.id] }}
+                      >
                         #{projectIndex + 1}
                       </span>
-                      <h4 className="text-primary text-lg font-bold" style={{ fontSize: '1.1rem' }}>
+                      <h4
+                        className="text-lg font-bold"
+                        style={{ fontSize: '1.1rem', color: projectColorMap[project.id] }}
+                      >
                         {project.name}
                       </h4>
                     </div>
@@ -124,7 +151,11 @@ export const ProjectTableView: React.FC<ProjectTableViewProps> = ({ projects, ta
                     <div className="text-muted-foreground text-sm">Manager: {project.manager}</div>
 
                     <div className="flex items-center gap-2">
-                      <Progress value={project.progress} className="flex-1" />
+                      <Progress
+                        value={project.progress}
+                        className="flex-1"
+                        indicatorColor={projectColorMap[project.id]}
+                      />
                       <span className="text-sm font-medium">{project.progress}%</span>
                     </div>
 
@@ -187,21 +218,23 @@ export const ProjectTableView: React.FC<ProjectTableViewProps> = ({ projects, ta
             <div
               key={project.id}
               id={`project-tasks-${project.id}`}
-              className={`space-y-2 transition-all ${
-                isSelected ? 'bg-primary/5 ring-primary/30 rounded-lg p-3 ring-2' : ''
-              }`}
+              className={`space-y-2 transition-all ${isSelected ? 'bg-primary/5 ring-primary/30 rounded-lg p-3 ring-2' : ''
+                }`}
             >
               {/* Nom du projet en en-tête */}
               <div
-                className={`flex items-center gap-2 border-b pb-1 font-bold ${
-                  isSelected ? 'border-primary text-primary' : 'border-border text-primary'
-                }`}
+                className={`flex items-center gap-2 border-b pb-1 font-bold ${isSelected ? 'border-primary' : 'border-border'
+                  }`}
                 style={{
                   fontSize: '1.1rem',
                   fontFamily: 'system-ui, -apple-system, sans-serif',
+                  color: projectColorMap[project.id]
                 }}
               >
-                <span className="bg-primary/20 text-primary rounded px-2 py-0.5 text-sm font-bold">
+                <span
+                  className="rounded px-2 py-0.5 text-sm font-bold"
+                  style={{ backgroundColor: `${projectColorMap[project.id]}33`, color: projectColorMap[project.id] }}
+                >
                   #{projectIndex + 1}
                 </span>
                 📁 {project.name}
@@ -213,30 +246,37 @@ export const ProjectTableView: React.FC<ProjectTableViewProps> = ({ projects, ta
               </div>
 
               {/* Tâches du projet */}
-              <div className="space-y-2 pl-4">
-                {projectTasks.map(task => (
-                  <Card key={task.id} className="border-l-primary/30 border-l-4">
-                    <CardContent className="p-3">
-                      <div className="flex items-center justify-between">
-                        <div className="flex-1">
-                          <h5 className="font-medium">{task.title}</h5>
-                          <div className="text-muted-foreground text-sm">
-                            Assigné à: {getAssigneeName(task.assignee)}
+              <div className="space-y-2 pl-4 flex flex-col">
+                {projectTasks.map(task => {
+                  const isSubtask = !!task.parent_id || task.title.toLowerCase().includes("sous-tâche");
+                  return (
+                    <Card
+                      key={task.id}
+                      className={`border-l-4 transition-all duration-200 ${isSubtask ? 'ml-8 italic opacity-90 border-l-[3px]' : ''}`}
+                      style={{ borderLeftColor: projectColorMap[project.id], opacity: isSubtask ? 0.85 : 1 }}
+                    >
+                      <CardContent className="p-3">
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <h5 className={`font-medium ${isSubtask ? 'text-muted-foreground' : ''}`}>{task.title}</h5>
+                            <div className="text-muted-foreground text-sm">
+                              Assigné à: {getAssigneeName(task.assignee)}
+                            </div>
+                          </div>
+                          <div className="space-y-1 text-right">
+                            <Badge variant="outline" className="text-xs">
+                              {task.status}
+                            </Badge>
+                            <div className="flex items-center gap-2">
+                              <Progress value={task.progress} className="w-16" indicatorColor={projectColorMap[project.id]} />
+                              <span className="text-xs font-medium">{task.progress}%</span>
+                            </div>
                           </div>
                         </div>
-                        <div className="space-y-1 text-right">
-                          <Badge variant="outline" className="text-xs">
-                            {task.status}
-                          </Badge>
-                          <div className="flex items-center gap-2">
-                            <Progress value={task.progress} className="w-16" />
-                            <span className="text-xs font-medium">{task.progress}%</span>
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                      </CardContent>
+                    </Card>
+                  )
+                })}
               </div>
             </div>
           );
@@ -268,7 +308,10 @@ export const ProjectTableView: React.FC<ProjectTableViewProps> = ({ projects, ta
                               {task.status}
                             </Badge>
                             <div className="flex items-center gap-2">
-                              <Progress value={task.progress} className="w-16" />
+                              <Progress
+                                value={task.progress}
+                                className="w-16"
+                              />
                               <span className="text-xs font-medium">{task.progress}%</span>
                             </div>
                           </div>

@@ -1,8 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthFilterContext } from '@/contexts/AuthContext';
 import { applyRoleFilters } from '@/lib/roleBasedFiltering';
 import { useToast } from '@/hooks/use-toast';
+import { CACHE_TTL } from '@/lib/queryConfig';
 
 export interface OnboardingProcess {
   id: string;
@@ -60,29 +61,40 @@ export interface OffboardingTask {
   tenant_id?: string;
 }
 
-export function useOnboardingOffboarding() {
-  const [onboardingProcesses, setOnboardingProcesses] = useState<OnboardingProcess[]>([]);
-  const [offboardingProcesses, setOffboardingProcesses] = useState<OffboardingProcess[]>([]);
-  const [onboardingTasks, setOnboardingTasks] = useState<OnboardingTask[]>([]);
-  const [offboardingTasks, setOffboardingTasks] = useState<OffboardingTask[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+interface OnboardingData {
+  onboardingProcesses: OnboardingProcess[];
+  offboardingProcesses: OffboardingProcess[];
+  onboardingTasks: OnboardingTask[];
+  offboardingTasks: OffboardingTask[];
+}
 
-  // 🔒 Contexte utilisateur pour le filtrage
+export function useOnboardingOffboarding() {
   const { userContext } = useAuthFilterContext();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
-  const fetchData = useCallback(async () => {
+  const tenantId = userContext?.tenantId ?? null;
 
-    if (!userContext) {
-      return;
-    }
+  // ============================================================
+  // QUERY — chargement de toutes les données onboarding/offboarding
+  // ============================================================
+  const {
+    data,
+    isLoading: loading,
+    error: queryError,
+    refetch,
+  } = useQuery<OnboardingData>({
+    queryKey: ['onboarding', tenantId],
+    queryFn: async () => {
+      if (!userContext) {
+        return {
+          onboardingProcesses: [],
+          offboardingProcesses: [],
+          onboardingTasks: [],
+          offboardingTasks: [],
+        };
+      }
 
-    try {
-      setLoading(true);
-      setError(null);
-
-      // 🔒 Construire les queries avec filtrage
       let onboardingQuery = supabase
         .from('onboarding_processes')
         .select('*')
@@ -122,102 +134,109 @@ export function useOnboardingOffboarding() {
       if (onboardingTasksRes.error) throw onboardingTasksRes.error;
       if (offboardingTasksRes.error) throw offboardingTasksRes.error;
 
-        onboarding: onboardingRes.data?.length,
-        offboarding: offboardingRes.data?.length,
-      });
+      return {
+        onboardingProcesses: (onboardingRes.data as OnboardingProcess[]) || [],
+        offboardingProcesses: (offboardingRes.data as OffboardingProcess[]) || [],
+        onboardingTasks: (onboardingTasksRes.data as OnboardingTask[]) || [],
+        offboardingTasks: (offboardingTasksRes.data as OffboardingTask[]) || [],
+      };
+    },
+    enabled: !!userContext,
+    ...CACHE_TTL.semiStatic,
+  });
 
-      setOnboardingProcesses((onboardingRes.data as OnboardingProcess[]) || []);
-      setOffboardingProcesses((offboardingRes.data as OffboardingProcess[]) || []);
-      setOnboardingTasks((onboardingTasksRes.data as OnboardingTask[]) || []);
-      setOffboardingTasks((offboardingTasksRes.data as OffboardingTask[]) || []);
-    } catch (err: any) {
-      console.error('❌ [useOnboardingOffboarding] Error:', err);
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  }, [userContext]);
+  const onboardingProcesses = data?.onboardingProcesses ?? [];
+  const offboardingProcesses = data?.offboardingProcesses ?? [];
+  const onboardingTasks = data?.onboardingTasks ?? [];
+  const offboardingTasks = data?.offboardingTasks ?? [];
+  const error = queryError ? (queryError as Error).message : null;
 
-  const createOnboardingProcess = async (
-    data: Omit<OnboardingProcess, 'id' | 'created_at' | 'updated_at'>
-  ) => {
-    try {
+  // ============================================================
+  // MUTATION — créer un processus d'onboarding
+  // ============================================================
+  const createOnboardingMutation = useMutation({
+    mutationFn: async (data: Omit<OnboardingProcess, 'id' | 'created_at' | 'updated_at'>) => {
       const { error } = await supabase.from('onboarding_processes').insert(data);
-
       if (error) throw error;
-
-      toast({
-        title: 'Succès',
-        description: "Processus d'onboarding créé avec succès",
-      });
-
-      fetchData();
-    } catch (err: any) {
+    },
+    onSuccess: () => {
+      toast({ title: 'Succès', description: "Processus d'onboarding créé avec succès" });
+      queryClient.invalidateQueries({ queryKey: ['onboarding', tenantId] });
+    },
+    onError: (err: any) => {
       console.error('Error creating onboarding process:', err);
       toast({
         title: 'Erreur',
         description: "Impossible de créer le processus d'onboarding",
         variant: 'destructive',
       });
-    }
-  };
+    },
+  });
 
-  const createOffboardingProcess = async (
-    data: Omit<OffboardingProcess, 'id' | 'created_at' | 'updated_at'>
-  ) => {
-    try {
+  const createOnboardingProcess = (data: Omit<OnboardingProcess, 'id' | 'created_at' | 'updated_at'>) =>
+    createOnboardingMutation.mutate(data);
+
+  // ============================================================
+  // MUTATION — créer un processus d'offboarding
+  // ============================================================
+  const createOffboardingMutation = useMutation({
+    mutationFn: async (data: Omit<OffboardingProcess, 'id' | 'created_at' | 'updated_at'>) => {
       const { error } = await supabase.from('offboarding_processes').insert(data);
-
       if (error) throw error;
-
-      toast({
-        title: 'Succès',
-        description: "Processus d'offboarding créé avec succès",
-      });
-
-      fetchData();
-    } catch (err: any) {
+    },
+    onSuccess: () => {
+      toast({ title: 'Succès', description: "Processus d'offboarding créé avec succès" });
+      queryClient.invalidateQueries({ queryKey: ['onboarding', tenantId] });
+    },
+    onError: (err: any) => {
       console.error('Error creating offboarding process:', err);
       toast({
         title: 'Erreur',
         description: "Impossible de créer le processus d'offboarding",
         variant: 'destructive',
       });
-    }
-  };
+    },
+  });
 
-  const updateTaskStatus = async (
-    taskId: string,
-    status: 'pending' | 'completed' | 'overdue',
-    isOnboarding: boolean
-  ) => {
-    try {
+  const createOffboardingProcess = (data: Omit<OffboardingProcess, 'id' | 'created_at' | 'updated_at'>) =>
+    createOffboardingMutation.mutate(data);
+
+  // ============================================================
+  // MUTATION — mettre à jour le statut d'une tâche
+  // ============================================================
+  const updateTaskMutation = useMutation({
+    mutationFn: async ({
+      taskId,
+      status,
+      isOnboarding,
+    }: {
+      taskId: string;
+      status: 'pending' | 'completed' | 'overdue';
+      isOnboarding: boolean;
+    }) => {
       const table = isOnboarding ? 'onboarding_tasks' : 'offboarding_tasks';
       const { error } = await supabase.from(table).update({ status }).eq('id', taskId);
-
       if (error) throw error;
-
-      toast({
-        title: 'Succès',
-        description: 'Statut de la tâche mis à jour',
-      });
-
-      fetchData();
-    } catch (err: any) {
+    },
+    onSuccess: () => {
+      toast({ title: 'Succès', description: 'Statut de la tâche mis à jour' });
+      queryClient.invalidateQueries({ queryKey: ['onboarding', tenantId] });
+    },
+    onError: (err: any) => {
       console.error('Error updating task status:', err);
       toast({
         title: 'Erreur',
         description: 'Impossible de mettre à jour le statut de la tâche',
         variant: 'destructive',
       });
-    }
-  };
+    },
+  });
 
-  useEffect(() => {
-    if (userContext) {
-      fetchData();
-    }
-  }, [userContext]); // ✅ Only depend on userContext, not fetchData
+  const updateTaskStatus = (
+    taskId: string,
+    status: 'pending' | 'completed' | 'overdue',
+    isOnboarding: boolean
+  ) => updateTaskMutation.mutate({ taskId, status, isOnboarding });
 
   return {
     onboardingProcesses,
@@ -226,7 +245,7 @@ export function useOnboardingOffboarding() {
     offboardingTasks,
     loading,
     error,
-    refetch: fetchData,
+    refetch,
     createOnboardingProcess,
     createOffboardingProcess,
     updateTaskStatus,

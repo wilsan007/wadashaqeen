@@ -5,6 +5,7 @@
  */
 
 import React, { useState, useMemo } from 'react';
+import { useTranslation } from '@/hooks/useTranslation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -76,6 +77,7 @@ const DEFAULT_FILTERS: SearchFilters = {
 };
 
 export const AdvancedTaskSearch: React.FC = () => {
+  const { t } = useTranslation();
   const { tasks, loading, updateTask, deleteTask } = useTasks();
   const { projects } = useProjects();
   const { employees } = useHRMinimal({
@@ -294,7 +296,7 @@ export const AdvancedTaskSearch: React.FC = () => {
       <AlertDialog open={confirmDeleteOpen} onOpenChange={setConfirmDeleteOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Supprimer {selectedTasks.size} tâche(s) ?</AlertDialogTitle>
+            <AlertDialogTitle>{t('taskSearch.confirmDeleteTitle', { count: selectedTasks.size })}</AlertDialogTitle>
             <AlertDialogDescription>
               Cette action est irréversible. Les tâches sélectionnées seront définitivement supprimées.
             </AlertDialogDescription>
@@ -317,7 +319,7 @@ export const AdvancedTaskSearch: React.FC = () => {
             <h2 className="bg-gradient-to-r from-violet-600 to-fuchsia-600 bg-clip-text text-3xl font-bold text-transparent dark:from-violet-400 dark:to-fuchsia-400">
               Explorateur
             </h2>
-            <p className="text-muted-foreground">Recherche avancée et filtres intelligents</p>
+            <p className="text-muted-foreground">{t('taskSearch.explorerDesc')}</p>
           </div>
 
           <div className="flex gap-2">
@@ -341,7 +343,7 @@ export const AdvancedTaskSearch: React.FC = () => {
           <div className="bg-background relative flex items-center rounded-xl border shadow-sm">
             <Search className="text-muted-foreground ml-4 h-5 w-5" />
             <Input
-              placeholder="Rechercher une tâche, un bug, une feature..."
+              placeholder={t('taskSearch.searchPlaceholder')}
               value={filters.query}
               onChange={e => handleFilterChange('query', e.target.value)}
               className="placeholder:text-muted-foreground/50 h-14 border-none bg-transparent text-lg focus-visible:ring-0"
@@ -386,7 +388,7 @@ export const AdvancedTaskSearch: React.FC = () => {
                         : 'bg-muted text-muted-foreground hover:bg-muted/80'
                     }`}
                   >
-                    {status === 'todo' ? 'À faire' : status === 'doing' ? 'En cours' : 'Terminé'}
+                    {status === 'todo' ? t('taskSearch.statusTodo') : status === 'doing' ? t('taskSearch.statusDoing') : t('taskSearch.statusDone')}
                   </button>
                 ))}
               </div>
@@ -422,16 +424,16 @@ export const AdvancedTaskSearch: React.FC = () => {
             {/* Autres Filtres */}
             <div className="space-y-4 border-t pt-4">
               <div className="space-y-2">
-                <Label>Projet</Label>
+                <Label>{t('taskSearch.projectLabel')}</Label>
                 <Select
                   value={filters.project}
                   onValueChange={value => handleFilterChange('project', value)}
                 >
                   <SelectTrigger className="bg-background/50">
-                    <SelectValue placeholder="Tous les projets" />
+                    <SelectValue placeholder={t('taskSearch.allProjects')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all_projects">Tous les projets</SelectItem>
+                    <SelectItem value="all_projects">{t('taskSearch.allProjects')}</SelectItem>
                     {projects.map(p => (
                       <SelectItem key={p.id} value={p.id}>
                         {p.name}
@@ -468,7 +470,7 @@ export const AdvancedTaskSearch: React.FC = () => {
         <div className="space-y-4 lg:col-span-3">
           <div className="bg-card/50 flex items-center justify-between rounded-lg border p-2 backdrop-blur-sm">
             <span className="px-2 text-sm font-medium">
-              {filteredTasks.length} résultat{filteredTasks.length > 1 ? 's' : ''}
+              {filteredTasks.length === 1 ? t('taskSearch.resultsCount', { count: 1 }) : t('taskSearch.resultsCountPlural', { count: filteredTasks.length })}
             </span>
             <div className="flex gap-2">
               {selectedTasks.size > 0 && (
@@ -504,8 +506,8 @@ export const AdvancedTaskSearch: React.FC = () => {
               <div className="bg-muted/50 mb-4 rounded-full p-4">
                 <Search className="text-muted-foreground h-8 w-8" />
               </div>
-              <h3 className="text-lg font-semibold">Aucun résultat</h3>
-              <p className="text-muted-foreground">Essayez de modifier vos filtres</p>
+              <h3 className="text-lg font-semibold">{t('taskSearch.noResultsTitle')}</h3>
+              <p className="text-muted-foreground">{t('taskSearch.noResultsDesc')}</p>
             </div>
           ) : (
             <div className="grid gap-3">

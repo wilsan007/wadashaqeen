@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthFilterContext } from '@/contexts/AuthContext';
 import { applyRoleFilters } from '@/lib/roleBasedFiltering';
+import { CACHE_TTL } from '@/lib/queryConfig';
 
 interface PayrollPeriod {
   id: string;
@@ -50,79 +51,70 @@ interface PayrollCheck {
   affectedEmployees?: string[];
 }
 
+interface PayrollData {
+  payrollPeriods: PayrollPeriod[];
+  employeePayrolls: EmployeePayroll[];
+  payrollChecks: PayrollCheck[];
+}
+
 export const usePayrollManagement = () => {
-  const [payrollPeriods, setPayrollPeriods] = useState<PayrollPeriod[]>([]);
-  const [employeePayrolls, setEmployeePayrolls] = useState<EmployeePayroll[]>([]);
-  const [payrollChecks, setPayrollChecks] = useState<PayrollCheck[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  // 🔒 Contexte utilisateur pour le filtrage
   const { userContext } = useAuthFilterContext();
+  const queryClient = useQueryClient();
 
-  const fetchPayrollData = useCallback(async () => {
-      userContext: !!userContext,
-    });
+  const tenantId = userContext?.tenantId ?? null;
 
-    if (!userContext) {
-      return;
-    }
+  // ============================================================
+  // QUERY — chargement de toutes les données paie
+  // ============================================================
+  const {
+    data,
+    isLoading: loading,
+    error: queryError,
+    refetch,
+  } = useQuery<PayrollData>({
+    queryKey: ['payroll', tenantId],
+    queryFn: async () => {
+      if (!userContext) {
+        return { payrollPeriods: [], employeePayrolls: [], payrollChecks: [] };
+      }
 
-    try {
-      setLoading(true);
-
-      // Fetch payroll periods avec filtrage
+      // Fetch payroll periods
       let periodsQuery = supabase
         .from('payroll_periods')
         .select('*')
         .order('year', { ascending: false })
         .order('month', { ascending: false });
-
-      // 🔒 Appliquer le filtrage par rôle (payroll_runs est l'équivalent)
       periodsQuery = applyRoleFilters(periodsQuery, userContext, 'payroll_runs');
-
       const { data: periods, error: periodsError } = await periodsQuery;
-
       if (periodsError) throw periodsError;
 
-      // Fetch employee payrolls avec filtrage
+      // Fetch employee payrolls
       let payrollsQuery = supabase.from('employee_payrolls').select('*').order('employee_name');
-
-      // 🔒 Appliquer le filtrage par rôle (payroll_items est l'équivalent)
       payrollsQuery = applyRoleFilters(payrollsQuery, userContext, 'payroll_items');
-
       const { data: payrolls, error: payrollsError } = await payrollsQuery;
-
       if (payrollsError) throw payrollsError;
 
-      // Fetch real data for payroll checks
+      // Fetch payroll checks data
       const { data: pendingLeaves, error: leavesError } = await supabase
         .from('leave_requests')
         .select('id, employee_id, start_date, end_date, status')
         .eq('status', 'pending');
-
       if (leavesError) throw leavesError;
 
       const { data: pendingExpenses, error: expensesError } = await supabase
         .from('expense_reports')
         .select('id, employee_name, status, total_amount')
         .in('status', ['draft', 'submitted']);
-
       if (expensesError) throw expensesError;
 
-      // Get employees for sample payrolls if none exist
+      // Fetch employees for fallback payroll data
       const { data: employees, error: employeesError } = await supabase
         .from('employees')
         .select('id, full_name, job_title, salary')
         .eq('status', 'active');
-
       if (employeesError) throw employeesError;
 
-        periods: periods?.length,
-        payrolls: payrolls?.length,
-      });
-
-      // Map database data to component interfaces
+      // Map periods
       const mappedPeriods: PayrollPeriod[] = (periods || []).map(period => ({
         id: period.id,
         year: period.year,
@@ -136,7 +128,7 @@ export const usePayrollManagement = () => {
         totalCharges: period.total_charges || 0,
       }));
 
-      // Create sample payroll data if none exists
+      // Map payrolls (or derive from employees)
       let mappedPayrolls: EmployeePayroll[] = [];
       if (payrolls && payrolls.length > 0) {
         mappedPayrolls = payrolls.map(payroll => ({
@@ -151,15 +143,14 @@ export const usePayrollManagement = () => {
           hoursWorked: payroll.hours_worked || 0,
           standardHours: payroll.standard_hours || 0,
           overtimeHours: payroll.overtime_hours || 0,
-          bonuses: [], // TODO: Fetch from payroll_components table
-          deductions: [], // TODO: Fetch from payroll_components table
+          bonuses: [],
+          deductions: [],
         }));
       } else if (employees && employees.length > 0) {
-        // Create sample payroll data from employee data
         mappedPayrolls = employees.map(emp => {
           const baseSalary = emp.salary || 3500;
-          const grossTotal = baseSalary + Math.random() * 500; // Add some variance
-          const socialCharges = grossTotal * 0.42; // Approximate social charges
+          const grossTotal = baseSalary + Math.random() * 500;
+          const socialCharges = grossTotal * 0.42;
           const netTotal = grossTotal - socialCharges;
 
           return {
@@ -171,7 +162,7 @@ export const usePayrollManagement = () => {
             grossTotal: Math.round(grossTotal),
             netTotal: Math.round(netTotal),
             socialCharges: Math.round(socialCharges),
-            hoursWorked: 151 + Math.floor(Math.random() * 20), // 151-170 hours
+            hoursWorked: 151 + Math.floor(Math.random() * 20),
             standardHours: 151,
             overtimeHours: Math.random() > 0.7 ? Math.floor(Math.random() * 10) : 0,
             bonuses: [],
@@ -180,8 +171,8 @@ export const usePayrollManagement = () => {
         });
       }
 
-      // Generate dynamic payroll checks based on real data
-      const dynamicPayrollChecks: PayrollCheck[] = [
+      // Generate dynamic payroll checks
+      const payrollChecks: PayrollCheck[] = [
         {
           id: 'attendance_check',
           type: 'attendance',
@@ -223,19 +214,22 @@ export const usePayrollManagement = () => {
         },
       ];
 
-      setPayrollPeriods(mappedPeriods);
-      setEmployeePayrolls(mappedPayrolls);
-      setPayrollChecks(dynamicPayrollChecks);
-    } catch (err) {
-      console.error('❌ [usePayrollManagement] Error:', err);
-      setError(err instanceof Error ? err.message : 'Une erreur est survenue');
-    } finally {
-      setLoading(false);
-    }
-  }, [userContext]); // ✅ Add userContext dependency
+      return { payrollPeriods: mappedPeriods, employeePayrolls: mappedPayrolls, payrollChecks };
+    },
+    enabled: !!userContext,
+    ...CACHE_TTL.semiStatic,
+  });
 
-  const createPayrollPeriod = async (periodData: Omit<PayrollPeriod, 'id'>) => {
-    try {
+  const payrollPeriods = data?.payrollPeriods ?? [];
+  const employeePayrolls = data?.employeePayrolls ?? [];
+  const payrollChecks = data?.payrollChecks ?? [];
+  const error = queryError ? (queryError as Error).message : null;
+
+  // ============================================================
+  // MUTATION — créer une période de paie
+  // ============================================================
+  const createPeriodMutation = useMutation({
+    mutationFn: async (periodData: Omit<PayrollPeriod, 'id'>) => {
       const dbData = {
         year: periodData.year,
         month: periodData.month,
@@ -269,16 +263,25 @@ export const usePayrollManagement = () => {
         totalCharges: data.total_charges || 0,
       };
 
-      setPayrollPeriods(prev => [mappedData, ...prev]);
       return mappedData;
-    } catch (err) {
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['payroll', tenantId] });
+    },
+    onError: (err: any) => {
       console.error('Error creating payroll period:', err);
       throw err;
-    }
-  };
+    },
+  });
 
-  const updatePayrollPeriod = async (id: string, updates: Partial<PayrollPeriod>) => {
-    try {
+  const createPayrollPeriod = async (periodData: Omit<PayrollPeriod, 'id'>) =>
+    createPeriodMutation.mutateAsync(periodData);
+
+  // ============================================================
+  // MUTATION — mettre à jour une période de paie
+  // ============================================================
+  const updatePeriodMutation = useMutation({
+    mutationFn: async ({ id, updates }: { id: string; updates: Partial<PayrollPeriod> }) => {
       const dbUpdates: any = {};
       if (updates.status) dbUpdates.status = updates.status;
       if (updates.lockDate) dbUpdates.lock_date = updates.lockDate;
@@ -310,34 +313,25 @@ export const usePayrollManagement = () => {
         totalCharges: data.total_charges || 0,
       };
 
-      setPayrollPeriods(prev =>
-        prev.map(period => (period.id === id ? { ...period, ...mappedData } : period))
-      );
       return mappedData;
-    } catch (err) {
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['payroll', tenantId] });
+    },
+    onError: (err: any) => {
       console.error('Error updating payroll period:', err);
       throw err;
-    }
-  };
+    },
+  });
 
-  const processPayroll = async (periodId: string) => {
-    try {
-      // For now, just mark the period as processed since we don't have the RPC function
-      await updatePayrollPeriod(periodId, {
-        status: 'processed',
-        processedDate: new Date().toISOString().split('T')[0],
-      });
-    } catch (err) {
-      console.error('Error processing payroll:', err);
-      throw err;
-    }
-  };
+  const updatePayrollPeriod = async (id: string, updates: Partial<PayrollPeriod>) =>
+    updatePeriodMutation.mutateAsync({ id, updates });
 
-  useEffect(() => {
-    if (userContext) {
-      fetchPayrollData();
-    }
-  }, [userContext]); // ✅ Only depend on userContext, not fetchPayrollData
+  const processPayroll = async (periodId: string) =>
+    updatePayrollPeriod(periodId, {
+      status: 'processed',
+      processedDate: new Date().toISOString().split('T')[0],
+    });
 
   return {
     payrollPeriods,
@@ -348,6 +342,6 @@ export const usePayrollManagement = () => {
     createPayrollPeriod,
     updatePayrollPeriod,
     processPayroll,
-    refetch: fetchPayrollData,
+    refetch,
   };
 };

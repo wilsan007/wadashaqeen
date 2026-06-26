@@ -1,24 +1,30 @@
 /* Styles pour garantir que les en-têtes sticky restent toujours visibles */
+/*
+  CORRECTIF: rgb(var(--primary)) est invalide — --primary contient une valeur HSL
+  brute (ex: "214 100% 50%") sans les parenthèses hsl().
+  La syntaxe correcte est hsl(var(--primary)) ou hsl(var(--primary) / 0.1).
+*/
 
 .sticky-action-header {
   position: sticky !important;
   top: 0 !important;
   z-index: 30 !important;
-  background: rgba(255, 255, 255, 0.95) !important;
+  /* Utilise les tokens CSS du design system au lieu de rgba hardcodé */
+  background: hsl(var(--background) / 0.95) !important;
   backdrop-filter: blur(8px) !important;
   -webkit-backdrop-filter: blur(8px) !important;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.1) !important;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05) !important;
+  border-bottom: 1px solid hsl(var(--border)) !important;
+  box-shadow: 0 2px 4px hsl(var(--foreground) / 0.05) !important;
 }
 
 .dark .sticky-action-header {
-  background: rgba(0, 0, 0, 0.95) !important;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+  background: hsl(var(--background) / 0.95) !important;
+  border-bottom: 1px solid hsl(var(--border)) !important;
 }
 
 .sticky-action-header.selected {
-  background: rgba(var(--primary), 0.1) !important;
-  border-bottom: 2px solid rgba(var(--primary), 0.3) !important;
+  background: hsl(var(--primary) / 0.1) !important;
+  border-bottom: 2px solid hsl(var(--primary) / 0.3) !important;
 }
 
 .action-header-cell {
@@ -30,20 +36,20 @@
   text-align: center !important;
   padding: 12px 8px !important;
   min-width: 120px !important;
-  border-right: 1px solid rgba(0, 0, 0, 0.05) !important;
+  border-right: 1px solid hsl(var(--border) / 0.5) !important;
   transition: all 0.2s ease !important;
 }
 
 .dark .action-header-cell {
-  border-right: 1px solid rgba(255, 255, 255, 0.05) !important;
+  border-right: 1px solid hsl(var(--border) / 0.3) !important;
 }
 
 .action-header-cell.highlighted {
-  background: rgba(var(--primary), 0.15) !important;
-  color: rgb(var(--primary)) !important;
+  background: hsl(var(--primary) / 0.15) !important;
+  color: hsl(var(--primary)) !important;
   font-weight: 700 !important;
-  border: 2px solid rgba(var(--primary), 0.4) !important;
-  box-shadow: 0 2px 8px rgba(var(--primary), 0.2) !important;
+  border: 2px solid hsl(var(--primary) / 0.4) !important;
+  box-shadow: 0 2px 8px hsl(var(--primary) / 0.2) !important;
 }
 
 .action-header-title {
@@ -56,7 +62,7 @@
 .action-header-indicator {
   width: 24px !important;
   height: 2px !important;
-  background: rgb(var(--primary)) !important;
+  background: hsl(var(--primary)) !important;
   border-radius: 1px !important;
   margin: 0 auto !important;
   animation: pulse 1.5s ease-in-out infinite !important;
@@ -77,15 +83,15 @@
 }
 
 .action-scroll-container::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.05) !important;
+  background: hsl(var(--muted) / 0.5) !important;
   border-radius: 4px !important;
 }
 
 .action-scroll-container::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.2) !important;
+  background: hsl(var(--muted-foreground) / 0.3) !important;
   border-radius: 4px !important;
 }
 
 .action-scroll-container::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.3) !important;
+  background: hsl(var(--muted-foreground) / 0.5) !important;
 }

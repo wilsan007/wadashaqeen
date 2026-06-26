@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { useMutation } from '@tanstack/react-query';
 import { useHRMinimal } from '@/hooks/useHRMinimal';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -39,8 +40,8 @@ export const LeaveBalanceManagement = () => {
 
   const filteredBalances = leaveBalances.filter(balance => balance.year === selectedYear);
 
-  const onSubmit = async (data: any) => {
-    try {
+  const createBalance = useMutation({
+    mutationFn: async (data: any) => {
       const balanceData = {
         employee_id: data.employee_id,
         absence_type_id: data.absence_type_id,
@@ -49,60 +50,46 @@ export const LeaveBalanceManagement = () => {
         used_days: 0,
         remaining_days: parseFloat(data.total_days),
       };
-
       const { error } = await supabase.from('leave_balances').insert(balanceData);
-
       if (error) throw error;
-
-      toast({
-        title: 'Succès',
-        description: 'Solde de congés créé avec succès',
-      });
-
+    },
+    onSuccess: () => {
+      toast({ title: 'Succès', description: 'Solde de congés créé avec succès' });
       reset();
       setIsCreateDialogOpen(false);
       refresh();
-    } catch (error: any) {
+    },
+    onError: (error: any) => {
       console.error('Error creating leave balance:', error);
-      toast({
-        title: 'Erreur',
-        description: 'Impossible de créer le solde de congés',
-        variant: 'destructive',
-      });
-    }
-  };
+      toast({ title: 'Erreur', description: 'Impossible de créer le solde de congés', variant: 'destructive' });
+    },
+  });
 
-  const updateBalance = async (balanceId: string, newTotalDays: number) => {
-    try {
+  const updateLeaveBalance = useMutation({
+    mutationFn: async ({ balanceId, newTotalDays }: { balanceId: string; newTotalDays: number }) => {
       const balance = leaveBalances.find(b => b.id === balanceId);
       if (!balance) return;
-
       const remaining = Math.max(0, newTotalDays - balance.used_days);
-
       const { error } = await supabase
         .from('leave_balances')
-        .update({
-          total_days: newTotalDays,
-          remaining_days: remaining,
-        })
+        .update({ total_days: newTotalDays, remaining_days: remaining })
         .eq('id', balanceId);
-
       if (error) throw error;
-
-      toast({
-        title: 'Succès',
-        description: 'Solde mis à jour avec succès',
-      });
-
+    },
+    onSuccess: () => {
+      toast({ title: 'Succès', description: 'Solde mis à jour avec succès' });
       refresh();
-    } catch (error: any) {
+    },
+    onError: (error: any) => {
       console.error('Error updating balance:', error);
-      toast({
-        title: 'Erreur',
-        description: 'Impossible de mettre à jour le solde',
-        variant: 'destructive',
-      });
-    }
+      toast({ title: 'Erreur', description: 'Impossible de mettre à jour le solde', variant: 'destructive' });
+    },
+  });
+
+  const onSubmit = (data: any) => createBalance.mutate(data);
+
+  const updateBalance = (balanceId: string, newTotalDays: number) => {
+    updateLeaveBalance.mutate({ balanceId, newTotalDays });
   };
 
   if (loading) {

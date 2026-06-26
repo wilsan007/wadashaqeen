@@ -1,5 +1,6 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Tree, TreeNode } from 'react-organizational-chart';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useHRMinimal, Employee } from '@/hooks/useHRMinimal';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -177,10 +178,8 @@ export const OrganizationChart: React.FC = () => {
     limits: { employees: 1000 }, // Load all employees for hierarchical view
   });
   const [zoom, setZoom] = React.useState(0.8);
-  const [levels, setLevels] = useState<OrganizationLevel[]>([]);
-  const [departments, setDepartments] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const [pendingDetach, setPendingDetach] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
   // Edit Mode State
   const [isEditMode, setIsEditMode] = useState(false);
@@ -192,24 +191,88 @@ export const OrganizationChart: React.FC = () => {
   const [newEmployeeName, setNewEmployeeName] = useState('');
   const [newEmployeeJob, setNewEmployeeJob] = useState('');
 
-  // Fetch Levels and Departments
-  useEffect(() => {
-    const fetchMetadata = async () => {
-      setLoading(true);
-      const [levelsRes, deptsRes] = await Promise.all([
-        supabase
-          .from('organization_levels' as any)
-          .select('*')
-          .order('rank_order'),
-        supabase.from('departments').select('*'),
-      ]);
+  // useQuery for organization levels
+  const { data: levels = [], isLoading: levelsLoading } = useQuery<OrganizationLevel[]>({
+    queryKey: ['organization_levels'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('organization_levels' as any)
+        .select('*')
+        .order('rank_order');
+      if (error) throw error;
+      return data || [];
+    },
+  });
 
-      if (levelsRes.data) setLevels(levelsRes.data);
-      if (deptsRes.data) setDepartments(deptsRes.data);
-      setLoading(false);
-    };
-    fetchMetadata();
-  }, []);
+  // useQuery for departments
+  const { data: departments = [], isLoading: deptsLoading } = useQuery<any[]>({
+    queryKey: ['departments-org'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('departments').select('*');
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  const loading = levelsLoading || deptsLoading;
+
+  // useMutation: update manager link
+  const updateManagerMutation = useMutation({
+    mutationFn: async ({ employeeId, managerId }: { employeeId: string; managerId: string }) => {
+      const { error } = await supabase
+        .from('employees')
+        .update({ manager_id: managerId })
+        .eq('id', employeeId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success('Hiérarchie mise à jour !');
+      refetch();
+    },
+    onError: (error) => {
+      console.error('Error updating manager:', error);
+      toast.error('Erreur lors de la mise à jour.');
+    },
+  });
+
+  // useMutation: add employee
+  const addEmployeeMutation = useMutation({
+    mutationFn: async ({ name, job, parentId }: { name: string; job: string; parentId: string }) => {
+      const fakeEmail = `${name.toLowerCase().replace(/\s+/g, '.')}@example.com`;
+      const { error } = await supabase.from('employees').insert({
+        full_name: name,
+        job_title: job,
+        manager_id: parentId,
+        email: fakeEmail,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success('Employé ajouté !');
+      refetch();
+      setShowAddDialog(false);
+    },
+    onError: (error: any) => {
+      console.error('Error adding employee:', error);
+      toast.error("Erreur lors de l'ajout: " + error.message);
+    },
+  });
+
+  // useMutation: detach employee
+  const detachEmployeeMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('employees').update({ manager_id: null }).eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success('Employé détaché !');
+      refetch();
+    },
+    onError: (error) => {
+      console.error('Error detaching employee:', error);
+      toast.error('Erreur lors du détachement.');
+    },
+  });
 
   // Handlers
   const handleStartLink = (id: string) => {
@@ -217,30 +280,15 @@ export const OrganizationChart: React.FC = () => {
     toast.info('Sélectionnez le nouveau manager pour cet employé.');
   };
 
-  const handleCompleteLink = async (targetId: string) => {
+  const handleCompleteLink = (targetId: string) => {
     if (!linkingNodeId) return;
     if (linkingNodeId === targetId) {
       toast.error('Un employé ne peut pas être son propre manager.');
       setLinkingNodeId(null);
       return;
     }
-
-    try {
-      const { error } = await supabase
-        .from('employees')
-        .update({ manager_id: targetId })
-        .eq('id', linkingNodeId);
-
-      if (error) throw error;
-
-      toast.success('Hiérarchie mise à jour !');
-      refetch();
-    } catch (error) {
-      console.error('Error updating manager:', error);
-      toast.error('Erreur lors de la mise à jour.');
-    } finally {
-      setLinkingNodeId(null);
-    }
+    updateManagerMutation.mutate({ employeeId: linkingNodeId, managerId: targetId });
+    setLinkingNodeId(null);
   };
 
   const handleAddStart = (parentId: string) => {
@@ -250,49 +298,20 @@ export const OrganizationChart: React.FC = () => {
     setShowAddDialog(true);
   };
 
-  const handleAddConfirm = async () => {
+  const handleAddConfirm = () => {
     if (!newEmployeeName || !parentNodeId) return;
-
-    try {
-      // Create a basic employee record
-      const fakeEmail = `${newEmployeeName.toLowerCase().replace(/\s+/g, '.')}@example.com`;
-
-      const { error } = await supabase.from('employees').insert({
-        full_name: newEmployeeName,
-        job_title: newEmployeeJob,
-        manager_id: parentNodeId,
-        email: fakeEmail,
-      });
-
-      if (error) throw error;
-
-      toast.success('Employé ajouté !');
-      refetch();
-      setShowAddDialog(false);
-    } catch (error: any) {
-      console.error('Error adding employee:', error);
-      toast.error("Erreur lors de l'ajout: " + error.message);
-    }
+    addEmployeeMutation.mutate({ name: newEmployeeName, job: newEmployeeJob, parentId: parentNodeId });
   };
 
   const handleDelete = (id: string) => {
     setPendingDetach(id);
   };
 
-  const confirmDetach = async () => {
+  const confirmDetach = () => {
     if (!pendingDetach) return;
     const id = pendingDetach;
     setPendingDetach(null);
-    try {
-      const { error } = await supabase.from('employees').update({ manager_id: null }).eq('id', id);
-
-      if (error) throw error;
-      toast.success('Employé détaché !');
-      refetch();
-    } catch (error) {
-      console.error('Error detaching employee:', error);
-      toast.error('Erreur lors du détachement.');
-    }
+    detachEmployeeMutation.mutate(id);
   };
 
   const hierarchy = useMemo(() => {

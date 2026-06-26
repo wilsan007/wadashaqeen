@@ -1,8 +1,3 @@
-/**
- * ChangeLogoDialog - Modal d'upload de logo entreprise
- * Accessible uniquement aux TENANT_ADMIN
- */
-
 import React, { useState, useRef } from 'react';
 import {
   ResponsiveModal,
@@ -24,41 +19,49 @@ interface ChangeLogoDialogProps {
   currentLogoUrl?: string;
 }
 
+const EXT_TO_MIME: Record<string, string> = {
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  webp: 'image/webp',
+  gif: 'image/gif',
+  svg: 'image/svg+xml',
+};
+
+const MAX_SIZE_BYTES = 2 * 1024 * 1024;
+
 export const ChangeLogoDialog: React.FC<ChangeLogoDialogProps> = ({
   open,
   onOpenChange,
   currentLogoUrl,
 }) => {
   const { toast } = useToast();
-  const { currentTenant } = useTenant();
+  const { currentTenant, refreshTenant } = useTenant();
   const [loading, setLoading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(currentLogoUrl || null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const getExtension = (filename: string) =>
+    filename.split('.').pop()?.toLowerCase() ?? '';
+
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Fichier sélectionné
-
-    // Valider l'extension (plus fiable que file.type)
-    const ext = file.name.split('.').pop()?.toLowerCase();
-    const validExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'];
-
-    if (!ext || !validExtensions.includes(ext)) {
+    const ext = getExtension(file.name);
+    if (!EXT_TO_MIME[ext]) {
       toast({
-        title: '❌ Extension invalide',
-        description: `Extensions acceptées: ${validExtensions.join(', ')}`,
+        title: 'Extension invalide',
+        description: `Extensions acceptées : ${Object.keys(EXT_TO_MIME).join(', ')}`,
         variant: 'destructive',
       });
       return;
     }
 
-    // Valider la taille (max 2MB)
-    if (file.size > 2 * 1024 * 1024) {
+    if (file.size > MAX_SIZE_BYTES) {
       toast({
-        title: '❌ Fichier trop volumineux',
+        title: 'Fichier trop volumineux',
         description: 'La taille maximale est de 2 MB',
         variant: 'destructive',
       });
@@ -67,120 +70,68 @@ export const ChangeLogoDialog: React.FC<ChangeLogoDialogProps> = ({
 
     setSelectedFile(file);
 
-    // Créer aperçu
     const reader = new FileReader();
-    reader.onloadend = () => {
-      setPreviewUrl(reader.result as string);
-      // Aperçu créé
-    };
-    reader.onerror = () => {
-      // Erreur lecture fichier
-    };
+    reader.onloadend = () => setPreviewUrl(reader.result as string);
     reader.readAsDataURL(file);
   };
 
   const handleSubmit = async () => {
-    if (!selectedFile) {
-      toast({
-        title: '❌ Aucun fichier',
-        description: 'Veuillez sélectionner un logo',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    if (!currentTenant?.id) {
-      toast({
-        title: '❌ Erreur',
-        description: 'Tenant non trouvé',
-        variant: 'destructive',
-      });
-      return;
-    }
+    if (!selectedFile || !currentTenant?.id) return;
 
     setLoading(true);
 
     try {
-      // 1. Upload DIRECT du fichier sans transformation
-      const fileExt = selectedFile.name.split('.').pop()?.toLowerCase();
-      const fileName = `${currentTenant.id}/logo-${Date.now()}.${fileExt}`;
+      const ext = getExtension(selectedFile.name);
+      const contentType = EXT_TO_MIME[ext] ?? 'image/jpeg';
+      const fileName = `${currentTenant.id}/logo-${Date.now()}.${ext}`;
 
-      // 🧹 NETTOYAGE: Supprimer les anciens logos du dossier du tenant
+      // Supprimer les anciens logos du tenant
       const { data: existingFiles } = await supabase.storage
-        .from('company-logos')
+        .from('tenant-logos')
         .list(currentTenant.id);
 
       if (existingFiles && existingFiles.length > 0) {
-        const filesToRemove = existingFiles.map(f => `${currentTenant.id}/${f.name}`);
-        await supabase.storage.from('company-logos').remove(filesToRemove);
+        const paths = existingFiles.map((f) => `${currentTenant.id}/${f.name}`);
+        await supabase.storage.from('tenant-logos').remove(paths);
       }
 
-      // Déterminer le type MIME manuellement pour éviter application/json
-      let contentType = selectedFile.type;
-      const ext = selectedFile.name.split('.').pop()?.toLowerCase();
+      // Créer un Blob avec le bon MIME type (indépendant de file.type)
+      const arrayBuffer = await selectedFile.arrayBuffer();
+      const blob = new Blob([arrayBuffer], { type: contentType });
 
-      if (
-        !contentType ||
-        contentType === 'application/json' ||
-        contentType === 'application/octet-stream'
-      ) {
-        if (ext === 'png') contentType = 'image/png';
-        else if (ext === 'jpg' || ext === 'jpeg') contentType = 'image/jpeg';
-        else if (ext === 'webp') contentType = 'image/webp';
-        else if (ext === 'svg') contentType = 'image/svg+xml';
-        else contentType = 'image/jpeg'; // Fallback par défaut
-      }
-
-
-      // 🚨 CRITIQUE: Convertir en Blob pour forcer le type MIME
-      // Cela écrase toute métadonnée incorrecte du fichier original
-      const fileBlob = selectedFile.slice(0, selectedFile.size, contentType);
-
-      // Upload du BLOB
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('company-logos')
-        .upload(fileName, fileBlob, {
+      const { error: uploadError } = await supabase.storage
+        .from('tenant-logos')
+        .upload(fileName, blob, {
+          contentType,
           cacheControl: '3600',
           upsert: true,
-          contentType: contentType,
         });
 
       if (uploadError) throw uploadError;
 
-      // 2. Obtenir l'URL publique
       const {
         data: { publicUrl },
-      } = supabase.storage.from('company-logos').getPublicUrl(fileName);
+      } = supabase.storage.from('tenant-logos').getPublicUrl(fileName);
 
-      // 3. Mettre à jour le tenant avec la nouvelle URL
-      // UPDATE tenants.logo_url
-
-      const { data: updateData, error: updateError } = await supabase
+      const { error: updateError } = await supabase
         .from('tenants')
         .update({ logo_url: publicUrl })
-        .eq('id', currentTenant.id)
-        .select();
+        .eq('id', currentTenant.id);
 
-      if (updateError) {
-        throw updateError;
-      }
+      if (updateError) throw updateError;
 
-      // Logo uploadé et enregistré avec succès
+      await refreshTenant();
 
       toast({
-        title: '✅ Logo modifié',
-        description: 'Rechargement de la page...',
+        title: 'Logo modifié',
+        description: 'Le logo est maintenant visible dans la sidebar.',
       });
 
-      // Fermer le dialog
       onOpenChange(false);
-
-      // Rafraîchir la page pour voir le logo
-      window.location.reload();
     } catch (error: any) {
       console.error('Erreur upload logo:', error);
       toast({
-        title: '❌ Erreur',
+        title: 'Erreur',
         description: error.message || 'Impossible de modifier le logo',
         variant: 'destructive',
       });
@@ -192,9 +143,7 @@ export const ChangeLogoDialog: React.FC<ChangeLogoDialogProps> = ({
   const handleRemovePreview = () => {
     setSelectedFile(null);
     setPreviewUrl(currentLogoUrl || null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   return (
@@ -203,12 +152,11 @@ export const ChangeLogoDialog: React.FC<ChangeLogoDialogProps> = ({
         <ResponsiveModalHeader>
           <ResponsiveModalTitle>Modifier le logo de l'entreprise</ResponsiveModalTitle>
           <ResponsiveModalDescription>
-            Téléchargez un nouveau logo (PNG, JPG - Max 2 MB)
+            Téléchargez un nouveau logo (PNG, JPG, WEBP — Max 2 MB)
           </ResponsiveModalDescription>
         </ResponsiveModalHeader>
 
         <div className="grid gap-4 py-4">
-          {/* Zone de prévisualisation */}
           <div className="flex flex-col items-center gap-4">
             <div className="border-muted-foreground/25 bg-muted/10 relative h-32 w-auto max-w-full min-w-[8rem] overflow-hidden rounded-lg border-2 border-dashed px-2">
               {previewUrl ? (
@@ -237,11 +185,12 @@ export const ChangeLogoDialog: React.FC<ChangeLogoDialogProps> = ({
               )}
             </div>
 
-            {/* Bouton de sélection */}
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/*"
+              accept={Object.keys(EXT_TO_MIME)
+                .map((e) => `.${e}`)
+                .join(',')}
               onChange={handleFileSelect}
               className="hidden"
             />
@@ -256,9 +205,9 @@ export const ChangeLogoDialog: React.FC<ChangeLogoDialogProps> = ({
             </Button>
 
             {selectedFile && (
-              <div className="text-muted-foreground text-sm">
-                <span className="font-medium">Fichier sélectionné :</span> {selectedFile.name}
-              </div>
+              <p className="text-muted-foreground text-sm">
+                <span className="font-medium">Fichier :</span> {selectedFile.name}
+              </p>
             )}
           </div>
         </div>
@@ -272,7 +221,11 @@ export const ChangeLogoDialog: React.FC<ChangeLogoDialogProps> = ({
           >
             Annuler
           </Button>
-          <Button type="button" onClick={handleSubmit} disabled={loading || !selectedFile}>
+          <Button
+            type="button"
+            onClick={handleSubmit}
+            disabled={loading || !selectedFile}
+          >
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Enregistrer
           </Button>

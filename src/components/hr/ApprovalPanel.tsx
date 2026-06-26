@@ -3,6 +3,7 @@
  */
 
 import { useState } from 'react';
+import { useMutation } from '@tanstack/react-query';
 import { useHRSelfService } from '@/hooks/useHRSelfService';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -152,14 +153,14 @@ export function ApprovalPanel() {
     setDialogOpen(true);
   };
 
-  const handleApproval = async (reason?: string) => {
-    if (!dialogData) return;
+  const approvalMutation = useMutation({
+    mutationFn: async ({ reason }: { reason?: string }) => {
+      if (!dialogData) return;
 
-    const { item, type, action } = dialogData;
-    const status = action === 'approve' ? 'approved' : 'rejected';
-    const now = new Date().toISOString();
+      const { item, type, action } = dialogData;
+      const status = action === 'approve' ? 'approved' : 'rejected';
+      const now = new Date().toISOString();
 
-    try {
       // Récupérer l'ID de l'utilisateur courant
       const { data: { user } } = await supabase.auth.getUser();
       const userId = user?.id;
@@ -168,10 +169,11 @@ export function ApprovalPanel() {
         // Les notes de frais ont un statut spécial 'approved_manager'
         await approveExpenseReport(item.id, userId ?? '', 'manager');
         if (action === 'reject') {
-          await supabase
+          const { error } = await supabase
             .from('expense_reports')
             .update({ status: 'rejected', rejection_reason: reason ?? null })
             .eq('id', item.id);
+          if (error) throw error;
         }
       } else if (type === 'timesheet') {
         const updates: Record<string, unknown> = { status };
@@ -204,22 +206,28 @@ export function ApprovalPanel() {
         const { error } = await supabase.from('administrative_requests').update(updates).eq('id', item.id);
         if (error) throw error;
       }
-
+    },
+    onSuccess: () => {
+      const action = dialogData?.action;
       toast({
         title: action === 'approve' ? 'Approuvé ✅' : 'Rejeté',
         description: `La demande a été ${action === 'approve' ? 'approuvée' : 'rejetée'} avec succès.`,
       });
-
       refresh();
-    } catch (err: any) {
+      setDialogData(null);
+    },
+    onError: (err: any) => {
       toast({
         title: 'Erreur',
         description: err.message ?? "Impossible de traiter la demande.",
         variant: 'destructive',
       });
-    } finally {
       setDialogData(null);
-    }
+    },
+  });
+
+  const handleApproval = (reason?: string) => {
+    approvalMutation.mutate({ reason });
   };
 
   const renderExpenseCard = (expense: any) => (

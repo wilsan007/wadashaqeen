@@ -9,6 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useMultiplePlaceholderHandler } from '@/hooks/usePlaceholderHandler';
 import { SocialAuth } from '@/components/auth/SocialAuth';
 import type { User, Session } from '@supabase/supabase-js';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface AuthProps {
   onAuthStateChange: (user: User | null, session: Session | null) => void;
@@ -21,12 +22,13 @@ export const Auth = ({ onAuthStateChange }: AuthProps) => {
   const [fullName, setFullName] = useState(''); // Ajout du state pour le nom complet
   const [showMFAInput, setShowMFAInput] = useState(false);
   const [mfaCode, setMfaCode] = useState('');
+  const { t } = useTranslation();
 
   // Gestion des placeholders (sécurisée - pas d'auto-complétion)
   const { handleFocus, getPlaceholder, forceHidePlaceholder } = useMultiplePlaceholderHandler({
-    email: 'admin@example.com',
-    password: 'Votre mot de passe',
-    fullName: 'Votre nom complet',
+    email: t('authFlow.emailPlaceholder'),
+    password: t('authFlow.passwordPlaceholder'),
+    fullName: t('authFlow.fullNamePlaceholder'),
   });
 
   // Forcer le masquage des placeholders si des valeurs sont détectées (sécurité)
@@ -45,9 +47,8 @@ export const Auth = ({ onAuthStateChange }: AuthProps) => {
     const error = searchParams.get('error');
     if (error === 'invitation_failed') {
       toast({
-        title: '⚠️ Lien expiré ou invalide',
-        description:
-          "Le lien d'invitation n'a pas pu être validé. Veuillez vous connecter avec votre email et le mot de passe temporaire reçu.",
+        title: t('authFlow.invitationLabel'),
+        description: t('authFlow.invitationDesc'),
         variant: 'destructive',
       });
     }
@@ -73,7 +74,7 @@ export const Auth = ({ onAuthStateChange }: AuthProps) => {
 
   const verifyMFA = async () => {
     if (!mfaCode || mfaCode.length !== 6) {
-      return { error: new Error('Code à 6 chiffres requis') };
+      return { error: new Error(t('authFlow.mfaCodeRequired')) };
     }
 
     // Utiliser la méthode mfa.challenge pour les codes TOTP
@@ -87,7 +88,7 @@ export const Auth = ({ onAuthStateChange }: AuthProps) => {
       return { data, error };
     }
 
-    return { error: new Error('Aucun facteur MFA trouvé') };
+    return { error: new Error(t('authFlow.noMfaFactor')) };
   };
 
   const signUp = async (email: string, password: string, fullName: string) => {
@@ -138,7 +139,7 @@ export const Auth = ({ onAuthStateChange }: AuthProps) => {
 
       if (error) {
         // Gestion d'erreurs moderne pour l'authentification
-        let errorTitle = "❌ Erreur d'authentification";
+        let errorTitle = t('authFlow.errTitle');
         let errorMessage = error.message || "Une erreur s'est produite.";
 
         // Email déjà utilisé
@@ -148,8 +149,8 @@ export const Auth = ({ onAuthStateChange }: AuthProps) => {
             error.message?.toLowerCase().includes('exists') ||
             error.message?.toLowerCase().includes('taken'))
         ) {
-          errorTitle = '📧 Email déjà utilisé';
-          errorMessage = 'Cette adresse email est déjà utilisée. Veuillez en choisir une autre.';
+          errorTitle = t('authFlow.emailUsedTitle');
+          errorMessage = t('authFlow.emailUsedDesc');
         }
 
         // Identifiants invalides
@@ -157,9 +158,8 @@ export const Auth = ({ onAuthStateChange }: AuthProps) => {
           error.message?.toLowerCase().includes('invalid') ||
           error.message?.toLowerCase().includes('credentials')
         ) {
-          errorTitle = '🔐 Email ou mot de passe incorrect';
-          errorMessage =
-            "L'email et/ou le mot de passe sont erronés. Veuillez vérifier vos informations.";
+          errorTitle = t('authFlow.invalidCredsTitle');
+          errorMessage = t('authFlow.invalidCredsDesc');
         }
 
         // Mot de passe faible
@@ -168,9 +168,8 @@ export const Auth = ({ onAuthStateChange }: AuthProps) => {
           (error.message?.toLowerCase().includes('weak') ||
             error.message?.toLowerCase().includes('strength'))
         ) {
-          errorTitle = '🔒 Mot de passe trop faible';
-          errorMessage =
-            'Votre mot de passe doit contenir au moins 8 caractères avec majuscules, minuscules, chiffres et symboles.';
+          errorTitle = t('authFlow.weakPasswordTitle');
+          errorMessage = t('authFlow.weakPasswordDesc');
         }
 
         toast({
@@ -180,20 +179,19 @@ export const Auth = ({ onAuthStateChange }: AuthProps) => {
         });
       } else if (isForgotPassword) {
         toast({
-          title: 'Email envoyé',
-          description:
-            'Si un compte existe avec cet email, vous recevrez un lien de réinitialisation.',
+          title: t('authFlow.emailSentTitle'),
+          description: t('authFlow.emailSentDesc'),
         });
         setIsForgotPassword(false);
       } else if (isSignUp) {
         toast({
-          title: 'Inscription réussie',
-          description: 'Vérifiez votre email pour confirmer votre compte',
+          title: t('authFlow.signupSuccessTitle'),
+          description: t('authFlow.signupSuccessDesc'),
         });
       } else if (!showMFAInput) {
         toast({
-          title: 'Connexion réussie',
-          description: 'Vous êtes maintenant connecté',
+          title: t('authFlow.loginSuccessTitle'),
+          description: t('authFlow.loginSuccessDesc'),
         });
       }
     } catch (error: any) {
@@ -216,8 +214,8 @@ export const Auth = ({ onAuthStateChange }: AuthProps) => {
 
       if (error) {
         toast({
-          title: '❌ Code incorrect',
-          description: 'Le code MFA est incorrect. Veuillez réessayer.',
+          title: t('authFlow.mfaCodeFailTitle'),
+          description: t('authFlow.mfaCodeFailDesc'),
           variant: 'destructive',
         });
       } else {
@@ -238,18 +236,33 @@ export const Auth = ({ onAuthStateChange }: AuthProps) => {
   };
 
   return (
-    <div className="bg-background flex min-h-screen items-center justify-center">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle>
-            {isForgotPassword ? 'Mot de passe oublié' : isSignUp ? 'Créer un compte' : 'Connexion'}
+    <div
+      className="flex min-h-screen flex-col items-center justify-center px-4"
+      style={{
+        background: `
+          radial-gradient(ellipse 80% 50% at 20% -10%, hsl(var(--primary) / 0.1) 0%, transparent 55%),
+          radial-gradient(ellipse 60% 40% at 80% 110%, hsl(280 70% 60% / 0.07) 0%, transparent 55%),
+          var(--gradient-bg)
+        `,
+      }}
+    >
+      {/* Logo + nom de l'app */}
+      <div className="mb-8 flex flex-col items-center gap-4">
+        <img src="/logo-w.svg" alt="Wadashaqayn" className="h-16 w-16 drop-shadow-lg" onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+        <span className="text-2xl font-bold tracking-tight text-foreground">Wadashaqayn</span>
+      </div>
+
+      <Card className="w-full max-w-md shadow-xl">
+        <CardHeader className="pb-4">
+          <CardTitle className="text-xl">
+            {isForgotPassword ? t('authFlow.forgotPasswordLabel') : isSignUp ? t('authFlow.createAccountLabel') : t('auth.login')}
           </CardTitle>
           <CardDescription>
             {isForgotPassword
-              ? 'Entrez votre email pour recevoir un lien de réinitialisation'
+              ? t('authFlow.forgotPasswordHint')
               : isSignUp
-                ? "Créez votre compte admin pour accéder à l'application"
-                : 'Connectez-vous avec vos identifiants admin'}
+                ? t('authFlow.createAccountHint')
+                : t('authFlow.loginHint')}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -259,7 +272,7 @@ export const Auth = ({ onAuthStateChange }: AuthProps) => {
           {showMFAInput ? (
             <form onSubmit={handleMFAVerification} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="mfaCode">Code d'authentification à deux facteurs</Label>
+                <Label htmlFor="mfaCode">{t('authFlow.mfaLabel')}</Label>
                 <Input
                   id="mfaCode"
                   type="text"
@@ -275,11 +288,11 @@ export const Auth = ({ onAuthStateChange }: AuthProps) => {
                   required
                 />
                 <p className="text-muted-foreground text-center text-sm">
-                  Entrez le code à 6 chiffres depuis votre application d'authentification
+                  {t('authFlow.mfaHint')}
                 </p>
               </div>
               <Button type="submit" className="w-full" disabled={loading || mfaCode.length !== 6}>
-                {loading ? 'Vérification...' : 'Vérifier'}
+                {loading ? t('authFlow.verifying') : t('authFlow.verify')}
               </Button>
               <Button
                 type="button"
@@ -290,14 +303,14 @@ export const Auth = ({ onAuthStateChange }: AuthProps) => {
                   setMfaCode('');
                 }}
               >
-                Retour
+                {t('authFlow.back')}
               </Button>
             </form>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-4" autoComplete="off">
               {isSignUp && (
                 <div className="space-y-2">
-                  <Label htmlFor="fullName">Nom complet</Label>
+                  <Label htmlFor="fullName">{t('auth.fullName')}</Label>
                   <Input
                     id="fullName"
                     type="text"
@@ -315,7 +328,7 @@ export const Auth = ({ onAuthStateChange }: AuthProps) => {
                 </div>
               )}
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">{t('auth.email')}</Label>
                 <Input
                   id="email"
                   type="email"
@@ -334,7 +347,7 @@ export const Auth = ({ onAuthStateChange }: AuthProps) => {
               {!isForgotPassword && (
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
-                    <Label htmlFor="password">Mot de passe</Label>
+                    <Label htmlFor="password">{t('auth.password')}</Label>
                     {!isSignUp && (
                       <Button
                         variant="link"
@@ -342,7 +355,7 @@ export const Auth = ({ onAuthStateChange }: AuthProps) => {
                         onClick={() => setIsForgotPassword(true)}
                         type="button"
                       >
-                        Mot de passe oublié ?
+                        {t('authFlow.passwordForgotten')}
                       </Button>
                     )}
                   </div>
@@ -364,12 +377,12 @@ export const Auth = ({ onAuthStateChange }: AuthProps) => {
               )}
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading
-                  ? 'Chargement...'
+                  ? t('authFlow.loading')
                   : isForgotPassword
-                    ? 'Envoyer le lien'
+                    ? t('authFlow.sendLink')
                     : isSignUp
-                      ? 'Créer le compte'
-                      : 'Se connecter'}
+                      ? t('authFlow.createAccountLabel')
+                      : t('auth.login')}
               </Button>
               <div className="mt-4 text-center">
                 <Button
@@ -385,10 +398,10 @@ export const Auth = ({ onAuthStateChange }: AuthProps) => {
                   className="text-sm"
                 >
                   {isForgotPassword
-                    ? 'Retour à la connexion'
+                    ? t('authFlow.backToLogin')
                     : isSignUp
-                      ? 'Déjà un compte ? Se connecter'
-                      : 'Créer un compte admin'}
+                      ? t('authFlow.alreadyHaveAccount')
+                      : t('authFlow.createAdminAccount')}
                 </Button>
               </div>
             </form>
@@ -397,13 +410,13 @@ export const Auth = ({ onAuthStateChange }: AuthProps) => {
       </Card>
 
       {/* Liens légaux */}
-      <p className="mt-4 text-center text-xs text-zinc-500">
-        <Link to="/privacy" className="underline underline-offset-2 hover:text-zinc-300 transition-colors">
-          Politique de confidentialité
+      <p className="mt-6 text-center text-xs text-muted-foreground">
+        <Link to="/privacy" className="underline underline-offset-2 hover:text-foreground transition-colors">
+          {t('authFlow.privacyPolicy')}
         </Link>
         {' · '}
-        <Link to="/terms" className="underline underline-offset-2 hover:text-zinc-300 transition-colors">
-          CGU
+        <Link to="/terms" className="underline underline-offset-2 hover:text-foreground transition-colors">
+          {t('authFlow.cgu')}
         </Link>
       </p>
     </div>

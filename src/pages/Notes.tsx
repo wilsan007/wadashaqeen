@@ -118,7 +118,7 @@ export default function Notes() {
             </Button>
             <div>
               <h1 className="flex items-center gap-2 text-3xl font-bold">
-                <FileText className="h-8 w-8" />
+                <FileText className="h-8 w-8" aria-hidden="true" />
                 Bloc-notes
               </h1>
               <p className="text-muted-foreground">Vos notes personnelles</p>
@@ -142,30 +142,47 @@ export default function Notes() {
             <Card>
               <CardHeader>
                 <div className="flex items-center gap-2">
-                  <Search className="text-muted-foreground h-4 w-4" />
+                  <Search className="text-muted-foreground h-4 w-4" aria-hidden="true" />
                   <Input
                     placeholder="Rechercher..."
                     value={search}
                     onChange={e => setSearch(e.target.value)}
                     className="border-0 focus-visible:ring-0"
+                    aria-label="Rechercher une note"
                   />
                 </div>
               </CardHeader>
               <CardContent className="p-0">
                 {filteredNotes.length === 0 ? (
-                  <div className="px-4 py-8 text-center">
-                    <FileText className="text-muted-foreground mx-auto mb-2 h-12 w-12" />
-                    <p className="text-muted-foreground">Aucune note</p>
+                  <div className="px-4 py-8 text-center" role="status" aria-live="polite">
+                    <FileText className="text-muted-foreground mx-auto mb-2 h-12 w-12" aria-hidden="true" />
+                    <p className="text-muted-foreground font-medium">
+                      {search ? 'Aucune note correspondante' : 'Aucune note'}
+                    </p>
+                    {!search && (
+                      <p className="text-muted-foreground mt-1 text-xs">
+                        Créez votre première note en cliquant sur « Nouvelle note »
+                      </p>
+                    )}
                   </div>
                 ) : (
                   <div className="divide-y">
                     {filteredNotes.map(note => (
                       <div
                         key={note.id}
-                        className={`hover:bg-accent cursor-pointer p-4 transition-colors ${
+                        role="button"
+                        tabIndex={0}
+                        aria-current={selectedNote?.id === note.id ? 'true' : undefined}
+                        className={`hover:bg-accent cursor-pointer p-4 transition-colors focus-visible:bg-accent focus-visible:outline-none ${
                           selectedNote?.id === note.id ? 'bg-accent' : ''
                         }`}
                         onClick={() => handleSelectNote(note)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            handleSelectNote(note);
+                          }
+                        }}
                       >
                         <div className="mb-2 flex items-start justify-between">
                           <h3 className="line-clamp-1 font-medium">{note.title}</h3>
@@ -173,12 +190,13 @@ export default function Notes() {
                             variant="ghost"
                             size="sm"
                             className="h-6 w-6 p-0"
+                            aria-label={`Supprimer la note « ${note.title} »`}
                             onClick={e => {
                               e.stopPropagation();
                               handleDelete(note.id);
                             }}
                           >
-                            <Trash2 className="h-3 w-3" />
+                            <Trash2 className="h-3 w-3" aria-hidden="true" />
                           </Button>
                         </div>
                         <p className="text-muted-foreground mb-2 line-clamp-2 text-sm">
@@ -224,7 +242,7 @@ export default function Notes() {
                 </div>
                 <div className="flex gap-2">
                   <Button onClick={handleSave} disabled={loading}>
-                    <FileText className="mr-2 h-4 w-4" />
+                    <FileText className="mr-2 h-4 w-4" aria-hidden="true" />
                     Enregistrer
                   </Button>
                   <Button
@@ -239,7 +257,8 @@ export default function Notes() {
                   </Button>
                 </div>
                 <p className="text-muted-foreground text-xs">
-                  💡 Astuce : Utilisez Markdown pour formater vos notes (fonctionnalité à venir)
+                  <span aria-hidden="true">💡</span>{' '}
+                  Astuce : Utilisez Markdown pour formater vos notes (fonctionnalité à venir)
                 </p>
               </CardContent>
             </Card>

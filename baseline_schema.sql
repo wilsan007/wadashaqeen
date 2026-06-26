@@ -8764,7 +8764,7 @@ ALTER TABLE ONLY "public"."user_roles"
 
 
 
-CREATE POLICY "Anyone can validate invitation tokens" ON "public"."invitations" FOR SELECT USING (true);
+CREATE POLICY "Users can read own invitations" ON "public"."invitations" FOR SELECT TO "authenticated" USING (("email" = "auth"."email"()));
 
 
 

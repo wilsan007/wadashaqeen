@@ -23,6 +23,8 @@ import { useEmployees } from '@/hooks/useEmployees';
 import { QuickInviteCollaborator } from '@/components/tasks/QuickInviteCollaborator';
 import { useToast } from '@/hooks/use-toast';
 import { CurrencySelect } from '@/components/common/CurrencySelect';
+import { useTranslation } from '@/hooks/useTranslation';
+import { useProjectEditPermissions } from '@/hooks/useProjectEditPermissions';
 
 interface ProjectCreationDialogProps {
   open: boolean;
@@ -45,7 +47,12 @@ export const ProjectCreationDialog: React.FC<ProjectCreationDialogProps> = ({
   onCreateProject,
 }) => {
   const { toast } = useToast();
+  const { t } = useTranslation();
   const { employees, refetch: refetchEmployees } = useEmployees();
+
+  // 🔒 Seuls PM+, admins et tenant_admin peuvent inviter des collaborateurs
+  const projectPermissions = useProjectEditPermissions();
+  const canInviteCollaborator = projectPermissions.canManageTeam;
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [manager, setManager] = useState('unassigned'); // ✅ Valeur par défaut valide pour Radix UI
@@ -81,7 +88,7 @@ export const ProjectCreationDialog: React.FC<ProjectCreationDialogProps> = ({
 
   const handleSubmit = async () => {
     if (!name.trim()) {
-      toast({ title: 'Champ obligatoire', description: 'Le nom du projet est obligatoire.', variant: 'destructive' });
+      toast({ title: t('projectsBloc.creation.errorTitle'), description: t('projectsBloc.creation.errorMissingName'), variant: 'destructive' });
       return;
     }
 
@@ -109,7 +116,7 @@ export const ProjectCreationDialog: React.FC<ProjectCreationDialogProps> = ({
 
       onOpenChange(false);
     } catch (error) {
-      toast({ title: 'Erreur', description: 'Erreur lors de la création du projet.', variant: 'destructive' });
+      toast({ title: t('projectsBloc.creation.createError'), description: t('projectsBloc.creation.createErrorDesc'), variant: 'destructive' });
     } finally {
       setLoading(false);
     }
@@ -121,40 +128,40 @@ export const ProjectCreationDialog: React.FC<ProjectCreationDialogProps> = ({
         <ResponsiveModalHeader>
           <ResponsiveModalTitle className="flex items-center gap-2 text-base sm:text-lg">
             <Plus className="h-4 w-4 sm:h-5 sm:w-5" />
-            <span className="truncate">Créer un Nouveau Projet</span>
+            <span className="truncate">{t('projectsBloc.creation.title')}</span>
           </ResponsiveModalTitle>
         </ResponsiveModalHeader>
 
         <div className="space-y-3 sm:space-y-4">
           <div className="space-y-2">
-            <Label>Nom du projet *</Label>
+            <Label>{t('projectsBloc.creation.nameLabel')}</Label>
             <Input
               value={name}
               onChange={e => setName(e.target.value)}
-              placeholder="Nom du projet..."
+              placeholder={t('projectsBloc.creation.namePlaceholder')}
               maxLength={100}
             />
           </div>
 
           <div className="space-y-2">
-            <Label>Description</Label>
+            <Label>{t('projectsBloc.creation.descLabel')}</Label>
             <Textarea
               value={description}
               onChange={e => setDescription(e.target.value)}
-              placeholder="Description du projet..."
+              placeholder={t('projectsBloc.creation.descPlaceholder')}
               rows={3}
             />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Manager / Chef de projet</Label>
+              <Label>{t('projectsBloc.creation.managerLabel')}</Label>
               <Select value={manager} onValueChange={setManager}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Sélectionner un manager" />
+                  <SelectValue placeholder={t('projectsBloc.creation.selectManager')} />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="unassigned">Non assigné</SelectItem>
+                  <SelectItem value="unassigned">{t('projectsBloc.creation.unassigned')}</SelectItem>
                   {employees.map(employee => (
                     <SelectItem key={employee.id} value={employee.id}>
                       {employee.full_name}
@@ -162,27 +169,29 @@ export const ProjectCreationDialog: React.FC<ProjectCreationDialogProps> = ({
                   ))}
                 </SelectContent>
               </Select>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={() => setShowQuickInvite(true)}
-                className="w-full border-blue-300 text-blue-600 hover:bg-blue-50"
-              >
-                ➕ Inviter un manager
-              </Button>
+              {canInviteCollaborator && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowQuickInvite(true)}
+                  className="w-full border-blue-300 text-blue-600 hover:bg-blue-50"
+                >
+                  {t('projectsBloc.creation.inviteManager')}
+                </Button>
+              )}
             </div>
 
             <div className="space-y-2">
-              <Label>Statut</Label>
+              <Label>{t('projectsBloc.creation.statusLabel')}</Label>
               <Select value={status} onValueChange={(value: any) => setStatus(value)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="a_venir">À venir</SelectItem>
-                  <SelectItem value="en_cours">En cours</SelectItem>
-                  <SelectItem value="termine">Terminé</SelectItem>
+                  <SelectItem value="a_venir">{t('gantt.status.todo')}</SelectItem>
+                  <SelectItem value="en_cours">{t('gantt.status.inProgress')}</SelectItem>
+                  <SelectItem value="termine">{t('gantt.status.completed')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -190,28 +199,28 @@ export const ProjectCreationDialog: React.FC<ProjectCreationDialogProps> = ({
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Priorité</Label>
+              <Label>{t('projectsBloc.creation.priorityLabel')}</Label>
               <Select value={priority} onValueChange={(value: any) => setPriority(value)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="low">🟢 Faible</SelectItem>
-                  <SelectItem value="medium">🟡 Moyenne</SelectItem>
-                  <SelectItem value="high">🟠 Élevée</SelectItem>
-                  <SelectItem value="urgent">🔴 Urgente</SelectItem>
+                  <SelectItem value="low">🟢 {t('gantt.priority.low')}</SelectItem>
+                  <SelectItem value="medium">🟡 {t('gantt.priority.medium')}</SelectItem>
+                  <SelectItem value="high">🟠 {t('gantt.priority.high')}</SelectItem>
+                  <SelectItem value="urgent">🔴 {t('gantt.priority.urgent')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <div className="space-y-2">
-              <Label>Budget</Label>
+              <Label>{t('projectsBloc.creation.budgetLabel')}</Label>
               <div className="flex gap-2">
                 <Input
                   type="number"
                   value={budget || ''}
                   onChange={e => setBudget(e.target.value ? Number(e.target.value) : undefined)}
-                  placeholder="Budget estimé..."
+                  placeholder={t('projectsBloc.creation.budgetPlaceholder')}
                   className="flex-1"
                 />
                 <CurrencySelect
@@ -224,12 +233,12 @@ export const ProjectCreationDialog: React.FC<ProjectCreationDialogProps> = ({
           </div>
 
           <div className="space-y-2">
-            <Label>Compétences requises</Label>
+            <Label>{t('projectsBloc.creation.skillsLabel')}</Label>
             <div className="flex gap-2">
               <Input
                 value={newSkill}
                 onChange={e => setNewSkill(e.target.value)}
-                placeholder="Ajouter une compétence..."
+                placeholder={t('projectsBloc.creation.skillsPlaceholder')}
                 onKeyPress={e => e.key === 'Enter' && addSkill()}
               />
               <Button type="button" onClick={addSkill} size="sm">
@@ -271,31 +280,33 @@ export const ProjectCreationDialog: React.FC<ProjectCreationDialogProps> = ({
         <ResponsiveModalFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             <X className="mr-2 h-4 w-4" />
-            Annuler
+            {t('projectsBloc.creation.cancelBtn')}
           </Button>
           <Button onClick={handleSubmit} disabled={loading || !name.trim()}>
             <Save className="mr-2 h-4 w-4" />
-            {loading ? 'Création...' : 'Créer le Projet'}
+            {loading ? t('projectsBloc.creation.creating') : t('projectsBloc.creation.createBtn')}
           </Button>
         </ResponsiveModalFooter>
       </ResponsiveModalContent>
 
-      <QuickInviteCollaborator
-        open={showQuickInvite}
-        onOpenChange={setShowQuickInvite}
-        onSuccess={employeeId => {
-          if (refetchEmployees) {
-            refetchEmployees();
-          }
-          if (employeeId) {
-            setManager(employeeId);
-          }
-          toast({
-            title: '✅ Manager invité',
-            description: 'La personne a été automatiquement assignée comme manager du projet.',
-          });
-        }}
-      />
+      {canInviteCollaborator && (
+        <QuickInviteCollaborator
+          open={showQuickInvite}
+          onOpenChange={setShowQuickInvite}
+          onSuccess={employeeId => {
+            if (refetchEmployees) {
+              refetchEmployees();
+            }
+            if (employeeId) {
+              setManager(employeeId);
+            }
+            toast({
+              title: t('projectsBloc.creation.managerInvited'),
+              description: t('projectsBloc.creation.managerInvitedDesc'),
+            });
+          }}
+        />
+      )}
     </ResponsiveModal>
   );
 };

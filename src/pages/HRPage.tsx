@@ -11,12 +11,14 @@ import {
   TrendingUp,
   BookOpen,
   Shield,
+  UserX,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { ResponsiveLayout } from '@/components/responsive/ResponsiveLayout';
-import { BrandedLoadingScreen } from '@/components/layout/BrandedLoadingScreen';
+import { useTranslation } from '@/hooks/useTranslation';
+
 
 // 🚀 OPTIMISATION BUNDLE - Lazy loading des composants HR lourds
 const HRDashboard = lazy(() =>
@@ -71,16 +73,20 @@ const HierarchyConfig = lazy(() =>
 const OrganizationChart = lazy(() =>
   import('@/components/hr/OrganizationChart').then(m => ({ default: m.OrganizationChart }))
 );
+const FormerEmployees = lazy(() =>
+  import('@/components/hr/FormerEmployees').then(m => ({ default: m.FormerEmployees }))
+);
 
-// Composant de chargement professionnel
-const LoadingFallback = () => <BrandedLoadingScreen appName="Wadashaqayn" logoSrc="/logo-w.svg" />;
-
-// Helper pour envelopper les composants lazy avec Suspense
-const withSuspense = (Component: React.LazyExoticComponent<any>) => {
-  return () => (
-    <Suspense fallback={<LoadingFallback />}>
-      <Component />
-    </Suspense>
+// Spinner inline léger — ne masque PAS la barre d'onglets
+const LoadingFallback = () => {
+  const { t } = useTranslation();
+  return (
+    <div className="flex min-h-[200px] items-center justify-center py-12">
+      <div className="flex flex-col items-center gap-3">
+        <div className="border-primary h-8 w-8 animate-spin rounded-full border-2 border-t-transparent" />
+        <p className="text-muted-foreground text-sm">{t('common.loading')}</p>
+      </div>
+    </div>
   );
 };
 
@@ -165,6 +171,11 @@ const OrganizationChartWithSuspense = () => (
     <OrganizationChart />
   </Suspense>
 );
+const FormerEmployeesWithSuspense = () => (
+  <Suspense fallback={<LoadingFallback />}>
+    <FormerEmployees />
+  </Suspense>
+);
 
 const HRPage = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -175,8 +186,11 @@ const HRPage = () => {
     leaves: 'requests',
     time: 'attendance',
   });
+  // Onglet anciens employés dans la section personnel
+  const [showFormer, setShowFormer] = useState(false);
   const isMobile = useIsMobile();
   const navigate = useNavigate();
+  const { t } = useTranslation();
 
   return (
     <ResponsiveLayout>
@@ -190,16 +204,16 @@ const HRPage = () => {
             className="hover-glow h-9 w-9 shrink-0 p-0 sm:h-10 sm:w-auto sm:px-4"
           >
             <ArrowLeft className="h-4 w-4" />
-            <span className="sr-only sm:not-sr-only sm:ml-2">Retour</span>
+            <span className="sr-only sm:not-sr-only sm:ml-2">{t('common.back')}</span>
           </Button>
           <div className="min-w-0 flex-1">
             <h1 className="from-primary via-accent to-tech-purple truncate bg-gradient-to-r bg-clip-text text-xl font-bold text-transparent drop-shadow-sm sm:text-2xl md:text-4xl">
-              <span className="hidden sm:inline">Gestion des Ressources Humaines</span>
-              <span className="sm:hidden">RH</span>
+              <span className="hidden sm:inline">{t('hr.title')}</span>
+              <span className="sm:hidden">{t('hr.titleShort')}</span>
             </h1>
             <p className="text-muted-foreground mt-0.5 truncate text-xs font-medium sm:text-sm md:text-lg">
-              <span className="hidden sm:inline">Module complet de gestion RH</span>
-              <span className="sm:hidden">Gestion RH</span>
+              <span className="hidden sm:inline">{t('hr.subtitle')}</span>
+              <span className="sm:hidden">{t('hr.subtitleShort')}</span>
             </p>
           </div>
         </div>
@@ -217,42 +231,42 @@ const HRPage = () => {
               className="flex shrink-0 items-center gap-2 px-3 whitespace-nowrap sm:px-4"
             >
               <Building className="h-4 w-4" />
-              <span className="hidden sm:inline">Dashboard</span>
+              <span className="hidden sm:inline">{t('hr.dashboard')}</span>
             </TabsTrigger>
             <TabsTrigger
               value="personnel"
               className="flex shrink-0 items-center gap-2 px-3 whitespace-nowrap sm:px-4"
             >
               <Users className="h-4 w-4" />
-              <span className="hidden sm:inline">Personnel</span>
+              <span className="hidden sm:inline">{t('hr.personnel')}</span>
             </TabsTrigger>
             <TabsTrigger
               value="performance"
               className="flex shrink-0 items-center gap-2 px-3 whitespace-nowrap sm:px-4"
             >
               <TrendingUp className="h-4 w-4" />
-              <span className="hidden sm:inline">Performance</span>
+              <span className="hidden sm:inline">{t('hr.performance')}</span>
             </TabsTrigger>
             <TabsTrigger
               value="operations"
               className="flex shrink-0 items-center gap-2 px-3 whitespace-nowrap sm:px-4"
             >
               <Clock className="h-4 w-4" />
-              <span className="hidden sm:inline">Opérations</span>
+              <span className="hidden sm:inline">{t('hr.operations')}</span>
             </TabsTrigger>
             <TabsTrigger
               value="development"
               className="flex shrink-0 items-center gap-2 px-3 whitespace-nowrap sm:px-4"
             >
               <BookOpen className="h-4 w-4" />
-              <span className="hidden sm:inline">Développement</span>
+              <span className="hidden sm:inline">{t('hr.development')}</span>
             </TabsTrigger>
             <TabsTrigger
               value="safety"
               className="flex shrink-0 items-center gap-2 px-3 whitespace-nowrap sm:px-4"
             >
               <Shield className="h-4 w-4" />
-              <span className="hidden sm:inline">Sécurité</span>
+              <span className="hidden sm:inline">{t('hr.safety')}</span>
             </TabsTrigger>
           </TabsList>
         </div>
@@ -271,48 +285,59 @@ const HRPage = () => {
           className="m-0 data-[state=active]:mt-2 sm:data-[state=active]:mt-3"
         >
           <div className="space-y-4 sm:space-y-6">
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button
-                variant={activeSubTab.employees === 'management' ? 'default' : 'outline'}
-                onClick={() => setActiveSubTab(prev => ({ ...prev, employees: 'management' }))}
+                variant={!showFormer && activeSubTab.employees === 'management' ? 'default' : 'outline'}
+                onClick={() => { setShowFormer(false); setActiveSubTab(prev => ({ ...prev, employees: 'management' })); }}
                 className="h-10 flex-1 text-xs sm:h-auto sm:text-sm"
               >
                 <Users className="mr-1.5 h-4 w-4 sm:mr-2" />
-                <span className="hidden sm:inline">Gestion </span>Employés
+                <span className="hidden sm:inline">{t('hr.management')} </span>{t('hr.employees')}
               </Button>
               <Button
-                variant={activeSubTab.employees === 'departments' ? 'default' : 'outline'}
-                onClick={() => setActiveSubTab(prev => ({ ...prev, employees: 'departments' }))}
+                variant={!showFormer && activeSubTab.employees === 'departments' ? 'default' : 'outline'}
+                onClick={() => { setShowFormer(false); setActiveSubTab(prev => ({ ...prev, employees: 'departments' })); }}
                 className="h-10 flex-1 text-xs sm:h-auto sm:text-sm"
               >
                 <Building className="mr-1.5 h-4 w-4 sm:mr-2" />
-                Départ.
+                {t('hr.departments')}
               </Button>
               <Button
-                variant={activeSubTab.employees === 'hierarchy' ? 'default' : 'outline'}
-                onClick={() => setActiveSubTab(prev => ({ ...prev, employees: 'hierarchy' }))}
+                variant={!showFormer && activeSubTab.employees === 'hierarchy' ? 'default' : 'outline'}
+                onClick={() => { setShowFormer(false); setActiveSubTab(prev => ({ ...prev, employees: 'hierarchy' })); }}
                 className="h-10 flex-1 text-xs sm:h-auto sm:text-sm"
               >
                 <TrendingUp className="mr-1.5 h-4 w-4 sm:mr-2" />
-                Organigramme
+                {t('hr.orgChart')}
               </Button>
               <Button
-                variant={activeSubTab.employees === 'config' ? 'default' : 'outline'}
-                onClick={() => setActiveSubTab(prev => ({ ...prev, employees: 'config' }))}
+                variant={!showFormer && activeSubTab.employees === 'config' ? 'default' : 'outline'}
+                onClick={() => { setShowFormer(false); setActiveSubTab(prev => ({ ...prev, employees: 'config' })); }}
                 className="h-10 flex-1 text-xs sm:h-auto sm:text-sm"
               >
                 <Shield className="mr-1.5 h-4 w-4 sm:mr-2" />
-                Config.
+                {t('hr.config')}
+              </Button>
+              {/* Onglet Anciens Employés */}
+              <Button
+                variant={showFormer ? 'default' : 'outline'}
+                onClick={() => setShowFormer(true)}
+                className="h-10 flex-1 border-red-500/30 text-xs hover:bg-red-500/10 sm:h-auto sm:text-sm"
+                style={showFormer ? { backgroundColor: 'rgb(239 68 68)', color: 'white' } : {}}
+              >
+                <UserX className="mr-1.5 h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Anciens </span>Employés
               </Button>
             </div>
 
             <div className="modern-card transition-smooth hover-glow rounded-xl">
-              {activeSubTab.employees === 'management' && (
+              {!showFormer && activeSubTab.employees === 'management' && (
                 <EnhancedEmployeeManagementWithSuspense />
               )}
-              {activeSubTab.employees === 'departments' && <DepartmentManagementWithSuspense />}
-              {activeSubTab.employees === 'hierarchy' && <OrganizationChartWithSuspense />}
-              {activeSubTab.employees === 'config' && <HierarchyConfigWithSuspense />}
+              {!showFormer && activeSubTab.employees === 'departments' && <DepartmentManagementWithSuspense />}
+              {!showFormer && activeSubTab.employees === 'hierarchy' && <OrganizationChartWithSuspense />}
+              {!showFormer && activeSubTab.employees === 'config' && <HierarchyConfigWithSuspense />}
+              {showFormer && <FormerEmployeesWithSuspense />}
             </div>
           </div>
         </TabsContent>
@@ -339,7 +364,7 @@ const HRPage = () => {
                 className="h-10 justify-start text-xs sm:min-w-32 sm:flex-1 sm:justify-center sm:text-sm"
               >
                 <Users className="mr-1.5 h-4 w-4" />
-                <span className="truncate">Onboarding</span>
+                <span className="truncate">{t('hr.onboarding')}</span>
               </Button>
               <Button
                 variant={activeSubTab.operations === 'leaves' ? 'default' : 'outline'}
@@ -347,7 +372,7 @@ const HRPage = () => {
                 className="h-10 justify-start text-xs sm:min-w-32 sm:flex-1 sm:justify-center sm:text-sm"
               >
                 <Calendar className="mr-1.5 h-4 w-4" />
-                <span className="truncate">Congés</span>
+                <span className="truncate">{t('hr.leaves')}</span>
               </Button>
               <Button
                 variant={activeSubTab.operations === 'time' ? 'default' : 'outline'}
@@ -355,7 +380,7 @@ const HRPage = () => {
                 className="h-10 justify-start text-xs sm:min-w-32 sm:flex-1 sm:justify-center sm:text-sm"
               >
                 <Clock className="mr-1.5 h-4 w-4" />
-                <span className="truncate">Temps</span>
+                <span className="truncate">{t('hr.time')}</span>
               </Button>
               <Button
                 variant={activeSubTab.operations === 'expenses' ? 'default' : 'outline'}
@@ -363,7 +388,7 @@ const HRPage = () => {
                 className="h-10 justify-start text-xs sm:min-w-32 sm:flex-1 sm:justify-center sm:text-sm"
               >
                 <Building className="mr-1.5 h-4 w-4" />
-                <span className="truncate">Frais</span>
+                <span className="truncate">{t('hr.expenses')}</span>
               </Button>
               <Button
                 variant={activeSubTab.operations === 'payroll' ? 'default' : 'outline'}
@@ -371,7 +396,7 @@ const HRPage = () => {
                 className="h-10 justify-start text-xs sm:min-w-32 sm:flex-1 sm:justify-center sm:text-sm"
               >
                 <TrendingUp className="mr-1.5 h-4 w-4" />
-                <span className="truncate">Paie</span>
+                <span className="truncate">{t('hr.payroll')}</span>
               </Button>
             </div>
 
@@ -386,7 +411,7 @@ const HRPage = () => {
                       className="h-10 flex-1 text-xs sm:min-w-32 sm:text-sm"
                     >
                       <Calendar className="mr-1.5 h-4 w-4" />
-                      Demandes
+                      {t('hr.requests')}
                     </Button>
                     <Button
                       variant={activeSubTab.leaves === 'balances' ? 'default' : 'outline'}
@@ -394,7 +419,7 @@ const HRPage = () => {
                       className="h-10 flex-1 text-xs sm:min-w-32 sm:text-sm"
                     >
                       <Clock className="mr-1.5 h-4 w-4" />
-                      Soldes
+                      {t('hr.balances')}
                     </Button>
                     <Button
                       variant={activeSubTab.leaves === 'types' ? 'default' : 'outline'}
@@ -402,7 +427,7 @@ const HRPage = () => {
                       className="h-10 flex-1 text-xs sm:min-w-32 sm:text-sm"
                     >
                       <Building className="mr-1.5 h-4 w-4" />
-                      Types
+                      {t('hr.types')}
                     </Button>
                   </div>
                   <div>
@@ -421,7 +446,7 @@ const HRPage = () => {
                       className="h-10 flex-1 text-xs sm:text-sm"
                     >
                       <Clock className="mr-1.5 h-4 w-4" />
-                      Présences
+                      {t('hr.attendance')}
                     </Button>
                     <Button
                       variant={activeSubTab.time === 'timesheets' ? 'default' : 'outline'}
@@ -429,8 +454,8 @@ const HRPage = () => {
                       className="h-10 flex-1 text-xs sm:text-sm"
                     >
                       <Calendar className="mr-1.5 h-4 w-4" />
-                      <span className="hidden sm:inline">Feuilles de temps</span>
-                      <span className="sm:hidden">Temps</span>
+                      <span className="hidden sm:inline">{t('hr.timesheets')}</span>
+                      <span className="sm:hidden">{t('hr.timesheetsShort')}</span>
                     </Button>
                   </div>
                   <div>
@@ -457,7 +482,7 @@ const HRPage = () => {
                 className="h-10 flex-1 text-xs sm:h-auto sm:text-sm"
               >
                 <TrendingUp className="mr-1.5 h-4 w-4 sm:mr-2" />
-                <span className="hidden sm:inline">Compétences & </span>Formation
+                <span className="hidden sm:inline">{t('hr.skills')} </span>{t('hr.skillsShort')}
               </Button>
             </div>
 

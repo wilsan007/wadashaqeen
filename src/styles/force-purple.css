@@ -1,77 +1,59 @@
-/* CSS D'URGENCE - FORCE LE VIOLET SUR TOUT */
+/*
+  REFACTORED: Ancien fichier d'urgence avec des hex hardcodés (#667eea, #764ba2).
+  Toutes les couleurs utilisent maintenant les tokens CSS du design system.
 
-/* Sélecteurs ultra-agressifs pour forcer le violet */
+  Les valeurs originales correspondaient approximativement à :
+    #667eea  = indigo-500 ~ hsl(239 84% 67%)  => var(--tech-purple) en dark
+    #764ba2  = purple-700 ~ hsl(272 49% 46%)  => var(--primary) en dark
+  Ces couleurs sont maintenant pilotées par --primary (violet en dark mode).
+
+  IMPORTANT: Ce fichier ne doit plus utiliser de !important à grande échelle.
+  Les règles ci-dessous sont limitées aux cas où le contexte DOM impose le
+  ciblage par classe utilitaire agressive (sticky headers dans action-table).
+*/
+
+/* En-têtes de table action - gradient depuis les tokens design system */
 *[class*='action-header'],
-*[class*='action-table'],
-div[style*='position: sticky'],
-div[style*='z-index: 95'],
-div[style*='backdrop-filter: blur'],
-.action-table-container > div,
-.action-table-container div:first-child,
 .action-table-container > div:first-child,
-[class*='action-table-container'] > div,
-[class*='action-table-container'] div:first-child {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-  background-color: #667eea !important;
-  background-image: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-  border-bottom: 2px solid rgba(102, 126, 234, 0.4) !important;
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2) !important;
+.action-table-container > div:nth-child(1),
+.action-header-fixed {
+  background: linear-gradient(
+    135deg,
+    hsl(var(--primary)),
+    hsl(var(--tech-purple))
+  ) !important;
+  border-bottom: 2px solid hsl(var(--primary) / 0.4) !important;
+  box-shadow: 0 4px 12px hsl(var(--primary) / 0.2) !important;
 }
 
-/* Force sur tous les en-têtes de table */
+/* Texte dans les en-têtes */
 *[class*='action'] th,
 *[class*='action'] thead th,
-*[class*='action'] .action-header-cell,
 .action-table-container th,
-.action-table-container thead th,
-.action-table-container table th,
-.action-table-container .action-header-cell {
-  color: #ffffff !important;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.4) !important;
+.action-table-container thead th {
+  color: hsl(var(--primary-foreground)) !important;
+  text-shadow: 0 1px 3px hsl(var(--foreground) / 0.4) !important;
   font-weight: 700 !important;
   background: transparent !important;
 }
 
-/* Sélecteur par attribut style */
+/* Éléments avec attributs style inline correspondant aux anciens gradients */
 div[style*='linear-gradient(135deg, #4facfe'],
 div[style*='linear-gradient(135deg, #f093fb'] {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-  border-bottom: 2px solid rgba(102, 126, 234, 0.4) !important;
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2) !important;
+  background: linear-gradient(
+    135deg,
+    hsl(var(--primary)),
+    hsl(var(--tech-purple))
+  ) !important;
+  border-bottom: 2px solid hsl(var(--primary) / 0.4) !important;
+  box-shadow: 0 4px 12px hsl(var(--primary) / 0.2) !important;
 }
 
-/* Force absolue sur les conteneurs React */
-[data-testid*='action'],
-[data-component*='action'],
-.action-header-fixed,
-div.action-header-fixed,
-span.action-header-fixed {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-  border-bottom: 2px solid rgba(102, 126, 234, 0.4) !important;
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2) !important;
-}
-
-/* Sélecteur par position dans le DOM */
-.action-table-container > *:first-child,
-.action-table-container > div:first-child,
-.action-table-container > div:nth-child(1) {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-  border-bottom: 2px solid rgba(102, 126, 234, 0.4) !important;
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2) !important;
-}
-
-/* Force sur les éléments avec flex */
-div[style*='flex-shrink: 0'] {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-  border-bottom: 2px solid rgba(102, 126, 234, 0.4) !important;
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2) !important;
-}
-
-/* Dernière chance - sélecteur universel dans le contexte */
+/* Variable CSS utilitaire pour les sous-composants */
 .action-table-container * {
-  --action-bg: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --action-bg: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--tech-purple)));
 }
 
 .action-table-container div[style] {
-  background: var(--action-bg, linear-gradient(135deg, #667eea 0%, #764ba2 100%)) !important;
+  background: var(--action-bg, linear-gradient(135deg, hsl(var(--primary)), hsl(var(--tech-purple)))) !important;
 }

@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useRef } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -62,6 +63,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { useTranslation } from '@/hooks/useTranslation';
 
 interface NewEmployee {
   full_name: string;
@@ -103,34 +105,30 @@ export function EnhancedEmployeeManagement() {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const { toast } = useToast();
   const isMobile = useIsMobile();
+  const { t } = useTranslation();
 
-  // Fetch departments separately since useHRMinimal doesn't export them
-  const [departments, setDepartments] = useState<any[]>([]);
-  const [hierarchyLevels, setHierarchyLevels] = useState<any[]>([]);
+  // Fetch departments via useQuery
+  const { data: departments = [] } = useQuery<any[]>({
+    queryKey: ['departments'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('departments').select('*');
+      if (error) throw error;
+      return data || [];
+    },
+  });
 
-  useEffect(() => {
-    const fetchDepartments = async () => {
-      const { data } = await supabase.from('departments').select('*');
-      if (data) setDepartments(data);
-    };
-
-    const fetchLevels = async () => {
-      const { data: session } = await supabase.auth.getSession();
-      if (!session.session?.user) return;
-
-      // Get tenant_id from user metadata or context would be better, but let's query levels directly
-      // The RLS will filter for us anyway based on auth.
-      const { data } = await supabase
-        .from('organization_levels')
+  // Fetch hierarchy levels via useQuery (RLS filters by auth)
+  const { data: hierarchyLevels = [] } = useQuery<any[]>({
+    queryKey: ['organization_levels'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('organization_levels' as any)
         .select('*')
         .order('rank_order', { ascending: true });
-
-      if (data) setHierarchyLevels(data);
-    };
-
-    fetchDepartments();
-    fetchLevels();
-  }, []);
+      if (error) throw error;
+      return data || [];
+    },
+  });
 
   const [newEmployee, setNewEmployee] = useState({
     full_name: '',
@@ -144,25 +142,21 @@ export function EnhancedEmployeeManagement() {
     role_id: '', // Will store selected role ID
   });
 
-  // Roles state
-  const [roles, setRoles] = useState<Array<{ id: string; name: string; display_name: string }>>([]);
   const DEFAULT_EMPLOYEE_ROLE_ID = '3733965a-d485-4cdc-87a4-ae8f5abc5cd9';
 
-  // Fetch roles
-  useEffect(() => {
-    const fetchRoles = async () => {
+  // Fetch roles via useQuery
+  const { data: roles = [] } = useQuery<Array<{ id: string; name: string; display_name: string }>>({
+    queryKey: ['roles_non_admin'],
+    queryFn: async () => {
       const { data, error } = await supabase
         .from('roles')
         .select('id, name, display_name')
         .not('name', 'in', '(tenant_admin,admin)')
         .order('display_name');
-
-      if (data && !error) {
-        setRoles(data);
-      }
-    };
-    fetchRoles();
-  }, []);
+      if (error) throw error;
+      return data || [];
+    },
+  });
 
   // Import Excel Logic
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -398,13 +392,13 @@ export function EnhancedEmployeeManagement() {
   const getStatusLabel = (status: string | null) => {
     switch (status) {
       case 'active':
-        return 'Actif';
+        return t('hrAdvanced.employee.statusActive');
       case 'inactive':
-        return 'Inactif';
+        return t('hrAdvanced.employee.statusInactive');
       case 'on_leave':
-        return 'En congé';
+        return t('hrAdvanced.employee.statusOnLeave');
       default:
-        return 'Non défini';
+        return t('hrAdvanced.employee.noDefined');
     }
   };
 
@@ -430,21 +424,21 @@ export function EnhancedEmployeeManagement() {
               {employee.full_name}
             </h3>
             <p className="text-muted-foreground truncate text-sm font-medium">
-              {employee.job_title || 'Poste non défini'}
+              {employee.job_title || t('hrAdvanced.employee.noJobTitle')}
             </p>
             <p className="text-muted-foreground mt-0.5 text-xs">
-              {departments?.find(d => d.id === employee.department_id)?.name || 'Sans département'}
+              {departments?.find(d => d.id === employee.department_id)?.name || t('hrAdvanced.employee.noDeptSelected')}
             </p>
           </div>
           <Badge
             className={cn(
               'flex-shrink-0 font-semibold shadow-lg transition-all duration-300',
               employee.status === 'active' &&
-                'bg-gradient-to-r from-emerald-500 to-green-500 text-white hover:shadow-emerald-500/50',
+              'bg-gradient-to-r from-emerald-500 to-green-500 text-white hover:shadow-emerald-500/50',
               employee.status === 'inactive' &&
-                'bg-gradient-to-r from-gray-500 to-slate-500 text-white hover:shadow-gray-500/50',
+              'bg-gradient-to-r from-gray-500 to-slate-500 text-white hover:shadow-gray-500/50',
               employee.status === 'on_leave' &&
-                'bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:shadow-amber-500/50'
+              'bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:shadow-amber-500/50'
             )}
           >
             {getStatusLabel(employee.status)}
@@ -464,7 +458,7 @@ export function EnhancedEmployeeManagement() {
           )}
           <div className="flex items-center gap-2 text-sm">
             <Briefcase className="h-3.5 w-3.5 flex-shrink-0 text-cyan-500" />
-            <span>{employee.contract_type || 'Type non défini'}</span>
+            <span>{employee.contract_type || t('hrAdvanced.employee.noContract')}</span>
           </div>
         </div>
 
@@ -479,14 +473,14 @@ export function EnhancedEmployeeManagement() {
             }}
           >
             <Eye className="mr-2 h-4 w-4" />
-            Détails
+            {t('hrAdvanced.employee.btnDetails')}
           </Button>
           <Button
             size="sm"
             className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow-lg shadow-purple-500/30 transition-all duration-300 hover:from-purple-700 hover:to-blue-700"
           >
             <Edit className="mr-2 h-4 w-4" />
-            Modifier
+            {t('hrAdvanced.employee.btnEdit')}
           </Button>
         </div>
       </CardContent>
@@ -550,10 +544,10 @@ export function EnhancedEmployeeManagement() {
               <div className="rounded-lg bg-white/20 p-2 backdrop-blur-sm">
                 <UserPlus className="h-6 w-6 md:h-7 md:w-7" />
               </div>
-              Employés
+              {t('hr.employees')}
             </h2>
             <p className="relative z-10 mt-2 text-sm text-white/90 md:text-base">
-              Gérez votre effectif et les informations des employés
+              {t('hrAdvanced.employee.subtitle')}
             </p>
           </div>
           <ResponsiveModal open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
@@ -572,24 +566,24 @@ export function EnhancedEmployeeManagement() {
                 className="flex-1 border-purple-200 text-purple-700 hover:bg-purple-50 sm:flex-none"
               >
                 <FileText className="mr-2 h-4 w-4" />
-                Importer Excel
+                {t('hrAdvanced.employee.importExcel')}
               </Button>
               <ResponsiveModalTrigger asChild>
                 <Button className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 text-white shadow-lg shadow-purple-500/30 transition-all duration-300 hover:from-purple-700 hover:to-blue-700 hover:shadow-xl hover:shadow-purple-500/40 sm:flex-none">
                   <UserPlus className="mr-2 h-4 w-4" />
-                  Ajouter un employé
+                  {t('hrAdvanced.employee.addBtn')}
                 </Button>
               </ResponsiveModalTrigger>
             </div>
             <ResponsiveModalContent className="sm:max-w-[600px]">
               <ResponsiveModalHeader>
                 <ResponsiveModalTitle className="bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
-                  Ajouter un nouvel employé
+                  {t('hrAdvanced.employee.addTitle')}
                 </ResponsiveModalTitle>
               </ResponsiveModalHeader>
               <div className="grid gap-4 px-4 py-4 md:px-0">
                 <div className="space-y-2">
-                  <Label htmlFor="fullName">Nom complet</Label>
+                  <Label htmlFor="fullName">{t('auth.fullName')}</Label>
                   <Input
                     id="fullName"
                     value={newEmployee.full_name}
@@ -604,7 +598,7 @@ export function EnhancedEmployeeManagement() {
                 </div>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
+                    <Label htmlFor="email">{t('auth.email')}</Label>
                     <Input
                       id="email"
                       type="email"
@@ -613,10 +607,10 @@ export function EnhancedEmployeeManagement() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="employeeId">ID Employé</Label>
+                    <Label htmlFor="employeeId">{t('hrAdvanced.employee.id')}</Label>
                     <Input
                       id="employeeId"
-                      value="Généré automatiquement"
+                      value={t('hrAdvanced.employee.idAuto')}
                       disabled
                       className="bg-muted text-muted-foreground"
                     />
@@ -648,7 +642,7 @@ export function EnhancedEmployeeManagement() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="role">Rôle</Label>
+                    <Label htmlFor="role">{t('hrAdvanced.employee.role')}</Label>
                     <Select
                       value={newEmployee.role_id}
                       onValueChange={value =>
@@ -659,7 +653,7 @@ export function EnhancedEmployeeManagement() {
                       }
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="Employé (par défaut)" />
+                        <SelectValue placeholder={t('hrAdvanced.employee.defaultRole')} />
                       </SelectTrigger>
                       <SelectContent>
                         {roles.map(role => (
@@ -671,7 +665,7 @@ export function EnhancedEmployeeManagement() {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="jobTitle">Titre du poste</Label>
+                    <Label htmlFor="jobTitle">{t('hrAdvanced.employee.jobTitle')}</Label>
                     <Input
                       id="jobTitle"
                       value={newEmployee.job_title}
@@ -686,7 +680,7 @@ export function EnhancedEmployeeManagement() {
                 </div>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <Label htmlFor="hireDate">Date d'embauche</Label>
+                    <Label htmlFor="hireDate">{t('hrAdvanced.employee.hireDate')}</Label>
                     <Input
                       id="hireDate"
                       type="date"
@@ -700,7 +694,7 @@ export function EnhancedEmployeeManagement() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="contractType">Type de contrat</Label>
+                    <Label htmlFor="contractType">{t('hrAdvanced.employee.contractType')}</Label>
                     <Select
                       value={newEmployee.contract_type}
                       onValueChange={value =>
@@ -708,7 +702,7 @@ export function EnhancedEmployeeManagement() {
                       }
                     >
                       <SelectTrigger>
-                        <SelectValue placeholder="Sélectionner" />
+                        <SelectValue placeholder={t('hrAdvanced.employee.select')} />
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="CDI">CDI</SelectItem>
@@ -720,7 +714,7 @@ export function EnhancedEmployeeManagement() {
                   </div>
                 </div>
                 <Button onClick={handleCreateEmployee} className="mt-4 w-full">
-                  Créer l'employé
+                  {t('hrAdvanced.employee.createBtn')}
                 </Button>
               </div>
             </ResponsiveModalContent>
@@ -732,7 +726,7 @@ export function EnhancedEmployeeManagement() {
           <div className="relative flex-1">
             <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
             <Input
-              placeholder="Rechercher un employé..."
+              placeholder={t('hrAdvanced.employee.search')}
               value={searchTerm}
               onChange={e => setSearchTerm(e.target.value)}
               className="pl-9"
@@ -742,10 +736,10 @@ export function EnhancedEmployeeManagement() {
             <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
               <SelectTrigger>
                 <Building className="mr-2 h-4 w-4" />
-                <SelectValue placeholder="Département" />
+                <SelectValue placeholder={t('hrAdvanced.employee.department')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Tous les départements</SelectItem>
+                <SelectItem value="all">{t('hrAdvanced.employee.allDepartments')}</SelectItem>
                 {departments?.map(dept => (
                   <SelectItem key={dept.id} value={dept.id}>
                     {dept.name}
@@ -756,13 +750,13 @@ export function EnhancedEmployeeManagement() {
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger>
                 <UserCheck className="mr-2 h-4 w-4" />
-                <SelectValue placeholder="Statut" />
+                <SelectValue placeholder={t('hrAdvanced.employee.colStatus')} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Tous les statuts</SelectItem>
-                <SelectItem value="active">Actif</SelectItem>
-                <SelectItem value="inactive">Inactif</SelectItem>
-                <SelectItem value="on_leave">En congé</SelectItem>
+                <SelectItem value="all">{t('hrAdvanced.employee.allStatus')}</SelectItem>
+                <SelectItem value="active">{t('hrAdvanced.employee.statusActive')}</SelectItem>
+                <SelectItem value="inactive">{t('hrAdvanced.employee.statusInactive')}</SelectItem>
+                <SelectItem value="on_leave">{t('hrAdvanced.employee.statusOnLeave')}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -771,12 +765,12 @@ export function EnhancedEmployeeManagement() {
         {/* Employee List */}
         {loading ? (
           <div className="py-12 text-center">
-            <p className="text-muted-foreground">Chargement des employés...</p>
+            <p className="text-muted-foreground">{t('hrAdvanced.employee.loading')}</p>
           </div>
         ) : filteredEmployees.length === 0 ? (
           <Card>
             <CardContent className="py-12 text-center">
-              <p className="text-muted-foreground">Aucun employé trouvé</p>
+              <p className="text-muted-foreground">{t('hrAdvanced.employee.noEmployee')}</p>
             </CardContent>
           </Card>
         ) : isMobile ? (
@@ -792,11 +786,11 @@ export function EnhancedEmployeeManagement() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Employé</TableHead>
-                  <TableHead>Poste & Département</TableHead>
-                  <TableHead>Statut</TableHead>
-                  <TableHead>Contact</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead>{t('hrAdvanced.employee.colEmployee')}</TableHead>
+                  <TableHead>{t('hrAdvanced.employee.colRoleDept')}</TableHead>
+                  <TableHead>{t('hrAdvanced.employee.colStatus')}</TableHead>
+                  <TableHead>{t('hrAdvanced.employee.colContact')}</TableHead>
+                  <TableHead className="text-right">{t('hrAdvanced.employee.colActions')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -1129,8 +1123,8 @@ export function EnhancedEmployeeManagement() {
                           <div className="text-muted-foreground">
                             {selectedEmployee.hire_date
                               ? format(new Date(selectedEmployee.hire_date), 'dd MMMM yyyy', {
-                                  locale: fr,
-                                })
+                                locale: fr,
+                              })
                               : 'Non renseigné'}
                           </div>
                         </div>

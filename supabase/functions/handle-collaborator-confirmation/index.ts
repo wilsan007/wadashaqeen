@@ -1,68 +1,270 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { validateWebhookSecret } from '../_shared/validateWebhook.ts';
 
 declare const Deno: any;
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
-// ===========================================================================
-// FONCTIONS D'AIDE OPTIMALES (identiques à l'autre fichier pour la cohérence)
-// ===========================================================================
-
-/**
- * 🛡️ FIX BUG API : Tente de confirmer l'email via API, ou force via metadonnées.
- */
-async function secureConfirmUser(supabaseClient: any, userId: string, metadataUpdates: any) {
-  const timestamp = new Date().toISOString();
-  let finalError = null;
-
-  // Tentative 1: Standard
-  try {
-    const { error } = await supabaseClient.auth.admin.updateUserById(userId, {
-      email_confirm: true,
-      user_metadata: {
-        ...metadataUpdates,
-        confirmation_method: 'standard',
-        confirmed_at: timestamp,
-      },
-    });
-    if (!error) return { success: true, method: 'standard' };
-    finalError = error;
-  } catch (e) {
-    finalError = e;
-  }
-
-  // Tentative 2: Contournement (Méthode "Force")
-  try {
-    const { error } = await supabaseClient.auth.admin.updateUserById(userId, {
-      user_metadata: {
-        ...metadataUpdates,
-        email_confirmed_automatically: true,
-        simulated_email_confirmed_at: timestamp,
-        confirmation_method: 'forced_metadata',
-        bypass_reason: finalError?.message || 'unknown_error',
-      },
-    });
-    if (error) throw error;
-    return { success: true, method: 'forced_metadata' };
-  } catch (criticalError) {
-    return { success: false, error: criticalError.message };
-  }
+function corsHeaders(origin: string | null) {
+  return {
+    'Access-Control-Allow-Origin': origin ?? '*',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  };
 }
 
-// ===========================================================================
-// EDGE FUNCTION PRINCIPALE : COLLABORATOR CONFIRMATION
-// ===========================================================================
+function respond(
+  body: unknown,
+  status: number,
+  origin: string | null,
+  extra?: HeadersInit
+): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: {
+      ...corsHeaders(origin),
+      'Content-Type': 'application/json',
+      ...extra,
+    },
+  });
+}
 
-serve(async req => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+// ─── Email confirmation helper ────────────────────────────────────────────────
+// Tries standard API first, falls back to metadata flag on known Supabase bug.
+async function confirmEmail(admin: any, userId: string, currentMeta: Record<string, any>) {
+  const ts = new Date().toISOString();
+
+  const { error } = await admin.auth.admin.updateUserById(userId, {
+    email_confirm: true,
+    user_metadata: { ...currentMeta, email_confirmed_at: ts },
+  });
+
+  if (!error) return;
+
+  // Fallback — metadata-only flag (never grants real auth power, purely informational)
+  await admin.auth.admin.updateUserById(userId, {
+    user_metadata: {
+      ...currentMeta,
+      email_confirmed_at: ts,
+      email_confirm_fallback: true,
+    },
+  });
+}
+
+// ─── Main logic (shared between direct-call and webhook modes) ────────────────
+async function processCollaborator(
+  admin: any,
+  userId: string,
+  userEmail: string,
+  userMeta: Record<string, any>,
+  emailAlreadyConfirmed: boolean
+): Promise<Response> {
+  const origin = null; // not used here, caller handles CORS
+
+  if (userMeta?.invitation_type !== 'collaborator') {
+    return respond({ message: 'Ignoré: non collaborateur' }, 200, origin);
   }
 
-  const supabaseAdmin = createClient(
+  // Guard anti-boucle INTELLIGENT : vérifie si CETTE invitation spécifique
+  // a déjà été traitée, et non pas "un quelconque traitement passé".
+  // Cela permet à un user existant d'être re-invité dans un autre tenant.
+  if (
+    userMeta?.processed_collaborator_at &&
+    userMeta?.last_processed_invitation_id &&
+    userMeta.last_processed_invitation_id === userMeta.invitation_id
+  ) {
+    return respond({ message: 'Déjà traité pour cette invitation' }, 200, origin);
+  }
+
+  // 1. Validate invitation — ID en priorité, fallback par email si ID absent
+  let invitation: { id: string; tenant_id: string; full_name: string; role_to_assign: string; department: string | null; job_position: string | null } | null = null;
+
+  if (userMeta.invitation_id) {
+    const { data, error } = await admin
+      .from('invitations')
+      .select('id, tenant_id, full_name, role_to_assign, department, job_position, status')
+      .eq('id', userMeta.invitation_id)
+      .single();
+    if (!error && data) {
+      // ── Anti-double-processing guard ──
+      // If this invitation was already accepted (second call from webhook or retry),
+      // return success immediately without re-inserting anything.
+      if (data.status === 'accepted') {
+        console.log(`[handle-collaborator-confirmation] invitation ${data.id} already accepted — skipping duplicate processing`);
+        return respond({ success: true, message: 'Déjà traité', data: { user_id: userId, tenant_id: data.tenant_id } }, 200, origin);
+      }
+      invitation = data;
+    }
+  }
+
+  if (!invitation) {
+    console.warn(`[handle-collaborator-confirmation] invitation_id introuvable (${userMeta.invitation_id}), fallback email: ${userEmail}`);
+    const { data, error } = await admin
+      .from('invitations')
+      .select('id, tenant_id, full_name, role_to_assign, department, job_position')
+      .eq('email', userEmail)
+      .eq('invitation_type', 'collaborator')
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+    if (error || !data) {
+      throw new Error(`INVITATION_NOT_FOUND: invitation_id=${userMeta.invitation_id}, email=${userEmail}`);
+    }
+    invitation = data;
+    console.log(`[handle-collaborator-confirmation] fallback email réussi — invitation: ${invitation.id}, tenant: ${invitation.tenant_id}`);
+  }
+
+  if (!invitation.tenant_id) {
+    throw new Error('INVALID_INVITATION: tenant_id manquant');
+  }
+
+  // 2. Confirm email if not already done (webhook mode only — direct mode has an active session)
+  if (!emailAlreadyConfirmed) {
+    await confirmEmail(admin, userId, userMeta);
+  }
+
+  // 3. Resolve role
+  const { data: role, error: roleError } = await admin
+    .from('roles')
+    .select('id, name, display_name')
+    .eq('name', invitation.role_to_assign)
+    .single();
+
+  if (roleError || !role) {
+    throw new Error(`ROLE_NOT_FOUND: '${invitation.role_to_assign}' inexistant`);
+  }
+
+  // 4. employee_id is auto-generated by the DB trigger `set_employee_id`
+  //    (sequence public.employee_id_seq → 'EMP-XXXX').
+  //    No RPC needed — just omit employee_id from the INSERT.
+
+  // 5. Create profile — vérifier l'existence avant d'insérer
+  // Un user peut avoir un profil dans un AUTRE tenant (compte multi-invitation).
+  // On ne crée le profil que s'il n'existe pas encore dans CE tenant spécifique.
+  const { data: existingProfile } = await admin
+    .from('profiles')
+    .select('id, tenant_id')
+    .eq('user_id', userId)
+    .eq('tenant_id', invitation.tenant_id)
+    .maybeSingle();
+
+  if (!existingProfile) {
+    const { error: profileError } = await admin.from('profiles').insert({
+      user_id: userId,
+      tenant_id: invitation.tenant_id,
+      full_name: invitation.full_name,
+      email: userEmail,
+      role: role.name,
+      contract_type: 'CDI',
+      weekly_hours: 35,
+    });
+
+    if (profileError) {
+      throw new Error(`DB_PROFILE_ERROR: ${profileError.message}`);
+    }
+  } else {
+    // Le profil existe déjà dans ce tenant (réinvitation) — mettre à jour le rôle
+    const { error: updateProfileError } = await admin
+      .from('profiles')
+      .update({ role: role.name, updated_at: new Date().toISOString() })
+      .eq('user_id', userId)
+      .eq('tenant_id', invitation.tenant_id);
+
+    if (updateProfileError) {
+      console.error('⚠️ profile update:', updateProfileError.message);
+    }
+  }
+
+  // 6. Create employee record — employee_id is auto-generated by DB trigger.
+  //    upsert on user_id+tenant_id (constraint added by migration 20260605000001)
+  const { data: empData, error: empError } = await admin.from('employees').upsert(
+    {
+      user_id: userId,
+      // employee_id intentionally omitted — DB trigger set_employee_id fills it
+      full_name: invitation.full_name,
+      email: userEmail,
+      job_title: invitation.job_position ?? 'Collaborateur',
+      department_id: invitation.department ?? null,
+      hire_date: new Date().toISOString().split('T')[0],
+      contract_type: 'CDI',
+      weekly_hours: 35,
+      status: 'active',
+      tenant_id: invitation.tenant_id,
+    },
+    { onConflict: 'user_id,tenant_id', ignoreDuplicates: true }
+  ).select('employee_id').maybeSingle();
+
+  if (empError) {
+    console.error('⚠️ employees upsert:', empError.message);
+    // Non-fatal: continue even if employee record fails
+  }
+
+  const employeeId = empData?.employee_id ?? 'auto-generated';
+
+  // 7. Assign role — upsert to avoid duplicate user_roles entries
+  // onConflict uses constraint (user_id, role_id, tenant_id) added by migration 20260605000001
+  const { error: roleAssignError } = await admin.from('user_roles').upsert(
+    {
+      user_id: userId,
+      role_id: role.id,
+      context_type: 'global',
+      context_id: invitation.tenant_id,
+      assigned_at: new Date().toISOString(),
+      is_active: true,
+      tenant_id: invitation.tenant_id,
+    },
+    { onConflict: 'user_id,role_id,tenant_id', ignoreDuplicates: true }
+  );
+
+  if (roleAssignError) {
+    console.error('⚠️ user_roles upsert:', roleAssignError.message);
+    // Non-fatal: continue even if role assignment fails
+  }
+
+  // 8. Marquer comme traité (anti-boucle) — stocker l'invitation_id traitée
+  // pour différencier une re-invitation future d'un retraitement de la même invitation
+  await admin.auth.admin.updateUserById(userId, {
+    user_metadata: {
+      ...userMeta,
+      processed_collaborator_at:    new Date().toISOString(),
+      last_processed_invitation_id: invitation.id,
+      employee_id: employeeId,
+    },
+  });
+
+  await admin.from('invitations').update({ status: 'accepted' }).eq('id', invitation.id);
+
+  console.log(`✅ Collaborateur configuré: user=${userId}, tenant=${invitation.tenant_id}, employee_id=${employeeId}`);
+
+  return respond(
+    {
+      success: true,
+      message: 'Collaborateur configuré avec succès',
+      data: {
+        user_id: userId,
+        tenant_id: invitation.tenant_id,
+        employee_id: employeeId,
+        role: role.display_name,
+      },
+    },
+    200,
+    origin
+  );
+}
+
+// ─── Entry point ──────────────────────────────────────────────────────────────
+serve(async req => {
+  const origin = req.headers.get('origin');
+
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders(origin) });
+  }
+
+  if (req.method !== 'POST') {
+    return respond({ error: 'Method Not Allowed' }, 405, origin);
+  }
+
+  const admin = createClient(
     Deno.env.get('SUPABASE_URL') ?? '',
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
     { auth: { autoRefreshToken: false, persistSession: false } }
@@ -70,187 +272,79 @@ serve(async req => {
 
   try {
     const payload = await req.json();
-    const user = payload.record;
 
-    // 1. VÉRIFICATION DU CONTEXTE (ANTI-BOUCLE)
-    if (payload.type !== 'UPDATE' || payload.table !== 'users') {
-      return new Response(JSON.stringify({ message: 'Événement ignoré' }), {
-        headers: corsHeaders,
-      });
-    }
+    let userId: string;
+    let userEmail: string;
+    let userMeta: Record<string, any>;
+    let emailAlreadyConfirmed: boolean;
 
-    const meta = user.raw_user_meta_data;
-    const isCollaborator = meta?.invitation_type === 'collaborator';
+    // ── Mode A: Direct call from AuthCallback (has Authorization + user_id in body) ──
+    if (payload.user_id) {
+      const authHeader = req.headers.get('Authorization');
+      if (!authHeader) return respond({ error: 'Non autorisé' }, 401, origin);
 
-    if (!isCollaborator) {
-      return new Response(JSON.stringify({ message: 'Ignoré: Pas un collaborateur' }), {
-        headers: corsHeaders,
-      });
-    }
+      const accessToken = authHeader.replace('Bearer ', '').trim();
+      const { data: { user: caller }, error: authError } = await admin.auth.getUser(accessToken);
 
-    // Protection anti-boucle
-    if (meta.processed_collaborator_at) {
-      return new Response(JSON.stringify({ message: 'Déjà traité' }), { headers: corsHeaders });
-    }
+      if (authError || !caller) return respond({ error: 'Token invalide' }, 401, origin);
 
-    // 2. VÉRIFICATION DE L'INVITATION
-    const { data: pendingInvitation, error: inviteError } = await supabaseAdmin
-      .from('invitations')
-      .select('id, tenant_id, full_name, role_to_assign, department, job_position, metadata')
-      .eq('id', meta.invitation_id)
-      .single();
-
-    if (inviteError || !pendingInvitation) {
-      throw new Error(`INVITATION_NOT_FOUND: ${inviteError?.message || 'ID non trouvé.'}`);
-    }
-
-    // 3. VALIDATION SÉCURITAIRE
-    // Validation minimale pour un collaborateur :
-    if (meta.invitation_type !== 'collaborator' || !pendingInvitation.tenant_id) {
-      throw new Error('INVALID_METADATA: Les métadonnées sont incomplètes ou incorrectes.');
-    }
-
-    // 4. CONFIRMATION EMAIL (FIX BUG API - Même logique que l'Owner)
-    let isConfirmed = user.email_confirmed_at || meta.email_confirmed_automatically;
-
-    if (!isConfirmed) {
-      const confirmResult = await secureConfirmUser(supabaseAdmin, user.id, meta);
-
-      if (!confirmResult.success) {
-        throw new Error(
-          `EMAIL_CONFIRMATION_FAILED: ${confirmResult.error}. L'utilisateur est bloqué.`
-        );
+      // Security: the caller can only act on their own account
+      if (caller.id !== payload.user_id) {
+        return respond({ error: 'Identité non concordante' }, 403, origin);
       }
-      user.email_confirmed_at = new Date().toISOString();
+
+      userId = caller.id;
+      userEmail = caller.email!;
+      userMeta = caller.user_metadata ?? {};
+      // User has a valid session → email is confirmed by Supabase before session creation
+      emailAlreadyConfirmed = true;
     }
+    // ── Mode B: Supabase DB webhook (type/table/record structure) ──────────────
+    else if (payload.type === 'UPDATE' && payload.table === 'users' && payload.record) {
+      // Accept either:
+      //  a) x-webhook-secret (external DB webhook with WEBHOOK_SECRET configured)
+      //  b) Authorization: Bearer <SERVICE_ROLE_KEY> (internal dispatch from handle-email-confirmation)
+      const authHeader = req.headers.get('Authorization') ?? '';
+      const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+      const webhookSecretHeader = req.headers.get('x-webhook-secret');
+      const expectedSecret = Deno.env.get('WEBHOOK_SECRET');
 
-    // 5. OBTENIR LE RÔLE ID
-    const { data: role, error: roleError } = await supabaseAdmin
-      .from('roles')
-      .select('id, display_name')
-      .eq('name', pendingInvitation.role_to_assign) // Ex: 'manager'
-      .single();
+      const isAuthorizedByServiceKey = serviceKey.length > 0 && authHeader === `Bearer ${serviceKey}`;
+      const isAuthorizedByWebhookSecret = expectedSecret && webhookSecretHeader === expectedSecret;
 
-    if (roleError || !role)
-      throw new Error(`ROLE_NOT_FOUND: Rôle '${pendingInvitation.role_to_assign}' inexistant.`);
-
-    // 6. GÉNÉRATION DE L'EMPLOYEE_ID (FIX RACE CONDITION - RPC)
-    const { data: employeeId, error: seqError } = await supabaseAdmin.rpc('get_next_employee_id');
-    if (seqError || !employeeId)
-      throw new Error(`RPC_ID_ERROR: ${seqError?.message || 'ID non généré.'}`);
-
-    // 7. CRÉATION DU PROFIL (matching production schema exactly)
-    const profileData = {
-      user_id: user.id,
-      tenant_id: pendingInvitation.tenant_id,
-      full_name: pendingInvitation.full_name,
-      email: user.email,
-      role: role.name, // Use the role name fetched earlier
-      contract_type: 'CDI',
-      weekly_hours: 35,
-    };
-
-    const { error: profileError } = await supabaseAdmin.from('profiles').insert(profileData);
-    if (profileError) throw new Error(`DB_PROFILE_ERROR: ${profileError.message}`);
-
-    // [NEW] Create Employee Record
-    console.log('👷 Creating Employee record:', employeeId);
-    const { error: employeeError } = await supabaseAdmin.from('employees').insert({
-      user_id: user.id,
-      employee_id: employeeId,
-      full_name: pendingInvitation.full_name,
-      email: user.email,
-      job_title: pendingInvitation.job_position || 'Collaborateur',
-      department_id: pendingInvitation.department || null,
-      hire_date: new Date().toISOString().split('T')[0],
-      contract_type: 'CDI',
-      weekly_hours: 35,
-      status: 'active',
-      tenant_id: pendingInvitation.tenant_id,
-    });
-
-    if (employeeError) {
-      console.error('❌ Error creating employee:', employeeError);
-      // Non-blocking error
-    } else {
-      console.log('✅ Employee created');
-    }
-
-    // 8. ASSIGNATION DU RÔLE via user_roles
-    const { error: userRoleError } = await supabaseAdmin.from('user_roles').insert({
-      user_id: user.id,
-      role_id: role.id,
-      context_type: 'global',
-      context_id: pendingInvitation.tenant_id,
-      assigned_at: new Date().toISOString(),
-      is_active: true,
-      tenant_id: pendingInvitation.tenant_id,
-    });
-
-    if (userRoleError) {
-      console.error('⚠️ Error assigning role:', userRoleError);
-    }
-
-    // 9. FINALISATION (Marquer comme traité)
-    const { error: finalUpdateError } = await supabaseAdmin.auth.admin.updateUserById(user.id, {
-      user_metadata: {
-        ...meta,
-        processed_collaborator_at: new Date().toISOString(), // Empêche le prochain webhook
-        employee_id: employeeId, // Ajout de l'ID à l'Auth User
-      },
-    });
-    if (finalUpdateError) console.error('⚠️ Erreur mise à jour finale:', finalUpdateError);
-
-    await supabaseAdmin
-      .from('invitations')
-      .update({ status: 'accepted' })
-      .eq('id', pendingInvitation.id);
-
-    // 9. AUTO-CONNEXION (UX OPTIMALE - Ajouté pour parité avec Owner)
-    let sessionData = null;
-    try {
-      const { data: sessionResult, error: sessionError } =
-        await supabaseAdmin.auth.admin.generateLink({
-          type: 'magiclink',
-          email: user.email,
-          options: {
-            // Point de redirection après login
-            redirectTo: `${Deno.env.get('SITE_URL') || 'http://localhost:3000'}/app/dashboard`,
-          },
-        });
-      if (!sessionError && sessionResult.properties?.action_link) {
-        sessionData = {
-          magic_link: sessionResult.properties.action_link,
-        };
+      if (!isAuthorizedByServiceKey && !isAuthorizedByWebhookSecret) {
+        console.error('❌ Mode B: unauthorized — neither service_role JWT nor webhook secret matched');
+        return respond({ error: 'Unauthorized' }, 401, origin);
       }
-    } catch (sessionError) {
-      console.log('⚠️ Erreur création session (non critique):', sessionError);
+
+      const record = payload.record;
+      userId = record.id;
+      userEmail = record.email;
+      userMeta = record.raw_user_meta_data ?? {};
+      emailAlreadyConfirmed = Boolean(record.email_confirmed_at);
+    }
+    // ── Unknown format ─────────────────────────────────────────────────────────
+    else {
+      return respond({ error: 'Format de requête non reconnu' }, 400, origin);
     }
 
-    // 10. RÉPONSE FINALE
-    return new Response(
-      JSON.stringify({
-        success: true,
-        message: 'Collaborateur ajouté avec succès',
-        data: {
-          user_id: user.id,
-          tenant_id: pendingInvitation.tenant_id,
-          employee_id: employeeId,
-          role: role.display_name,
-          session: sessionData, // Contient le magic_link pour l'auto-connexion
-        },
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    const result = await processCollaborator(
+      admin,
+      userId,
+      userEmail,
+      userMeta,
+      emailAlreadyConfirmed
     );
-  } catch (error) {
-    console.error('❌ Erreur globale:', error);
-    return new Response(
-      JSON.stringify({
-        success: false,
-        error: error.message,
-        timestamp: new Date().toISOString(),
-      }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+
+    // Re-attach correct CORS headers to the result from processCollaborator
+    const body = await result.json();
+    return respond(body, result.status, origin);
+  } catch (err: any) {
+    console.error('❌ handle-collaborator-confirmation:', err.message);
+    return respond(
+      { success: false, error: err.message, timestamp: new Date().toISOString() },
+      500,
+      origin
     );
   }
 });
